@@ -1,0 +1,376 @@
+---
+title: "ReconTime"
+output: html_document
+date: "2023-04-05"
+---
+
+#clear
+
+```{r}
+# clear workspace
+rm(list = ls())
+```
+
+# Housekeeping
+
+```{r}
+wd = 'C:/Users/micha.engeser/Documents/GitHub/Reconstructed_time_analysis'
+setwd(wd)
+dir()
+if (!('tidyverse' %in% installed.packages()))
+{install.packages("tidyverse")}
+library(tidyverse)
+
+if (!('dplyr' %in% installed.packages()))
+{install.packages('dplyr')}
+library(dplyr)
+
+if (!('brms' %in% installed.packages()))
+{install.packages('brms')}
+library(brms)
+
+if (!('lme4' %in% installed.packages()))
+{install.packages('lme4')}
+library(lme4)
+
+if (!('lmerTest' %in% installed.packages()))
+{install.packages('lmerTest')}
+library(lmerTest)
+
+if (!('optimx' %in% installed.packages()))
+{install.packages('optimx')}
+library(optimx)
+
+```
+
+# details of subjects  
+
+```{r}
+subNums = c(101, 103)
+ses = 1
+Lab_ID = 'SX'
+task = 'prp'
+```
+
+# loading files
+
+
+```{r}
+count = 0
+sub_ids = NaN
+for (subNum in subNums ){
+count = count + 1
+sub_ids[count] = paste0(Lab_ID, subNum)
+
+sub_folder = paste0('sub-', Lab_ID, subNum)
+ses_folder = paste0('ses-', ses)
+file_name = paste0(sub_folder, '_', ses_folder, '_run-all_task-', task,'_events.csv')
+
+setwd("..")
+parent_dir = getwd()
+setwd(wd)
+file = file.path(parent_dir, 'Reconstructed_time_experiment', 'data', sub_folder, ses_folder, file_name)
+event_table = read.csv(file)
+
+
+# make format consistent
+if ('X' %in% colnames(event_table))
+{event_table$X <- NULL}
+
+colnames(event_table)[which(names(event_table) == "has_repsonse_vis")] <- "has_response_vis"
+colnames(event_table)[which(names(event_table) == "trial_repsonse_vis")] <- "trial_response_vis"
+
+# concatanate the tables
+if ( exists('all_event_table')){
+  all_event_table = rbind(all_event_table, event_table)
+} else {
+  all_event_table = event_table
+}
+}
+```
+
+# apply trial exclusion
+
+```{r}
+
+# remove target trials 
+all_event_table = all_event_table[all_event_table$task_relevance != 'target', ]
+relevant_event_table = all_event_table[all_event_table$task_relevance == 'non-target', ]
+irrelevant_event_table = all_event_table[all_event_table$task_relevance == 'irrelevant', ]
+
+# remove false alarm 
+all_event_table = all_event_table[all_event_table$trial_response_vis != 'fa', ]
+
+# remove RT < 100 ms
+all_event_table = all_event_table[all_event_table$RT_aud > 0.1, ]
+
+# remove incorrect auditory responses
+all_event_table = all_event_table[all_event_table$trial_accuracy_aud == 1, ]
+
+# remove RT > 700 ms
+# all_event_table = all_event_table[all_event_table$RT_aud < 0.7, ]
+
+# remove NaNs from auditory responses
+all_event_table = all_event_table[!is.na(all_event_table$trial_accuracy_aud), ]
+
+
+# sum(is.na(all_event_table$trial_accuracy_aud[all_event_table$SOA_lock == 'offset']), na.rm = TRUE)
+# sum(is.na(all_event_table$trial_accuracy_aud[all_event_table$SOA_lock == 'onset']), na.rm = TRUE)
+
+```
+
+# analysis
+
+```{r}
+
+RT_aud_mean = mean(event_table$RT_aud)
+
+# split by SOA, SOA_lock and task relevance
+task_relevance_lvl = c('non-target', 'irrelevant')
+SOA_lock_lvl = c('onset', 'offset')
+SOA_lvl = c(0,0.116,0.232,0.466)
+duration_lvl = c(0.5,1,1.5)
+sub_id_lvl = sub_ids
+
+# all task relevance
+
+all_data = data.frame(matrix(ncol = 0, nrow = 1))
+
+all_data$sub_id = "NaN"
+all_data$SOA = NaN
+all_data$SOA_lock = "NaN"
+all_data$task_relevance = "NaN"
+all_data$duration = NaN
+all_data$mean_RT = NaN 
+all_data$sd_RT = NaN
+
+all_data = all_data[-c(1), ]
+
+counter = 0
+for (o in sub_id_lvl){
+  for (i in SOA_lvl){
+    for (ii in SOA_lock_lvl) {
+      for (iii in task_relevance_lvl) {
+        for (iv in duration_lvl) {
+          
+          counter = counter + 1 
+          all_data = all_data %>% add_row(sub_id = o, SOA = i, SOA_lock = ii, task_relevance = iii, duration = iv,
+                                          mean_RT = mean(all_event_table$RT_aud[all_event_table$sub_id == o & all_event_table$SOA == i & all_event_table$SOA_lock == ii & all_event_table$task_relevance == iii & all_event_table$duration == iv], na.rm = TRUE),
+                                          sd_RT = sd(all_event_table$RT_aud[all_event_table$sub_id == o & all_event_table$SOA == i & all_event_table$SOA_lock == ii & all_event_table$task_relevance == iii & all_event_table$duration == iv], na.rm = TRUE))
+}}}}}
+
+all_data = all_data[1:(counter), ]
+
+SOA_SOA_lock_data = all_data %>%  group_by(SOA, SOA_lock) %>%
+                                      summarise(mean_RT = mean(mean_RT, na.rm = TRUE),
+                                                         sd_RT = mean(sd_RT, na.rm = TRUE))
+
+SOA_SOA_lock_task_relevance_data = all_data %>%  group_by(SOA, SOA_lock, task_relevance) %>%
+                                      summarise(mean_RT = mean(mean_RT, na.rm = TRUE),
+                                                         sd_RT = mean(sd_RT, na.rm = TRUE))
+
+SOA_duration_data = all_data %>%  group_by(SOA, duration) %>%
+                                      summarise(mean_RT = mean(mean_RT, na.rm = TRUE),
+                                                         sd_RT = mean(sd_RT, na.rm = TRUE))
+
+
+SOA_SOA_lock_duration_data = all_data %>%  group_by(SOA, SOA_lock, duration) %>%
+                                      summarise(mean_RT = mean(mean_RT, na.rm = TRUE),
+                                                         sd_RT = mean(sd_RT, na.rm = TRUE))
+
+all_event_table = all_event_table %>% mutate(log_RT_aud = log(RT_aud))
+
+
+
+```
+# plotting
+
+```{R}
+event_table2 = all_event_table
+event_table2$duration = as.character(event_table2$duration)
+
+hist_1 = ggplot(event_table2, aes(x=RT_aud)) + 
+  geom_histogram(bins = 30) + xlim(c(0,2))
+hist_1
+
+hist_2 = ggplot(event_table2, aes(x=RT_aud, fill=duration)) +
+  geom_histogram(alpha=0.6, position='identity') + xlim(c(0,2))
+hist_2
+
+hist_2_1 = ggplot(event_table2, aes(x = RT_aud)) +
+  geom_histogram(aes(y = after_stat(density), color = duration), fill = "white",position = "identity")+
+  geom_density(aes(color = duration), size = 1) +
+  scale_color_manual(values = c("#868686FF", "#EFC000FF", "#c81616")) + xlim(c(0,2))
+hist_2_1
+
+hist_3 = ggplot(event_table2, aes(x=RT_aud, fill=task_relevance)) +
+  geom_histogram(alpha=0.6, position='identity') + xlim(c(0,2))
+hist_3
+
+hist_3_1 = ggplot(event_table2, aes(x = RT_aud)) +
+  geom_histogram(aes(y = after_stat(density), color = task_relevance), fill = "white",position = "identity")+
+  geom_density(aes(color = task_relevance), size = 1) +
+  scale_color_manual(values = c("#868686FF", "#EFC000FF")) + xlim(c(0,2))
+hist_3_1
+
+hist_4 = ggplot(event_table2, aes(x=RT_aud, fill=SOA_lock)) +
+  geom_histogram(alpha=0.6, position='identity') + xlim(c(0,2))
+hist_4
+
+hist_4_1 = ggplot(event_table2, aes(x = RT_aud)) +
+  geom_histogram(aes(y = after_stat(density), color = SOA_lock), fill = "white",position = "identity")+
+  geom_density(aes(color = SOA_lock), size = 1) +
+  scale_color_manual(values = c("#868686FF", "#EFC000FF")) + xlim(c(0,2))
+hist_4_1
+
+
+p1 = ggplot(data=SOA_SOA_lock_data, aes(x=SOA*1000, y=mean_RT*1000, group=SOA_lock)) +
+  geom_line(aes(linetype = SOA_lock))+
+  geom_point()+
+  ylim(c(400,700))+
+  ylab("Reaction time [ms]")+
+  xlab('SOA [ms]')
+p1
+
+p2 = ggplot(data=SOA_SOA_lock_duration_data, aes(x=SOA*1000, y=mean_RT*1000, group=interaction(as.character(duration), SOA_lock))) +
+  geom_line(aes(color=as.character(duration), linetype = SOA_lock))+
+  geom_point()+
+  ylim(c(400,700))+
+  ylab("Reaction time [ms]")+
+  xlab('SOA [ms]')+
+  scale_color_manual(values=c('red','blue','green'))
+p2
+
+p3 = ggplot(data=SOA_SOA_lock_task_relevance_data, aes(x=SOA*1000, y=mean_RT*1000, group=interaction(task_relevance, SOA_lock))) +
+  geom_line(aes(color=task_relevance, linetype = SOA_lock))+
+  geom_point()+
+  ylim(c(400,700))+
+  ylab("Reaction time [ms]")+
+  xlab('SOA [ms]')+
+  scale_color_manual(values=c('red','blue'))
+p3
+
+```
+
+```{r}
+# box plots 
+box_plot_data = data.frame(matrix(ncol = 0, nrow = 0))
+counter2 = 0
+col_names = "nan"
+
+  for (i in SOA_lock_lvl){
+    for (ii in SOA_lvl) {
+      for (iii in task_relevance_lvl) {
+        for (iv in duration_lvl) {
+                    
+          counter2 = counter2 + 1 
+          col_names[counter2] = paste(i,ii,iii,iv,sep = "_")
+          for (o in 1:length(subNums)){
+
+          box_plot_data[o,counter2] = mean(all_event_table$RT_aud[all_event_table$sub_id == sub_id_lvl[o] & all_event_table$SOA_lock == i & all_event_table$SOA == ii & all_event_table$task_relevance == iii & all_event_table$duration == iv], na.rm = TRUE)
+}}}}}
+
+colnames(box_plot_data) = col_names
+boxplot(box_plot_data,las=2, par(mar=c(15,4,2,2)))
+
+```
+
+# stats
+
+```{r}
+
+# general linear models with  a single fixed effect
+
+model_SOA = glm(RT_aud ~ SOA, data=event_table)
+summary(model_SOA)
+
+model_duration = glm(RT_aud ~ duration, data=event_table)
+summary(model_duration)
+
+model_SOA_lock = glm(RT_aud ~ SOA_lock, data=event_table)
+summary(model_SOA_lock)
+
+model_task_relevance = glm(RT_aud ~ task_relevance, data=event_table)
+summary(model_task_relevance)
+
+# general linear models with fixed effects 
+
+main_model = glm(RT_aud ~ SOA*SOA_lock*duration*task_relevance, family = Gamma(), data=event_table)
+summary(main_model)
+
+# general linear mixed effect model
+
+main_mixed_model = glmer(RT_aud ~ SOA*SOA_lock*duration*task_relevance + (1+SOA+SOA_lock+duration+task_relevance|sub_id), family = Gamma(), data=all_event_table)
+summary(main_mixed_model)
+
+# control model
+
+control_mixed_model = glmer(RT_aud ~ SOA+SOA_lock+duration+task_relevance+category+pitch+orientation+trial_repsonse_vis+ (1+SOA+SOA_lock+duration+task_relevance+category+pitch+orientation+trial_repsonse_vis|sub_id), family = Gamma(), data=all_event_table)
+summary(control_mixed_model)
+
+control_norm_model = lmer(RT_aud ~ SOA+SOA_lock+duration+task_relevance+(1+SOA+SOA_lock+duration+task_relevance|sub_id), data=all_event_table, 
+    control=lmerControl(optimizer="optimx",optCtrl=list(method="nlminb")))
+summary(control_norm_model)
+
+
+pitch_model = glmer(RT_aud ~ pitch+(1 + pitch|sub_id), family = Gamma(), data=all_event_table)
+summary(pitch_model)
+
+# control for pitch 
+
+t.test(all_event_table$RT_aud[all_event_table$pitch == 1000],all_event_table$RT_aud[all_event_table$pitch == 1100])
+
+# bayesian version
+
+library(brms)
+
+brm_SOA_SOA_lock_model = brm(RT_aud ~ SOA*SOA_lock +(1|sub_id), event_table, family=Gamma(),save_all_pars = TRUE)
+summary(brm_SOA_SOA_lock_model )
+confint(brm_SOA_SOA_lock_model )
+
+brm_null_model = brm(RT_aud ~ 1, event_table, family=Gamma(),save_all_pars = TRUE)
+summary(brm_null_model)
+confint(brm_null_model)
+# Calculate the Bayes factor for the model with and without the parameter of interest
+bayes_factor = bayes_factor(brm_SOA_SOA_lock_model , brm_null_model)
+
+
+brm_main_mixed_model = brm(RT_aud ~ SOA*SOA_lock*duration*task_relevance + (1+SOA+SOA_lock+duration+task_relevance|sub_id), family = Gamma(), data=all_event_table)
+summary(brm_main_mixed_model)
+```
+
+power analysis
+````{r}
+if (!('pwr' %in% installed.packages()))
+{install.packages("pwr")}
+library(pwr)
+
+# from marti paper
+f = 47.08
+t = 3.29
+n = 10
+df_num = 5
+df_denom = n - df_num 
+
+# effect size 
+effect_size_t = t * sqrt(1/n)
+
+eta = (f * df_num ) / (f * df_num  + df_denom )
+effect_size_f = sqrt((df_denom/n)*(eta/(1-eta)))
+
+# Specify  desired power, and significance level
+power = 0.80
+alpha = 0.05
+
+# degrees of freedom for the numerator for our analysis 
+u = 4
+
+# Estimate sample size for GLMM with logistic regression
+from_F <- pwr.f2.test(u = u, v = NULL, f2 = effect_size_f, sig.level = alpha, power = power)
+
+```
+(Intercept)               0.516229   0.060345   8.555
+SOA                      -0.149264   0.021116  -7.069
+SOA_lockonset             0.053079   0.027122   1.957
+duration                  0.004461   0.006218   0.717
+task_relevancenon-target  0.031554   0.016313   1.934
