@@ -108,7 +108,7 @@ all_event_table = all_event_table[all_event_table$RT_aud > 0.1, ]
 all_event_table = all_event_table[all_event_table$trial_accuracy_aud == 1, ]
 
 # remove RT > 700 ms
-# all_event_table = all_event_table[all_event_table$RT_aud < 0.7, ]
+#all_event_table = all_event_table[all_event_table$RT_aud < 0.7, ]
 
 # remove NaNs from auditory responses
 all_event_table = all_event_table[!is.na(all_event_table$trial_accuracy_aud), ]
@@ -177,9 +177,14 @@ SOA_duration_data = all_data %>%  group_by(SOA, duration) %>%
 SOA_SOA_lock_duration_data = all_data %>%  group_by(SOA, SOA_lock, duration) %>%
                                       summarise(mean_RT = mean(mean_RT, na.rm = TRUE),
                                                          sd_RT = mean(sd_RT, na.rm = TRUE))
-
+# add log transformed column
 all_event_table = all_event_table %>% mutate(log_RT_aud = log(RT_aud))
 
+# add response window column 
+all_event_table = all_event_table %>% mutate(resp_window = (2-onset_SOA)+stim_jit )
+
+# add response window column 
+all_event_table = all_event_table %>% mutate(is_nan = is.na(trial_accuracy_aud))
 
 
 ```
@@ -278,21 +283,6 @@ boxplot(box_plot_data,las=2, par(mar=c(15,4,2,2)))
 # stats
 
 ```{r}
-
-# general linear models with  a single fixed effect
-
-model_SOA = glm(RT_aud ~ SOA, data=event_table)
-summary(model_SOA)
-
-model_duration = glm(RT_aud ~ duration, data=event_table)
-summary(model_duration)
-
-model_SOA_lock = glm(RT_aud ~ SOA_lock, data=event_table)
-summary(model_SOA_lock)
-
-model_task_relevance = glm(RT_aud ~ task_relevance, data=event_table)
-summary(model_task_relevance)
-
 # general linear models with fixed effects 
 
 main_model = glm(RT_aud ~ SOA*SOA_lock*duration*task_relevance, family = Gamma(), data=event_table)
@@ -315,6 +305,10 @@ summary(control_norm_model)
 
 pitch_model = glmer(RT_aud ~ pitch+(1 + pitch|sub_id), family = Gamma(), data=all_event_table)
 summary(pitch_model)
+
+
+is_nan_model = glmer(is_nan ~ resp_window*SOA_lock + (1+resp_window+SOA_lock|sub_id), family = binomial(link = "logit"), data=all_event_table)
+summary(is_nan_model)
 
 # control for pitch 
 
