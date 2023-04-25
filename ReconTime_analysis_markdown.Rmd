@@ -46,7 +46,7 @@ library(optimx)
 # details of subjects  
 
 ```{r}
-subNums = c(101, 103)
+subNums = c(101, 102, 103)
 ses = 1
 Lab_ID = 'SX'
 task = 'prp'
@@ -80,6 +80,13 @@ if ('X' %in% colnames(event_table))
 colnames(event_table)[which(names(event_table) == "has_repsonse_vis")] <- "has_response_vis"
 colnames(event_table)[which(names(event_table) == "trial_repsonse_vis")] <- "trial_response_vis"
 
+# add subject number column 
+event_table = event_table %>% mutate(sub_num = subNum)
+
+# make task relevance and SOA lock numeric
+event_table = event_table %>% mutate(is_task_relevant = ifelse(task_relevance == 'non-target',1,0))
+event_table = event_table %>% mutate(is_onset = ifelse(SOA_lock == 'onset',1,0))
+
 # concatanate the tables
 if ( exists('all_event_table')){
   all_event_table = rbind(all_event_table, event_table)
@@ -107,8 +114,11 @@ all_event_table = all_event_table[all_event_table$RT_aud > 0.1, ]
 # remove incorrect auditory responses
 all_event_table = all_event_table[all_event_table$trial_accuracy_aud == 1, ]
 
-# remove RT > 700 ms
-#all_event_table = all_event_table[all_event_table$RT_aud < 0.7, ]
+# remove RT > 3x std
+# all_event_table = all_event_table[all_event_table$RT_aud < mean(all_event_table$RT_aud, na.rm = TRUE) + 3*sd(all_event_table$RT_aud, na.rm = TRUE), ]
+
+# remove RT < 3x std
+all_event_table = all_event_table[all_event_table$RT_aud > mean(all_event_table$RT_aud, na.rm = TRUE) - 3*sd(all_event_table$RT_aud, na.rm = TRUE), ]
 
 # remove NaNs from auditory responses
 all_event_table = all_event_table[!is.na(all_event_table$trial_accuracy_aud), ]
@@ -185,6 +195,8 @@ all_event_table = all_event_table %>% mutate(resp_window = (2-onset_SOA)+stim_ji
 
 # add response window column 
 all_event_table = all_event_table %>% mutate(is_nan = is.na(trial_accuracy_aud))
+
+
 
 
 ```
@@ -339,28 +351,74 @@ if (!('pwr' %in% installed.packages()))
 {install.packages("pwr")}
 library(pwr)
 
+if (!('simr' %in% installed.packages()))
+{install.packages("simr", dependencies =  TRUE)}
+library(simr)
+
+
+
 # from marti paper
 f = 47.08
-t = 3.29
 n = 10
 df_num = 5
-df_denom = n - df_num 
+df_denom = 45
 
 # effect size 
-effect_size_t = t * sqrt(1/n)
-
 eta = (f * df_num ) / (f * df_num  + df_denom )
-effect_size_f = sqrt((df_denom/n)*(eta/(1-eta)))
+effect_size = sqrt((df_denom/n)*(eta/(1-eta)))
 
 # Specify  desired power, and significance level
 power = 0.80
 alpha = 0.05
 
 # degrees of freedom for the numerator for our analysis 
-u = 4
+u = 7
 
 # Estimate sample size for GLMM with logistic regression
-from_F <- pwr.f2.test(u = u, v = NULL, f2 = effect_size_f, sig.level = alpha, power = power)
+from_F <- pwr.f2.test(u = u, v = NULL, f2 = effect_size, sig.level = alpha, power = power)
+
+
+# (v = n - u - 1\). This implies \(n = v + u + 1\).
+
+ ##############################################
+
+main_mixed_model = lmer(RT_aud ~ SOA*is_onset + (1|sub_num), data=all_event_table)
+summary(main_mixed_model)
+
+# Run simulation simr
+
+# Extent data set
+model_extended <- extend(main_mixed_model, along="sub_num", n = 20)
+
+# POWER ANALYSIS WITH SIMR
+powerC <- powerCurve(fit = model_extended, test = fixed("SOA","is_onset"), along = "sub_num", breaks = c(4,5,6))
+   
+print(powerC)
+     
+# RUN SIMULATION mixedpower
+power_FLP <- mixedpower(model = main_mixed_model, data = all_event_table,
+                         fixed_effects = c("SOA", "is_onset"),
+                         simvar = "sub_num", steps = c(5,10,15,20),
+                         critical_value = 2, n_sim = 10)
+
+
+# Data from tutorial 
+#--------
+
+load("Yan_et_al.RData")
+# ------------------------------
+FLPmodel <- lmer(flp ~ word_length * complexity + (1|subject) + (1|sentence),
+                 data = YanData)
+
+summary(FLPmodel, corr = F) # let's have a look!
+
+# ------------------------------------------ #
+# RUN SIMULATION
+power_FLP <- mixedpower(model = FLPmodel, data = YanData,
+                        fixed_effects = c("word_length", "complexity"),
+                        simvar = "subject", steps = c(20,30,40,50,60),
+                        critical_value = 2, n_sim = 10)
+power_FLP 
 
 ```
 (Intercept)               0.516229   0.060345   8.555
