@@ -69,7 +69,7 @@ file_name = paste0(sub_folder, '_', ses_folder, '_run-all_task-', task,'_events.
 setwd("..")
 parent_dir = getwd()
 setwd(wd)
-file = file.path(parent_dir, 'Reconstructed_time_experiment', 'data', sub_folder, ses_folder, file_name)
+file = file.path(parent_dir, 'Reconstructed_time_experiment', 'pilot_data', sub_folder, ses_folder, file_name)
 event_table = read.csv(file)
 
 
@@ -115,7 +115,7 @@ all_event_table = all_event_table[all_event_table$RT_aud > 0.1, ]
 all_event_table = all_event_table[all_event_table$trial_accuracy_aud == 1, ]
 
 # remove RT > 3x std
-# all_event_table = all_event_table[all_event_table$RT_aud < mean(all_event_table$RT_aud, na.rm = TRUE) + 3*sd(all_event_table$RT_aud, na.rm = TRUE), ]
+# all_event_table = all_event_table[all_event_table$RT_aud < mean(all_event_table$RT_aud, na.rm = TRUE) + 4*sd(all_event_table$RT_aud, na.rm = TRUE), ]
 
 # remove RT < 3x std
 all_event_table = all_event_table[all_event_table$RT_aud > mean(all_event_table$RT_aud, na.rm = TRUE) - 3*sd(all_event_table$RT_aud, na.rm = TRUE), ]
@@ -267,6 +267,29 @@ p3 = ggplot(data=SOA_SOA_lock_task_relevance_data, aes(x=SOA*1000, y=mean_RT*100
   scale_color_manual(values=c('red','blue'))
 p3
 
+p4 = ggplot(data=all_data, aes(x=SOA*1000, y=mean_RT*1000, group=interaction(task_relevance, SOA_lock))) +
+  geom_line(aes(color=task_relevance, linetype = SOA_lock))+
+  geom_point()+
+  ylim(c(400,700))+
+  ylab("Reaction time [ms]")+
+  xlab('SOA [ms]')+
+  scale_color_manual(values=c('red','blue'))
+p4
+
+
+onset_data = all_data[all_data$SOA_lock == 'onset', ]
+offset_data = all_data[all_data$SOA_lock == 'offset', ]
+
+
+ggplot(all_data, aes(x=SOA*1000, y=mean_RT*1000, group=interaction(task_relevance, SOA_lock), color=SOA_lock)) + 
+      # add individual lines + data points
+      geom_line (aes(group=interaction(task_relevance, SOA_lock)), linetype = "dashed") +
+      geom_point(size=.5) +
+      # add mean lines + datapoints
+      geom_line (stat="summary", fun.y="mean") +
+      geom_point(stat="summary", fun.y="mean", size=2)
+
+
 ```
 
 ```{r}
@@ -287,8 +310,16 @@ col_names = "nan"
           box_plot_data[o,counter2] = mean(all_event_table$RT_aud[all_event_table$sub_id == sub_id_lvl[o] & all_event_table$SOA_lock == i & all_event_table$SOA == ii & all_event_table$task_relevance == iii & all_event_table$duration == iv], na.rm = TRUE)
 }}}}}
 
+
 colnames(box_plot_data) = col_names
-boxplot(box_plot_data,las=2, par(mar=c(15,4,2,2)))
+boxplot(box_plot_data,las=2, par(mar=c(15,4,2,2)),col=colors)
+
+colors = c(rep("red",3),rep("darkred",3),rep("green",3),rep("darkgreen",3),rep("blue",3),rep("darkblue",3),rep("yellow",3), rep("orange",3))
+
+ggplot(all_data, aes(SOA_lock, mean_RT, fill=interaction(duration, task_relevance, SOA))) +
+  stat_boxplot(geom ='errorbar')+
+  geom_boxplot() +
+  scale_fill_manual(values=colors)
 
 ```
 
@@ -297,12 +328,12 @@ boxplot(box_plot_data,las=2, par(mar=c(15,4,2,2)))
 ```{r}
 # general linear models with fixed effects 
 
-main_model = glm(RT_aud ~ SOA*SOA_lock*duration*task_relevance, family = Gamma(), data=event_table)
+main_model = glm(RT_aud ~ SOA*SOA_lock*duration*task_relevance, family=Gamma(link="log"), data=event_table)
 summary(main_model)
 
 # general linear mixed effect model
 
-main_mixed_model = glmer(RT_aud ~ SOA*SOA_lock*duration*task_relevance + (1+SOA+SOA_lock+duration+task_relevance|sub_id), family = Gamma(), data=all_event_table)
+main_mixed_model = glmer(RT_aud ~ SOA*SOA_lock*duration*task_relevance + (1+SOA+SOA_lock+duration+task_relevance|sub_id), family=Gamma(link="log"), data=all_event_table)
 summary(main_mixed_model)
 
 # control model
@@ -325,11 +356,25 @@ summary(is_nan_model)
 # control for pitch 
 
 t.test(all_event_table$RT_aud[all_event_table$pitch == 1000],all_event_table$RT_aud[all_event_table$pitch == 1100])
+```
 
 # bayesian version
 
-library(brms)
+```{r}
 
+library(brms)
+install.packages("dampack")
+library(dampack)
+
+
+
+# data simulation and priors
+gamma_params = gamma_params(mean(all_event_table$RT_aud, na.rm = TRUE), sd(event_table$RT_aud, na.rm = TRUE), scale = FALSE)
+
+prior1 = rgamma(n=1000,shape=gamma_params$shape,rate=gamma_params$rate)
+
+
+#
 brm_SOA_SOA_lock_model = brm(RT_aud ~ SOA*SOA_lock +(1|sub_id), event_table, family=Gamma(),save_all_pars = TRUE)
 summary(brm_SOA_SOA_lock_model )
 confint(brm_SOA_SOA_lock_model )
@@ -343,22 +388,22 @@ bayes_factor = bayes_factor(brm_SOA_SOA_lock_model , brm_null_model)
 
 brm_main_mixed_model = brm(RT_aud ~ SOA*SOA_lock*duration*task_relevance + (1+SOA+SOA_lock+duration+task_relevance|sub_id), family = Gamma(), data=all_event_table)
 summary(brm_main_mixed_model)
+
+
+
+
 ```
 
-power analysis
+# power analysis
+
 ````{r}
 if (!('pwr' %in% installed.packages()))
 {install.packages("pwr")}
 library(pwr)
 
-if (!('simr' %in% installed.packages()))
-{install.packages("simr", dependencies =  TRUE)}
-library(simr)
-
-
 
 # from marti paper
-f = 47.08
+f =  47.08
 n = 10
 df_num = 5
 df_denom = 45
@@ -372,53 +417,15 @@ power = 0.80
 alpha = 0.05
 
 # degrees of freedom for the numerator for our analysis 
-u = 7
+u = 1
 
 # Estimate sample size for GLMM with logistic regression
-from_F <- pwr.f2.test(u = u, v = NULL, f2 = effect_size, sig.level = alpha, power = power)
+v = pwr.f2.test(u = u, v = , f2 = effect_size/4, sig.level = .05, power = power)$v
 
-
+req_sample_size = ceiling(v + u + 1)
+  
 # (v = n - u - 1\). This implies \(n = v + u + 1\).
 
- ##############################################
-
-main_mixed_model = lmer(RT_aud ~ SOA*is_onset + (1|sub_num), data=all_event_table)
-summary(main_mixed_model)
-
-# Run simulation simr
-
-# Extent data set
-model_extended <- extend(main_mixed_model, along="sub_num", n = 20)
-
-# POWER ANALYSIS WITH SIMR
-powerC <- powerCurve(fit = model_extended, test = fixed("SOA","is_onset"), along = "sub_num", breaks = c(4,5,6))
-   
-print(powerC)
-     
-# RUN SIMULATION mixedpower
-power_FLP <- mixedpower(model = main_mixed_model, data = all_event_table,
-                         fixed_effects = c("SOA", "is_onset"),
-                         simvar = "sub_num", steps = c(5,10,15,20),
-                         critical_value = 2, n_sim = 10)
-
-
-# Data from tutorial 
-#--------
-
-load("Yan_et_al.RData")
-# ------------------------------
-FLPmodel <- lmer(flp ~ word_length * complexity + (1|subject) + (1|sentence),
-                 data = YanData)
-
-summary(FLPmodel, corr = F) # let's have a look!
-
-# ------------------------------------------ #
-# RUN SIMULATION
-power_FLP <- mixedpower(model = FLPmodel, data = YanData,
-                        fixed_effects = c("word_length", "complexity"),
-                        simvar = "subject", steps = c(20,30,40,50,60),
-                        critical_value = 2, n_sim = 10)
-power_FLP 
 
 ```
 (Intercept)               0.516229   0.060345   8.555
