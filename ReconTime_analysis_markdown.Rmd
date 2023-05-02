@@ -46,7 +46,7 @@ library(optimx)
 # details of subjects  
 
 ```{r}
-subNums = c(101, 102, 103)
+subNums = c(101)
 ses = 1
 Lab_ID = 'SX'
 task = 'prp'
@@ -114,11 +114,15 @@ all_event_table = all_event_table[all_event_table$RT_aud > 0.1, ]
 # remove incorrect auditory responses
 all_event_table = all_event_table[all_event_table$trial_accuracy_aud == 1, ]
 
+# remove outliers
+
+# sample_mean = mean(all_event_table$RT_aud, na.rm = TRUE)
+# sample_sd = sd(all_event_table$RT_aud, na.rm = TRUE)
 # remove RT > 3x std
-# all_event_table = all_event_table[all_event_table$RT_aud < mean(all_event_table$RT_aud, na.rm = TRUE) + 4*sd(all_event_table$RT_aud, na.rm = TRUE), ]
+# all_event_table = all_event_table[all_event_table$RT_aud < sample_mean + 4*sample_sd, ]
 
 # remove RT < 3x std
-all_event_table = all_event_table[all_event_table$RT_aud > mean(all_event_table$RT_aud, na.rm = TRUE) - 3*sd(all_event_table$RT_aud, na.rm = TRUE), ]
+# all_event_table = all_event_table[all_event_table$RT_aud > sample_mean - 4*sample_sd, ]
 
 # remove NaNs from auditory responses
 all_event_table = all_event_table[!is.na(all_event_table$trial_accuracy_aud), ]
@@ -126,6 +130,33 @@ all_event_table = all_event_table[!is.na(all_event_table$trial_accuracy_aud), ]
 
 # sum(is.na(all_event_table$trial_accuracy_aud[all_event_table$SOA_lock == 'offset']), na.rm = TRUE)
 # sum(is.na(all_event_table$trial_accuracy_aud[all_event_table$SOA_lock == 'onset']), na.rm = TRUE)
+
+# check if any combination of condition (cell) has too little trials 
+
+task_relevance_lvl = c('non-target', 'irrelevant')
+SOA_lock_lvl = c('onset', 'offset')
+SOA_lvl = c(0,0.116,0.232,0.466)
+duration_lvl = c(0.5,1,1.5)
+sub_id_lvl = sub_ids
+
+
+for (o in sub_id_lvl){
+  for (i in SOA_lvl){
+    for (ii in SOA_lock_lvl) {
+      for (iii in task_relevance_lvl) {
+        for (iv in duration_lvl) {
+          
+          cell_trials = sum(all_event_table$sub_id == o & all_event_table$SOA == i & all_event_table$SOA_lock == ii & all_event_table$task_relevance == iii & all_event_table$duration == iv, na.rm = TRUE)
+          
+          cell_name = paste(i,ii,iii,iv,sep= '-')
+          print(paste0('Subject ',o,' has only ', cell_trials,' trials for cell: ', cell_name, '\n'))
+          
+          
+          if(cell_trials < 30){
+            cell_name = paste(i,ii,iii,iv,sep= '-')
+            warning(paste0('Subject ',o,' has only ', cell_trials,' trials for cell: ', cell_name, '\n'))
+          }
+        }}}}}
 
 ```
 
@@ -197,6 +228,27 @@ all_event_table = all_event_table %>% mutate(resp_window = (2-onset_SOA)+stim_ji
 all_event_table = all_event_table %>% mutate(is_nan = is.na(trial_accuracy_aud))
 
 
+all_accuracy_data = data.frame(matrix(ncol = 0, nrow = 1))
+
+all_accuracy_data$sub_id = "NaN"
+all_accuracy_data$SOA = NaN
+all_accuracy_data$SOA_lock = "NaN"
+all_accuracy_data$task_relevance = "NaN"
+all_accuracy_data$duration = NaN
+all_accuracy_data$mean_accuracy = NaN 
+
+all_accuracy_data = all_accuracy_data[-c(1), ]
+counter = 0
+for (o in sub_id_lvl){
+  for (i in SOA_lvl){
+    for (ii in SOA_lock_lvl) {
+      for (iii in task_relevance_lvl) {
+        for (iv in duration_lvl) {
+          
+          counter = counter + 1 
+          all_accuracy_data = all_accuracy_data %>% add_row(sub_id = o, SOA = i, SOA_lock = ii, task_relevance = iii, duration = iv,
+                                          mean_accuracy = mean(all_event_table$trial_accuracy_aud[all_event_table$sub_id == o & all_event_table$SOA == i & all_event_table$SOA_lock == ii & all_event_table$task_relevance == iii & all_event_table$duration == iv], na.rm = TRUE))
+}}}}}
 
 
 ```
@@ -373,17 +425,26 @@ gamma_params = gamma_params(mean(all_event_table$RT_aud, na.rm = TRUE), sd(event
 
 prior1 = rgamma(n=1000,shape=gamma_params$shape,rate=gamma_params$rate)
 
+prior_v <-
+c(
+prior(normal(0, 10), class = Intercept),
+prior(normal(0, 10), class = b, coef = SOA),
+prior(normal(0, 50), class = sigma),
+prior(normal(0, 20), class = sd, coef = Intercept, group = sub_id),
+prior(normal(0, 20), class = sd, coef = SOA, group = sub_id)
+)
 
 #
-brm_SOA_SOA_lock_model = brm(RT_aud ~ SOA*SOA_lock +(1|sub_id), event_table, family=Gamma(),save_all_pars = TRUE)
-summary(brm_SOA_SOA_lock_model )
-confint(brm_SOA_SOA_lock_model )
+brm_SOA_SOA_lock_model = brm(RT_aud ~ SOA*SOA_lock +(1|sub_id), all_event_table, family=Gamma(),save_all_pars = TRUE)
+summary(brm_SOA_SOA_lock_model)
+confint(brm_SOA_SOA_lock_model)
+plot(brm_SOA_SOA_lock_model)
 
-brm_null_model = brm(RT_aud ~ 1, event_table, family=Gamma(),save_all_pars = TRUE)
+brm_null_model = brm(RT_aud ~ 1, all_event_table, family=Gamma(),save_all_pars = TRUE)
 summary(brm_null_model)
 confint(brm_null_model)
 # Calculate the Bayes factor for the model with and without the parameter of interest
-bayes_factor = bayes_factor(brm_SOA_SOA_lock_model , brm_null_model)
+bayes_factor = bayes_factor(brm_SOA_SOA_lock_model, brm_null_model)
 
 
 brm_main_mixed_model = brm(RT_aud ~ SOA*SOA_lock*duration*task_relevance + (1+SOA+SOA_lock+duration+task_relevance|sub_id), family = Gamma(), data=all_event_table)
