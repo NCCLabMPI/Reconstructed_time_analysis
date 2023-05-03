@@ -25,6 +25,10 @@ if (!('dplyr' %in% installed.packages()))
 {install.packages('dplyr')}
 library(dplyr)
 
+if (!('ggdist' %in% installed.packages()))
+{install.packages('ggdist')}
+library(ggdist)
+
 if (!('brms' %in% installed.packages()))
 {install.packages('brms')}
 library(brms)
@@ -156,56 +160,20 @@ for (o in sub_id_lvl){
 ```{r}
 
 # take mean for each participant
-task_relevance_lvl = c('non-target', 'irrelevant')
-SOA_lock_lvl = c('onset', 'offset')
-SOA_lvl = c(0,0.116,0.232,0.466)
-duration_lvl = c(0.5,1,1.5)
-sub_id_lvl = sub_ids
 
+all_data = all_event_table %>%  group_by(sub_id, SOA, SOA_lock, task_relevance, duration) %>% summarise(mean_RT = mean(RT_aud, na.rm = TRUE), sd_RT = sd(RT_aud, na.rm = TRUE))
 
-all_data = data.frame(matrix(ncol = 0, nrow = 1))
+SOA_SOA_lock_data = all_event_table %>%  group_by(SOA, SOA_lock) %>%
+                                      summarise(mean_RT = mean(RT_aud, na.rm = TRUE),
+                                                         sd_RT = mean(RT_aud, na.rm = TRUE))
 
-all_data$sub_id = "NaN"
-all_data$SOA = NaN
-all_data$SOA_lock = "NaN"
-all_data$task_relevance = "NaN"
-all_data$duration = NaN
-all_data$mean_RT = NaN 
-all_data$sd_RT = NaN
+SOA_SOA_lock_task_relevance_data = all_event_table%>%  group_by(SOA, SOA_lock, task_relevance) %>%
+                                      summarise(mean_RT = mean(RT_aud, na.rm = TRUE),
+                                                         sd_RT = mean(RT_aud, na.rm = TRUE))
 
-all_data = all_data[-c(1), ]
-
-counter = 0
-for (o in sub_id_lvl){
-  for (i in SOA_lvl){
-    for (ii in SOA_lock_lvl) {
-      for (iii in task_relevance_lvl) {
-        for (iv in duration_lvl) {
-          
-          counter = counter + 1 
-          all_data = all_data %>% add_row(sub_id = o, SOA = i, SOA_lock = ii, task_relevance = iii, duration = iv,
-                                          mean_RT = mean(all_event_table$RT_aud[all_event_table$sub_id == o & all_event_table$SOA == i & all_event_table$SOA_lock == ii & all_event_table$task_relevance == iii & all_event_table$duration == iv], na.rm = TRUE),
-                                          sd_RT = sd(all_event_table$RT_aud[all_event_table$sub_id == o & all_event_table$SOA == i & all_event_table$SOA_lock == ii & all_event_table$task_relevance == iii & all_event_table$duration == iv], na.rm = TRUE))
-}}}}}
-
-all_data = all_data[1:(counter), ]
-
-SOA_SOA_lock_data = all_data %>%  group_by(SOA, SOA_lock) %>%
-                                      summarise(mean_RT = mean(mean_RT, na.rm = TRUE),
-                                                         sd_RT = mean(sd_RT, na.rm = TRUE))
-
-SOA_SOA_lock_task_relevance_data = all_data %>%  group_by(SOA, SOA_lock, task_relevance) %>%
-                                      summarise(mean_RT = mean(mean_RT, na.rm = TRUE),
-                                                         sd_RT = mean(sd_RT, na.rm = TRUE))
-
-SOA_duration_data = all_data %>%  group_by(SOA, duration) %>%
-                                      summarise(mean_RT = mean(mean_RT, na.rm = TRUE),
-                                                         sd_RT = mean(sd_RT, na.rm = TRUE))
-
-
-SOA_SOA_lock_duration_data = all_data %>%  group_by(SOA, SOA_lock, duration) %>%
-                                      summarise(mean_RT = mean(mean_RT, na.rm = TRUE),
-                                                         sd_RT = mean(sd_RT, na.rm = TRUE))
+SOA_SOA_lock_duration_data = all_event_table %>%  group_by(SOA, SOA_lock, duration) %>%
+                                      summarise(mean_RT = mean(RT_aud, na.rm = TRUE),
+                                                         sd_RT = mean(RT_aud, na.rm = TRUE))
 ```
 
 ## TRANSFORM DATA
@@ -287,8 +255,70 @@ p3
 
 
 ```
+# rain cloud plot
 
 ```{r}
+
+ggplot(all_data, aes(x = SOA, y = mean_RT, group = SOA)) + 
+  ggdist::stat_halfeye(
+    adjust = .9, 
+    width = .1, 
+    .width = 0, 
+    justification = -.3) + 
+  geom_boxplot(
+    width = .03, 
+    outlier.shape = NA
+  ) +
+  geom_point(
+    size = 1.3,
+    alpha = .3,
+    position = position_jitter(
+      seed = 1, width = .001
+    )
+  ) + 
+  coord_cartesian(xlim = c(0,0.6), clip = "off")
+```
+
+# rain cloud plot
+
+```{r}
+
+packages <- c("ggplot2", "dplyr", "lavaan", "plyr", "cowplot", "rmarkdown", 
+              "readr", "caTools", "bitops")
+
+if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
+  install.packages(setdiff(packages, rownames(installed.packages())))  
+}
+library(cowplot)
+library(dplyr)
+library(readr)
+
+source("R_rainclouds.R")
+source("summarySE.R")
+
+sum_all_data <- summarySE(all_data, measurevar = "mean_RT", groupvars=c("SOA_lock", "SOA"))
+
+light_colors = c(rep("pink",5),rep("lightblue",5))
+
+#Rainclouds for repeated measures, additional plotting options 
+
+ggplot(all_data, aes(x = SOA, y = mean_RT, fill = SOA_lock)) +
+  geom_flat_violin(aes(fill = interaction(SOA_lock,SOA)),position = position_nudge(x = .02, y = 0), adjust = 1.5, trim = FALSE, alpha = .5, colour = NA)+
+  geom_point(aes(x = as.numeric(SOA)-.02, y = mean_RT, colour = SOA_lock),position = position_jitter(width = .005), size = .25, shape = 20)+
+  geom_boxplot(aes(x = SOA, y = mean_RT, fill = interaction(SOA_lock,SOA)),outlier.shape = NA, alpha = .5, width = .02, colour = "black")+geom_line(data = sum_all_data, aes(x = as.numeric(SOA)+.02, y = mean_RT_mean, group = SOA_lock, colour = SOA_lock), linetype = 3)+
+  geom_point(data = sum_all_data, aes(x = as.numeric(SOA)+.02, y = mean_RT_mean, group = SOA_lock, colour = SOA_lock), shape = 18) +
+  geom_errorbar(data = sum_all_data, aes(x = as.numeric(SOA)+.02, y = mean_RT_mean, group = SOA_lock, colour = SOA_lock, ymin = mean_RT_mean-sd, ymax = mean_RT_mean+sd), width = .005)+
+ scale_fill_manual(values=light_colors)+scale_color_manual(values = c("onset" = "blue", "offset" = "red"))
+
+
+
+```
+
+# box plot 
+
+```{r}
+
+
 # box plots 
 box_plot_data = data.frame(matrix(ncol = 0, nrow = 0))
 counter2 = 0
@@ -329,25 +359,78 @@ qqnorm(residuals(full_model))
 
 # reduced general linear mixed effect model (without duration, if duration is not significant in the full model)
 
-reduced_model = glmer(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant + (1c_SOA*is_onset*c_duration*is_task_relevant|sub_id), family=Gamma(link="log"), data=all_event_table)
+reduced_model = glmer(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant + (1*c_SOA*is_onset*c_duration*is_task_relevant|sub_id), family=Gamma(link="log"), data=all_event_table)
 summary(reduced_model)
 plot(fitted(reduced_model),residuals(reduced_model))
 qqnorm(residuals(reduced_model))
 
 ```
 
-# exploratory control analayses
+# exploratory control analayses - plots
 
 ```{r}
 
-# control model
+# pitch  
 
+SOA_SOA_lock_pitch_data = all_event_table %>%  group_by(SOA, SOA_lock, c_pitch) %>%
+                                      summarise(mean_RT = mean(RT_aud, na.rm = TRUE),
+                                                         sd_RT = mean(RT_aud, na.rm = TRUE))
+
+pitch_plot = ggplot(data=SOA_SOA_lock_pitch_data, aes(x=SOA*1000, y=mean_RT*1000, group=interaction(as.character(c_pitch), SOA_lock))) +
+  geom_line(aes(color=as.character(c_pitch), linetype = SOA_lock))+
+  geom_point()+
+  ylim(c(400,700))+
+  ylab("Reaction time [ms]")+
+  xlab('SOA [ms]')+
+  scale_color_manual(values=c('red','blue','green'))
+pitch_plot
+
+
+# category 
+
+SOA_SOA_lock_category_data = all_event_table %>%  group_by(SOA, SOA_lock, category) %>%
+                                      summarise(mean_RT = mean(RT_aud, na.rm = TRUE),
+                                                         sd_RT = mean(RT_aud, na.rm = TRUE))
+
+category_plot = ggplot(data=SOA_SOA_lock_category_data, aes(x=SOA*1000, y=mean_RT*1000, group=interaction(category, SOA_lock))) +
+  geom_line(aes(color=category, linetype = SOA_lock))+
+  geom_point()+
+  ylim(c(400,700))+
+  ylab("Reaction time [ms]")+
+  xlab('SOA [ms]')+
+  scale_color_manual(values=c('red','blue','green','orange'))
+category_plot
+
+
+# orientation
+
+SOA_SOA_lock_ori_data = all_event_table %>%  group_by(SOA, SOA_lock, orientation) %>%
+                                      summarise(mean_RT = mean(RT_aud, na.rm = TRUE),
+                                                         sd_RT = mean(RT_aud, na.rm = TRUE))
+
+ori_plot = ggplot(data=SOA_SOA_lock_ori_data, aes(x=SOA*1000, y=mean_RT*1000, group=interaction(orientation, SOA_lock))) +
+  geom_line(aes(color=orientation, linetype = SOA_lock))+
+  geom_point()+
+  ylim(c(400,700))+
+  ylab("Reaction time [ms]")+
+  xlab('SOA [ms]')+
+  scale_color_manual(values=c('red','blue','green'))
+ori_plot
+```
+
+# exploratory control analayses - models
+
+```{r}
+
+# pitch  
 pitch_model = glmer(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant*c_pitch + (1*c_SOA*is_onset*c_duration*is_task_relevant*c_pitch|sub_id), family=Gamma(link="log"), data=all_event_table)
 summary(pitch_model)
 
+# category 
 cate_model = glmer(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant*cate_num + (1*c_SOA*is_onset*c_duration*is_task_relevant*cate_num|sub_id), family=Gamma(link="log"), data=all_event_table)
 summary(cate_model)
 
+# orientation 
 ori_model = glmer(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant*ori_num + (1*c_SOA*is_onset*c_duration*is_task_relevant*ori_num|sub_id), family=Gamma(link="log"), data=all_event_table)
 summary(ori_model)
 
