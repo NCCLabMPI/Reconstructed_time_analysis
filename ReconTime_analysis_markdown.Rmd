@@ -186,15 +186,15 @@ all_event_table = all_event_table %>% mutate(log_RT_aud = log(RT_aud))
 all_event_table = all_event_table %>% mutate(resp_window = (2-onset_SOA)+stim_jit )
 
 # make task relevance and SOA lock numeric
-all_event_table = all_event_table %>% mutate(is_task_relevant = ifelse(task_relevance == 'non-target',1,-1)) 
-all_event_table = all_event_table %>% mutate(is_onset = ifelse(SOA_lock == 'onset',1,-1))
+all_event_table = all_event_table %>% mutate(is_task_relevant = ifelse(task_relevance == 'non-target',1,0)) 
+all_event_table = all_event_table %>% mutate(is_onset = ifelse(SOA_lock == 'onset',1,0))
 all_event_table = all_event_table %>% mutate(ori_num = unclass(as.factor(orientation))) # 1=center, 2=left, 3=right 
 all_event_table = all_event_table %>% mutate(cate_num = unclass(as.factor(category))) # 1=face, 2=false_font, 3=letter, 4=object
 
 # center variables 
 all_event_table = all_event_table %>% mutate(c_task_relevant = is_task_relevant - mean(is_task_relevant))
 all_event_table = all_event_table %>% mutate(c_is_onset = is_onset - mean(is_onset))
-all_event_table = all_event_table %>% mutate(c_pitch = (pitch-1050)/50) # makes pitches 1 for high and -1 for low
+all_event_table = all_event_table %>% mutate(c_pitch = (pitch-1050)/100) # makes pitches 0.5 for high and -0.5 for low
 
 ```
 # plotting
@@ -282,6 +282,7 @@ ggplot(all_data, aes(x = SOA, y = mean_RT, group = SOA)) +
 # rain cloud plot
 
 ```{r}
+# load required packages
 
 packages <- c("ggplot2", "dplyr", "lavaan", "plyr", "cowplot", "rmarkdown", 
               "readr", "caTools", "bitops")
@@ -293,22 +294,44 @@ library(cowplot)
 library(dplyr)
 library(readr)
 
+# extra resources
 source("R_rainclouds.R")
 source("summarySE.R")
 
-sum_all_data <- summarySE(all_data, measurevar = "mean_RT", groupvars=c("SOA_lock", "SOA"))
+# prepare data 
 
-light_colors = c(rep("pink",5),rep("lightblue",5))
+rp_data = all_event_table %>%  group_by(SOA, SOA_lock, sub_id) %>%
+                                      summarise(mean_RT = mean(RT_aud, na.rm = TRUE),
+                                                         sd_RT = mean(RT_aud, na.rm = TRUE))
+sum_data <- summarySE(rp_data, measurevar = "mean_RT", groupvars=c("SOA_lock", "SOA"))
+rp_data$SOAj = jitter(rp_data$SOA, amount = .005)
+
+
+# define colors
+fill_colors = c(rep("pink",5),rep("lightblue",5))
+line_colors = c("onset" = "blue", "offset" = "red")
 
 #Rainclouds for repeated measures, additional plotting options 
 
-ggplot(all_data, aes(x = SOA, y = mean_RT, fill = SOA_lock)) +
-  geom_flat_violin(aes(fill = interaction(SOA_lock,SOA)),position = position_nudge(x = .02, y = 0), adjust = 1.5, trim = FALSE, alpha = .5, colour = NA)+
-  geom_point(aes(x = as.numeric(SOA)-.02, y = mean_RT, colour = SOA_lock),position = position_jitter(width = .005), size = .25, shape = 20)+
-  geom_boxplot(aes(x = SOA, y = mean_RT, fill = interaction(SOA_lock,SOA)),outlier.shape = NA, alpha = .5, width = .02, colour = "black")+geom_line(data = sum_all_data, aes(x = as.numeric(SOA)+.02, y = mean_RT_mean, group = SOA_lock, colour = SOA_lock), linetype = 3)+
-  geom_point(data = sum_all_data, aes(x = as.numeric(SOA)+.02, y = mean_RT_mean, group = SOA_lock, colour = SOA_lock), shape = 18) +
-  geom_errorbar(data = sum_all_data, aes(x = as.numeric(SOA)+.02, y = mean_RT_mean, group = SOA_lock, colour = SOA_lock, ymin = mean_RT_mean-sd, ymax = mean_RT_mean+sd), width = .005)+
- scale_fill_manual(values=light_colors)+scale_color_manual(values = c("onset" = "blue", "offset" = "red"))
+ggplot(rp_data, aes(x = SOA, y = mean_RT, fill = SOA_lock)) +
+  # distribution plot
+  geom_flat_violin(aes(fill = interaction(SOA_lock,SOA)),position = position_nudge(x = .02, y = 0), adjust = 1.5, trim = FALSE, alpha = .5, colour = NA)+ 
+  # individual data points (each subject)
+  geom_point(aes(x = as.numeric(SOAj)+.02, y = mean_RT, colour = SOA_lock), size = 1, shape = 20) +
+  # connecting individual data points (onset-locked)
+  geom_line(data = rp_data %>% filter(SOA_lock =="onset"), aes(x=SOAj+.02, y = mean_RT, group=sub_id), color = 'lightblue',linetype = 1, size=0.1)+
+  # connecting individual data points (offset-locked)
+  geom_line(data = rp_data %>% filter(SOA_lock =="offset"), aes(x=SOAj+.02, y = mean_RT, group=sub_id), color = 'pink',linetype = 1, size=0.1)+ 
+  # box plots
+  geom_boxplot(aes(x = SOA, y = mean_RT, fill = interaction(SOA_lock,SOA)),outlier.shape = NA, alpha = .5, width = .02, colour = "black")+
+  # mean line
+  geom_line(data = sum_data, aes(x = as.numeric(SOA)+.02, y = mean_RT_mean, group = SOA_lock, colour = SOA_lock),linetype = 2, size=0.7)+
+  # mean points
+  geom_point(data = sum_data, aes(x = as.numeric(SOA)+.02, y = mean_RT_mean, group = SOA_lock, colour = SOA_lock), shape = 18, size=1.5)+
+  # error bars
+  geom_errorbar(data = sum_data, aes(x = as.numeric(SOA)+.02, y = mean_RT_mean, group = SOA_lock, colour = SOA_lock, ymin = mean_RT_mean-sem, ymax = mean_RT_mean+sem), width = .005)+ 
+  # adjust colors 
+  scale_fill_manual(values=fill_colors )+scale_color_manual(values = line_colors) 
 
 
 
@@ -352,14 +375,14 @@ ggplot(all_data, aes(SOA_lock, mean_RT, fill=interaction(duration, task_relevanc
 
 # full general linear mixed effect model
 
-full_model = glmer(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant + (1*c_SOA*is_onset*c_duration*is_task_relevant|sub_id), family=Gamma(link="log"), data=all_event_table)
+full_model = glmer(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant + (1*c_SOA*is_onset*c_duration*is_task_relevant|sub_num), family=Gamma(link="log"), data=all_event_table)
 summary(full_model)
 plot(fitted(full_model),residuals(full_model))
 qqnorm(residuals(full_model))
 
 # reduced general linear mixed effect model (without duration, if duration is not significant in the full model)
 
-reduced_model = glmer(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant + (1*c_SOA*is_onset*c_duration*is_task_relevant|sub_id), family=Gamma(link="log"), data=all_event_table)
+reduced_model = glmer(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant + (1*c_SOA*is_onset*c_duration*is_task_relevant|sub_num), family=Gamma(link="log"), data=all_event_table)
 summary(reduced_model)
 plot(fitted(reduced_model),residuals(reduced_model))
 qqnorm(residuals(reduced_model))
@@ -423,15 +446,15 @@ ori_plot
 ```{r}
 
 # pitch  
-pitch_model = glmer(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant*c_pitch + (1*c_SOA*is_onset*c_duration*is_task_relevant*c_pitch|sub_id), family=Gamma(link="log"), data=all_event_table)
+pitch_model = glmer(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant*c_pitch + (1*c_SOA*is_onset*c_duration*is_task_relevant*c_pitch|sub_num), family=Gamma(link="log"), data=all_event_table)
 summary(pitch_model)
 
 # category 
-cate_model = glmer(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant*cate_num + (1*c_SOA*is_onset*c_duration*is_task_relevant*cate_num|sub_id), family=Gamma(link="log"), data=all_event_table)
+cate_model = glmer(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant*cate_num + (1*c_SOA*is_onset*c_duration*is_task_relevant*cate_num|sub_num), family=Gamma(link="log"), data=all_event_table)
 summary(cate_model)
 
 # orientation 
-ori_model = glmer(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant*ori_num + (1*c_SOA*is_onset*c_duration*is_task_relevant*ori_num|sub_id), family=Gamma(link="log"), data=all_event_table)
+ori_model = glmer(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant*ori_num + (1*c_SOA*is_onset*c_duration*is_task_relevant*ori_num|sub_num), family=Gamma(link="log"), data=all_event_table)
 summary(ori_model)
 
 ```
