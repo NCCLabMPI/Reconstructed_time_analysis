@@ -234,7 +234,7 @@ def save_to_bids(raw, subject="", session="",  task="", datatype="eyetrack", roo
     if not os.path.isdir(save_dir):
         os.makedirs(save_dir)
     # Create the file name:
-    file_name = "sub-{}_ses-{}_task-{}_eyetrack.fif".format(subject, session, task)
+    file_name = "sub-{}_ses-{}_task-{}_eyetrack-raw.fif".format(subject, session, task)
     raw.save(Path(save_dir, file_name))
 
     return None
