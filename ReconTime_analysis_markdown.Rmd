@@ -50,7 +50,7 @@ library(optimx)
 # details of subjects  
 
 ```{r}
-subNums = c(101, 102, 103)
+subNums = c(101, 102, 103, 105, 106, 107, 108, 109, 110, 111)
 ses = 1
 Lab_ID = 'SX'
 task = 'prp'
@@ -72,7 +72,7 @@ file_name = paste0(sub_folder, '_', ses_folder, '_run-all_task-', task,'_events.
 setwd("..")
 parent_dir = getwd()
 setwd(wd)
-file = file.path(parent_dir, 'Reconstructed_time_experiment', 'pilot_data', sub_folder, ses_folder, file_name)
+file = file.path(parent_dir, 'Reconstructed_time_experiment', 'data', sub_folder, ses_folder, file_name)
 event_table = read.csv(file)
 
 # make format consistent
@@ -131,7 +131,7 @@ all_event_table = all_event_table[!is.na(all_event_table$trial_accuracy_aud), ]
 # sum(is.na(all_event_table$trial_accuracy_aud[all_event_table$SOA_lock == 'offset']), na.rm = TRUE)
 # sum(is.na(all_event_table$trial_accuracy_aud[all_event_table$SOA_lock == 'onset']), na.rm = TRUE)
 
-# check if any combination of condition (cell) has too little trials 
+# check if any combination of condition (cell) has less than 30 trials 
 
 task_relevance_lvl = c('non-target', 'irrelevant')
 SOA_lock_lvl = c('onset', 'offset')
@@ -196,6 +196,8 @@ all_event_table = all_event_table %>% mutate(cate_num = unclass(as.factor(catego
 # center variables 
 all_event_table = all_event_table %>% mutate(c_task_relevant = is_task_relevant - mean(is_task_relevant))
 all_event_table = all_event_table %>% mutate(c_is_onset = is_onset - mean(is_onset))
+all_event_table = all_event_table %>% mutate(c_SOA = SOA - mean(SOA))
+all_event_table = all_event_table %>% mutate(c_duration = duration - mean(duration))
 all_event_table = all_event_table %>% mutate(c_pitch = (pitch-1050)/100) # makes pitches 0.5 for high and -0.5 for low
 
 ```
@@ -257,46 +259,11 @@ p3
 
 
 ```
-# rain cloud plot
-
-```{r}
-
-ggplot(all_data, aes(x = SOA, y = mean_RT, group = SOA)) + 
-  ggdist::stat_halfeye(
-    adjust = .9, 
-    width = .1, 
-    .width = 0, 
-    justification = -.3) + 
-  geom_boxplot(
-    width = .03, 
-    outlier.shape = NA
-  ) +
-  geom_point(
-    size = 1.3,
-    alpha = .3,
-    position = position_jitter(
-      seed = 1, width = .001
-    )
-  ) + 
-  coord_cartesian(xlim = c(0,0.6), clip = "off")
-```
 
 # rain cloud plot
 
 ```{r}
-# load required packages
-
-packages <- c("ggplot2", "dplyr", "lavaan", "plyr", "cowplot", "rmarkdown", 
-              "readr", "caTools", "bitops")
-
-if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
-  install.packages(setdiff(packages, rownames(installed.packages())))  
-}
-library(cowplot)
-library(dplyr)
-library(readr)
-
-# extra resources
+# load extra resources
 source("R_rainclouds.R")
 source("summarySE.R")
 
@@ -384,7 +351,7 @@ qqnorm(residuals(full_model))
 
 # reduced general linear mixed effect model (without duration, if duration is not significant in the full model)
 
-reduced_model = glmer(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant + (1*c_SOA*is_onset*c_duration*is_task_relevant|sub_num), family=Gamma(link="log"), data=all_event_table)
+reduced_model = glmer(RT_aud ~ c_SOA*is_onset*is_task_relevant + (1*c_SOA*is_onset*is_task_relevant|sub_num), family=Gamma(link="log"), data=all_event_table)
 summary(reduced_model)
 plot(fitted(reduced_model),residuals(reduced_model))
 qqnorm(residuals(reduced_model))
@@ -476,7 +443,7 @@ summary(ori_model)
 
 ```
 
-# bayesian exploratory analysis
+# bayesian exploratory analysis - incomplete!
 
 ```{r}
 
@@ -487,34 +454,26 @@ library(dampack)
 
 
 # data simulation and priors
-gamma_params = gamma_params(mean(all_event_table$RT_aud, na.rm = TRUE), sd(event_table$RT_aud, na.rm = TRUE), scale = FALSE)
+#gamma_params = gamma_params(mean(all_event_table$RT_aud, na.rm = TRUE), sd(event_table$RT_aud, na.rm = TRUE), scale = FALSE)
 
-prior1 = rgamma(n=1000,shape=gamma_params$shape,rate=gamma_params$rate)
+#prior1 = rgamma(n=1000,shape=gamma_params$shape,rate=gamma_params$rate)
 
-prior_v <-
-c(
-prior(normal(0, 10), class = Intercept),
-prior(normal(0, 10), class = b, coef = SOA),
-prior(normal(0, 50), class = sigma),
-prior(normal(0, 20), class = sd, coef = Intercept, group = sub_id),
-prior(normal(0, 20), class = sd, coef = SOA, group = sub_id)
-)
 
-#
-brm_SOA_SOA_lock_model = brm(RT_aud ~ SOA*SOA_lock +(1|sub_id), all_event_table, family=Gamma(),save_all_pars = TRUE)
-summary(brm_SOA_SOA_lock_model)
-confint(brm_SOA_SOA_lock_model)
-plot(brm_SOA_SOA_lock_model)
+#brm_SOA_SOA_lock_model = brm(RT_aud ~ SOA*SOA_lock +(1|sub_id), all_event_table, family=Gamma(),save_all_pars = TRUE)
+#summary(brm_SOA_SOA_lock_model)
+#confint(brm_SOA_SOA_lock_model)
+#plot(brm_SOA_SOA_lock_model)
 
-brm_null_model = brm(RT_aud ~ 1, all_event_table, family=Gamma(),save_all_pars = TRUE)
-summary(brm_null_model)
-confint(brm_null_model)
+#brm_null_model = brm(RT_aud ~ 1, all_event_table, family=Gamma(),save_all_pars = TRUE)
+#summary(brm_null_model)
+#confint(brm_null_model)
+
+
 # Calculate the Bayes factor for the model with and without the parameter of interest
-bayes_factor = bayes_factor(brm_SOA_SOA_lock_model, brm_null_model)
+#bayes_factor = bayes_factor(brm_SOA_SOA_lock_model, brm_null_model)
 
-
-brm_main_mixed_model = brm(RT_aud ~ SOA*SOA_lock*duration*task_relevance + (1+SOA+SOA_lock+duration+task_relevance|sub_id), family = Gamma(), data=all_event_table)
-summary(brm_main_mixed_model)
+#brm_main_mixed_model = brm(RT_aud ~ SOA*SOA_lock*duration*task_relevance + (1+SOA*SOA_lock*duration*task_relevance|sub_id), family = Gamma(), data=all_event_table)
+#summary(brm_main_mixed_model)
 
 
 
@@ -523,7 +482,7 @@ summary(brm_main_mixed_model)
 
 # power analysis
 
-````{r}
+```{r}
 if (!('pwr' %in% installed.packages()))
 {install.packages("pwr")}
 library(pwr)
