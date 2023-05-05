@@ -271,7 +271,12 @@ source("summarySE.R")
 
 rp_data = all_event_table %>%  group_by(SOA, SOA_lock, sub_id) %>%
                                       summarise(mean_RT = mean(RT_aud, na.rm = TRUE),
-                                                         sd_RT = mean(RT_aud, na.rm = TRUE))
+                                                         sd_RT = sd(RT_aud, na.rm = TRUE))
+
+sum_rp_data = rp_data %>%  group_by(SOA, SOA_lock) %>%
+                                      summarise(mean_RT = mean(mean_RT, na.rm = TRUE),
+                                                         sd_RT = sd(mean_RT, na.rm = TRUE))
+
 sum_data <- summarySE(rp_data, measurevar = "mean_RT", groupvars=c("SOA_lock", "SOA"))
 rp_data$SOAj = jitter(rp_data$SOA, amount = .005)
 
@@ -300,7 +305,7 @@ ggplot(rp_data, aes(x = SOA, y = mean_RT, fill = SOA_lock)) +
   # mean points
   geom_point(data = sum_data, aes(x = as.numeric(SOA)+.02, y = mean_RT_mean, group = SOA_lock, colour = SOA_lock), shape = 18, size=3)+
   # adjust colors 
-  scale_fill_manual(values=fill_colors )+scale_color_manual(values = line_colors) 
+  scale_fill_manual(values=fill_colors )+scale_color_manual(values = line_colors)
 
 
 
@@ -344,17 +349,33 @@ ggplot(all_data, aes(SOA_lock, mean_RT, fill=interaction(duration, task_relevanc
 
 # full general linear mixed effect model
 
-full_model = glmer(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant + (1*c_SOA*is_onset*c_duration*is_task_relevant|sub_num), family=Gamma(link="log"), data=all_event_table)
+full_model = glmer(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant + (1*c_SOA*is_onset*c_duration*is_task_relevant|sub_num), family=Gamma(link="identity"), data=all_event_table)
 summary(full_model)
 plot(fitted(full_model),residuals(full_model))
 qqnorm(residuals(full_model))
 
 # reduced general linear mixed effect model (without duration, if duration is not significant in the full model)
 
-reduced_model = glmer(RT_aud ~ c_SOA*is_onset*is_task_relevant + (1*c_SOA*is_onset*is_task_relevant|sub_num), family=Gamma(link="log"), data=all_event_table)
+reduced_model = glmer(RT_aud ~ c_SOA*is_onset*is_task_relevant + (1*c_SOA*is_onset*is_task_relevant|sub_num), family=Gamma(link="identity"), data=all_event_table)
 summary(reduced_model)
 plot(fitted(reduced_model),residuals(reduced_model))
 qqnorm(residuals(reduced_model))
+
+```
+
+
+# exploratory offset analayses - models
+
+```{r}
+# offset general linear mixed effect model
+
+offset_event_table = all_event_table %>% filter(SOA_lock == 'offset')
+
+
+offset_model = glmer(RT_aud ~ c_SOA*c_duration*is_task_relevant + (1*c_SOA*c_duration*is_task_relevant|sub_num), family=Gamma(link="identity"), data=offset_event_table)
+summary(offset_model)
+plot(fitted(offset_model ),residuals(offset_model))
+qqnorm(residuals(offset_model))
 
 ```
 
@@ -430,16 +451,17 @@ acc_plot
 ```{r}
 
 # pitch  
-pitch_model = glmer(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant*c_pitch + (1*c_SOA*is_onset*c_duration*is_task_relevant*c_pitch|sub_num), family=Gamma(link="log"), data=all_event_table)
+pitch_model = glmer(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant*c_pitch + (1*c_SOA*is_onset*c_duration*is_task_relevant*c_pitch|sub_num), family=Gamma(link="identity"), data=all_event_table)
 summary(pitch_model)
 
 # category 
-cate_model = glmer(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant*cate_num + (1*c_SOA*is_onset*c_duration*is_task_relevant*cate_num|sub_num), family=Gamma(link="log"), data=all_event_table)
+cate_model = glmer(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant*cate_num + (1*c_SOA*is_onset*c_duration*is_task_relevant*cate_num|sub_num), family=Gamma(link="identity"), data=all_event_table)
 summary(cate_model)
 
 # orientation 
-ori_model = glmer(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant*ori_num + (1*c_SOA*is_onset*c_duration*is_task_relevant*ori_num|sub_num), family=Gamma(link="log"), data=all_event_table)
+ori_model = glmer(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant*ori_num + (1*c_SOA*is_onset*c_duration*is_task_relevant*ori_num|sub_num), family=Gamma(link="identity"), data=all_event_table)
 summary(ori_model)
+
 
 ```
 
