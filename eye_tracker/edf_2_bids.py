@@ -1,9 +1,10 @@
 import mne
-import os
 import numpy as np
-from mne_bids import (write_raw_bids, BIDSPath)
 from pathlib import Path
 import pandas as pd
+import os
+import subprocess
+import warnings
 
 # Eyelink logs' line tags
 OTHER = "OTHER"
@@ -151,12 +152,12 @@ def ascii_parser(ascii_file):
     df_fix = pd.DataFrame(pd.DataFrame({
         "onset": df_fix["tStart"].to_numpy(),
         "duration": df_fix["duration"].to_numpy(),
-        "description": np.array(["_".join(["blink", eye]) for eye in df_fix["eye"].to_list()])
+        "description": np.array(["_".join(["fixation", eye]) for eye in df_fix["eye"].to_list()])
     }))
     df_sacc = pd.DataFrame(pd.DataFrame({
         "onset": df_sacc["tStart"].to_numpy(),
         "duration": df_sacc["duration"].to_numpy(),
-        "description": np.array(["_".join(["blink", eye]) for eye in df_sacc["eye"].to_list()])
+        "description": np.array(["_".join(["saccade", eye]) for eye in df_sacc["eye"].to_list()])
     }))
     df_blink = pd.DataFrame(pd.DataFrame({
         "onset": df_blink["tStart"].to_numpy(),
@@ -235,12 +236,30 @@ def save_to_bids(raw, subject="", session="",  task="", datatype="eyetrack", roo
         os.makedirs(save_dir)
     # Create the file name:
     file_name = "sub-{}_ses-{}_task-{}_eyetrack-raw.fif".format(subject, session, task)
-    raw.save(Path(save_dir, file_name))
+    raw.save(Path(save_dir, file_name), overwrite=True)
 
     return None
 
 
-def ascii2mne_batch(root, subjects, save_root, session="1"):
+def edf2ascii(convert_exe, edf_file_name):
+    """
+    This function converts an edf file to an ascii file
+    :param edf_file_name:
+    :param convert_exe:
+    :return:
+    """
+    cmd = convert_exe
+    ascfile = Path(edf_file_name.parent, edf_file_name.stem + ".asc")
+
+    # check if an asc file already exists
+    if not os.path.isfile(ascfile):
+        subprocess.run([cmd, "-p", edf_file_name.parent, edf_file_name])
+    else:
+        warnings.warn("An Ascii file for " + edf_file_name.stem + " already exists!")
+    return ascfile
+
+
+def ascii2mne_batch(root, subjects, save_root, session="1", convert_exe=""):
     """
 
     :param subjects:
@@ -251,15 +270,17 @@ def ascii2mne_batch(root, subjects, save_root, session="1"):
         # Get the subject directory:
         subject_dir = Path(root, subject, "ses-" + session)
         # List the files in there:
-        subject_files = [fl for fl in os.listdir(subject_dir) if fl.endswith(".asc")]
+        subject_files = [fl for fl in os.listdir(subject_dir) if fl.endswith(".edf")]
         for task in tasks:
-            task_files = [fl for fl in subject_files if fl.split("_task-")[1].split("_eyetrack.asc")[0] == task]
+            task_files = [fl for fl in subject_files if fl.split("_task-")[1].split("_eyetrack.edf")[0] == task]
             # Loop through every file:
             raws = []
             for fl in task_files:
                 # Read in EyeLink file
+                print('Converting edf to asc')
+                asci_file = edf2ascii(convert_exe, Path(subject_dir, fl))
                 print('Reading in EyeLink file %s' % fl)
-                data_df, msg_df, sfreq = ascii_parser(Path(subject_dir, fl))
+                data_df, msg_df, sfreq = ascii_parser(asci_file)
                 raws.append(df2mne(data_df, msg_df, sfreq))
             # Concatenate:
             raw = mne.concatenate_raws(raws)
@@ -273,4 +294,5 @@ if __name__ == "__main__":
     data_root = r"C:\Users\alexander.lepauvre\Documents\PhD\Reconstructed_Time\raw_data"
     save_root = r"C:\Users\alexander.lepauvre\Documents\PhD\Reconstructed_Time\bids"
 
-    ascii2mne_batch(data_root, subjects_list, save_root)
+    ascii2mne_batch(data_root, subjects_list, save_root,
+                    convert_exe=r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker\edf2asc.exe")
