@@ -68,8 +68,10 @@ def epoch_data(raw, events, event_dict, events_of_interest=None, metadata_column
     if events_of_interest is not None:
         select_event_dict = {key: event_dict[key] for key in event_dict if any(substring in key
                                                                                for substring in events_of_interest)}
+    else:
+        select_event_dict = event_dict
     # Epochs the data accordingly:
-    epochs = mne.Epochs(raw, events=events, event_id=events_of_interest, tmin=tmin,
+    epochs = mne.Epochs(raw, events=events, event_id=select_event_dict, tmin=tmin,
                         tmax=tmax, baseline=baseline, verbose='ERROR', picks=picks,
                         reject_by_annotation=reject_by_annotation)
     # Dropping the bad epochs if there were any:

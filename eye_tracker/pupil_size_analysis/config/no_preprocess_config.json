@@ -1,0 +1,62 @@
+{
+  "bids_root": "C:\\Users\\alexander.lepauvre\\Documents\\PhD\\Reconstructed_Time\\bids",
+  "visit": "1",
+  "task": "prp",
+  "session": "1",
+  "data_type": "eyetrack",
+  "preprocess_folder": "epochs",
+  "analyses_parameters": {
+    "task_relevant_onset": {
+        "epoch_name": "visual_onset",
+        "picks": ["LPupil", "RPupil"],
+        "crop": [-0.3, 2.0],
+        "conditions": [
+        "non-target/onset"
+        ],
+        "remove_blinks": false,
+        "remove_saccades": false,
+        "baseline_mode": "mean",
+        "baseline_window": [null, -0.05],
+        "compared_condition": ["0", "0.116", "0.232", "0.466"]
+    },
+    "task_relevant_offset": {
+        "epoch_name": "visual_onset",
+        "picks": ["LPupil", "RPupil"],
+        "crop": [-0.3, 2.0],
+        "conditions": [
+        "non-target/offset"
+        ],
+        "remove_blinks": false,
+        "remove_saccades": false,
+        "baseline_mode": "mean",
+        "baseline_window": [null, -0.05],
+        "compared_condition": ["0", "0.116", "0.232", "0.466"]
+    },
+    "task_irrelevant_onset": {
+        "epoch_name": "visual_onset",
+        "picks": ["LPupil", "RPupil"],
+        "crop": [-0.3, 2.0],
+        "conditions": [
+        "non-target/onset"
+        ],
+        "remove_blinks": false,
+        "remove_saccades": false,
+        "baseline_mode": "mean",
+        "baseline_window": [null, -0.05],
+        "compared_condition": ["0", "0.116", "0.232", "0.466"]
+    },
+    "task_irrelevant_offset": {
+        "epoch_name": "visual_onset",
+        "picks": ["LPupil", "RPupil"],
+        "crop": [-0.3, 2.0],
+        "conditions": [
+        "non-target/offset"
+        ],
+        "remove_blinks": false,
+        "remove_saccades": false,
+        "baseline_mode": "mean",
+        "baseline_window": [null, -0.05],
+        "compared_condition": ["0", "0.116", "0.232", "0.466"]
+    }
+  }
+}

@@ -33,7 +33,7 @@
           "jitter onset"
       ],
       "reject_by_annotation": false,
-      "meta_data_column": ["event type", "task relevance", "duration", "category", "orientation", "identity",
+      "metadata_column": ["event type", "task relevance", "duration", "category", "orientation", "identity",
           "SOA", "lock", "pitch"]
     },
     "visual_offset": {
@@ -45,7 +45,7 @@
           "fixation_onset"
       ],
       "reject_by_annotation": false,
-      "meta_data_column": ["event type", "task relevance", "duration", "category", "orientation", "identity",
+      "metadata_column": ["event type", "task relevance", "duration", "category", "orientation", "identity",
           "SOA", "lock", "pitch"]
     },
     "audio_onset": {
@@ -57,7 +57,7 @@
           "audio_onset"
       ],
       "reject_by_annotation": false,
-      "meta_data_column": ["event type", "task relevance", "duration", "category", "orientation", "identity",
+      "metadata_column": ["event type", "task relevance", "duration", "category", "orientation", "identity",
           "SOA", "lock", "pitch"]
     }
   }
