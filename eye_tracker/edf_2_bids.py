@@ -289,7 +289,7 @@ def ascii2mne_batch(root, subjects, save_root, session="1", convert_exe=""):
 
 
 if __name__ == "__main__":
-    subjects_list = ["sub-SX105"]
+    subjects_list = ["sub-SX102", "sub-SX103"]
     tasks = ["auditory_and_visual", "visual", "auditory", "prp"]
     data_root = r"C:\Users\alexander.lepauvre\Documents\PhD\Reconstructed_Time\raw_data"
     save_root = r"C:\Users\alexander.lepauvre\Documents\PhD\Reconstructed_Time\bids"

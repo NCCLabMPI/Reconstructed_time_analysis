@@ -59,7 +59,8 @@ def preprocessing(subject, parameters):
 
 
 if __name__ == "__main__":
-    sub = "SX105"
+    subjects_list = ["SX102", "SX103", "SX104"]
     parameters_file = r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker" \
                       r"\parameters\preprocessing_parameters.json "
-    preprocessing(sub, parameters_file)
+    for sub in subjects_list:
+        preprocessing(sub, parameters_file)
