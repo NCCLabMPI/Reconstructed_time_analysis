@@ -1,0 +1,116 @@
+import numpy
+
+
+def create_metadata_from_events(epochs, metadata_column):
+    """
+    This function parses the events found in the epochs descriptions to create the meta data. The column of the meta
+    data are generated based on the metadata column names. The column name must be a list in the same order as the
+    strings describing the events. The name of the column must be the name of the overall condition, so say the
+    specific column describes the category of the presented stim (faces, objects...), then the column should be called
+    category. This will become obsolete here at some point, when the preprocessing is changed to generate the meta data
+    directly
+    :param epochs: (mne epochs object) epochs for which the meta data will be generated
+    :param metadata_column_names: (list of strings) name of the column of the meta data. Must be in the same order
+    as the events description + must be of the same length as the number of word in the events description
+    :return: epochs (mne epochs object)
+    """
+
+    # Getting the event description of each single trial
+    trials_descriptions = [[key for key in epochs.event_id.keys() if epochs.event_id[key] == event]
+                           for event in epochs.events[:, 2]]
+    trial_descriptions_parsed = [description[0].split(
+        "/") for description in trials_descriptions]
+    # Making sure that the dimensions of the trials description is consistent across all trials:
+    if len(set([len(vals) for vals in trial_descriptions_parsed])) > 1:
+        raise ValueError('dimension mismatch in event description!\nThe forward slash separated list found in the '
+                         'epochs description has inconsistent length when parsed. Having different number of '
+                         'descriptors for different trials is not yet supported. Please make sure that your events '
+                         'description are set accordingly')
+    if len(metadata_column) != len(trial_descriptions_parsed[0]):
+        raise ValueError("The number of meta data columns you have passed doesn't match the number of descriptors for\n"
+                         "each trials. Make sure you have matching numbers. In doubt, go and check the events file in\n"
+                         "the BIDS directory")
+    if len(trial_descriptions_parsed) != len(epochs):
+        raise ValueError("Somehow, the number of trials descriptions found in the epochs object doesn't match the "
+                         "number of trials in the same epochs. I have no idea how you managed that one champion, so I "
+                         "can't really help here")
+
+    # Convert the trials description to a pandas dataframe:
+    epochs.metadata = pd.DataFrame.from_records(
+        trial_descriptions_parsed, columns=metadata_column)
+
+    return epochs
+
+
+def epoch_data(raw, events, event_dict, events_of_interest=None, metadata_column=None, tmin=-0.5, tmax=2.0,
+               baseline=None, picks="all", reject_by_annotation=False):
+    """
+    This function epochs the continuous data according to specified events of interest, i.e. not all the events get
+    evoked, only those we are interested in!
+    :param raw:
+    :param events:
+    :param event_dict:
+    :param events_of_interest:
+    :param metadata_column:
+    :return:
+    """
+    # First, extract the events of interest:
+    if events_of_interest is not None:
+        select_event_dict = {key: event_dict[key] for key in event_dict if any(substring in key
+                                                                               for substring in events_of_interest)}
+    # Epochs the data accordingly:
+    epochs = mne.Epochs(raw, events=events, event_id=events_of_interest, tmin=tmin,
+                        tmax=tmax, baseline=baseline, verbose='ERROR', picks=picks,
+                        reject_by_annotation=reject_by_annotation)
+    # Dropping the bad epochs if there were any:
+    epochs.drop_bad()
+    # Adding the meta data to the table. The meta data are created by parsing the events strings, as each substring
+    # contains specific info about the trial:
+    if metadata_column is not None:
+        epochs = create_metadata_from_events(epochs, metadata_column)
+    return epochs
+
+
+def extract_blink(raw, description="blink", eyes=None):
+    """
+    This function extracts the blinks from the annotation file and converts them to a "boolean channel". In other words,
+    whereever there is blink, the channel is a 1, the rests are zeros. That way, down the line, we can use that info
+    in the epoched object to remove blinks and compute different kinds of variables on them
+    :param raw:
+    :param description:
+    :param eyes:
+    :return:
+    """
+    # Create the new channels, one per eye:
+    if eyes is None:
+        eyes = ["L", "R"]
+    description_l_ch, description_r_ch = np.zeros(raw.times.shape), np.zeros(raw.times.shape)
+    # Extract the relevant events from the annotation file:
+    evts_inds_l = np.where(raw.annotations.description == "_".join([description, "L"]))[0]
+    evts_inds_r = np.where(raw.annotations.description == "_".join([description, "R"]))[0]
+    # Extract the onset of each of these:
+    evts_onset_l = raw.annotations.onset[evts_inds_l]
+    evts_dur_l = raw.annotations.duration[evts_inds_l]
+    evts_onset_r = raw.annotations.onset[evts_inds_r]
+    evts_dur_r = raw.annotations.duration[evts_inds_r]
+
+    # Loop through each event for the left eye:
+    for evt_ind, evt in enumerate(evts_onset_l):
+        onset_ind = np.where(raw.times <= evt)[0][-1]
+        offset_ind = np.where(raw.times <= evt + evts_dur_l[evt_ind])[0][-1]
+        description_l_ch[onset_ind:offset_ind] = 1
+    # Same for the right eye:
+    for evt_ind, evt in enumerate(evts_onset_r):
+        onset_ind = np.where(raw.times <= evt)[0][-1]
+        offset_ind = np.where(raw.times <= evt + evts_dur_r[evt_ind])[0][-1]
+        description_r_ch[onset_ind:offset_ind] = 1
+
+    # Add these two channels to the raw data:
+    data = raw.get_data()
+    data = np.concatenate([data, np.array([description_l_ch, description_r_ch])])
+    channels = raw.ch_names
+    channels.extend(["".join([eye, description]) for eye in eyes])
+    info = mne.create_info(channels, ch_types=["eeg"] * len(channels), sfreq=raw.info["sfreq"])
+    raw_new = mne.io.RawArray(data, info)
+    raw_new.set_annotations(raw.annotations)
+    return raw_new

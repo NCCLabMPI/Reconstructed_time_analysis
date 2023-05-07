@@ -1,0 +1,64 @@
+{
+  "bids_root": "C:\\Users\\alexander.lepauvre\\Documents\\PhD\\Reconstructed_Time\\bids",
+  "visit": "1",
+  "task": "prp",
+  "session": "1",
+  "data_type": "eyetrack",
+  "preprocessing_steps": [
+    "extract_blinks",
+    "extract_saccades",
+    "extract_fixation",
+    "epochs"
+  ],
+  "extract_blinks": {
+    "eyes": ["L", "R"],
+    "description": "blink"
+  },
+  "extract_saccades": {
+    "eyes": ["L", "R"],
+    "description": "saccade"
+  },
+  "extract_fixation": {
+    "eyes": ["L", "R"],
+    "description": "fixation"
+  },
+  "epochs": {
+    "visual_onset": {
+      "picks": "all",
+      "tmin": -1,
+      "tmax": 2.5,
+      "baseline": null,
+      "events_of_interest": [
+          "response",
+          "jitter onset"
+      ],
+      "reject_by_annotation": false,
+      "meta_data_column": ["event type", "task relevance", "duration", "category", "orientation", "identity",
+          "SOA", "lock", "pitch"]
+    },
+    "visual_offset": {
+      "picks": "all",
+      "tmin": -1,
+      "tmax": 2.5,
+      "baseline": null,
+      "events_of_interest": [
+          "fixation_onset"
+      ],
+      "reject_by_annotation": false,
+      "meta_data_column": ["event type", "task relevance", "duration", "category", "orientation", "identity",
+          "SOA", "lock", "pitch"]
+    },
+    "audio_onset": {
+      "picks": "all",
+      "tmin": -1,
+      "tmax": 2.5,
+      "baseline": null,
+      "events_of_interest": [
+          "audio_onset"
+      ],
+      "reject_by_annotation": false,
+      "meta_data_column": ["event type", "task relevance", "duration", "category", "orientation", "identity",
+          "SOA", "lock", "pitch"]
+    }
+  }
+}
