@@ -2,17 +2,15 @@ import os
 import mne
 import json
 from pathlib import Path
-import pandas as pd
-import numpy as np
-from eye_tracker.preprocessing_helper_function import extract_blink, epoch_data
+from eye_tracker.preprocessing_helper_function import extract_eyelink_events, epoch_data
 
 
 def preprocessing(subject, parameters):
     """
     This function preprocesses the eyetracking data, using several MNE key functionalities for handling the data
-    :param subject:
-    :param parameters:
-    :return:
+    :param subject: (string) name of the subject to process. Note: do not include the sub-!
+    :param parameters: (string) parameter json file
+    :return: None: saves the epochs to file
     """
     # First, load the parameters:
     with open(parameters) as json_file:
@@ -42,7 +40,7 @@ def preprocessing(subject, parameters):
         # Performing blinks, saccades and fixaction extraction:
         if step in ["extract_blinks", "extract_saccades", "extract_fixation"]:
             print("Extracting the {} from the annotation".format(step_param["description"]))
-            raw = extract_blink(raw, step_param["description"])
+            raw = extract_eyelink_events(raw, step_param["description"])
 
         if step == "epochs":
             # Looping through each of the different epochs file to create:

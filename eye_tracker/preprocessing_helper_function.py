@@ -1,4 +1,6 @@
-import numpy
+import mne
+import numpy as np
+import pandas as pd
 
 
 def create_metadata_from_events(epochs, metadata_column):
@@ -10,7 +12,7 @@ def create_metadata_from_events(epochs, metadata_column):
     category. This will become obsolete here at some point, when the preprocessing is changed to generate the meta data
     directly
     :param epochs: (mne epochs object) epochs for which the meta data will be generated
-    :param metadata_column_names: (list of strings) name of the column of the meta data. Must be in the same order
+    :param metadata_column: (list of strings) name of the column of the meta data. Must be in the same order
     as the events description + must be of the same length as the number of word in the events description
     :return: epochs (mne epochs object)
     """
@@ -47,12 +49,20 @@ def epoch_data(raw, events, event_dict, events_of_interest=None, metadata_column
     """
     This function epochs the continuous data according to specified events of interest, i.e. not all the events get
     evoked, only those we are interested in!
-    :param raw:
-    :param events:
-    :param event_dict:
-    :param events_of_interest:
-    :param metadata_column:
-    :return:
+    :param raw: (mne raw object) contains the data to epochs
+    :param events: (array of int) ID of each event
+    :param event_dict: (dictionary) description for each event UID
+    :param events_of_interest: (list of strings) list of events that we wish to epochs. The name must match strings
+    found in the event_dict keys
+    :param metadata_column: (list of strings) name of the meta data table columns. The event descriptions must be
+    encoded as \ separated values. Each string in the event dict key corresponds to a specific parameter from the
+    experiment. These are then parsed as a meta data table accordingly
+    :param tmin: (float) time from which to epoch (relative to event onset)
+    :param tmax: (float) time until which to epoch (relative to event onset)
+    :param baseline: (None or tuple) time to use as baseline. If set to None, no baseline correction applied
+    :param picks: (list or "all") list of channels to epoch
+    :param reject_by_annotation: (boolean) whether or not to reject trials based on annotations
+    :return: mne epochs object: the epoched data
     """
     # First, extract the events of interest:
     if events_of_interest is not None:
@@ -71,15 +81,18 @@ def epoch_data(raw, events, event_dict, events_of_interest=None, metadata_column
     return epochs
 
 
-def extract_blink(raw, description="blink", eyes=None):
+def extract_eyelink_events(raw, description="blink", eyes=None):
     """
-    This function extracts the blinks from the annotation file and converts them to a "boolean channel". In other words,
-    whereever there is blink, the channel is a 1, the rests are zeros. That way, down the line, we can use that info
-    in the epoched object to remove blinks and compute different kinds of variables on them
-    :param raw:
-    :param description:
-    :param eyes:
-    :return:
+    This function extracts the eyelink events from the annotation. In the annotation, we have the onset and duration
+    for each of the eyelink parser events. These are converted to continuous regressors, with ones where we have the
+    event in question and zeros elsewhere. This is for handy processing down the line, where we can reject or regress
+    those out.
+    :param raw: (mne raw object) raw object containing the annotations and continuous recordings
+    :param description: (string) identifier for the event in question (blink, saccades, fixations...). The description
+    must match the description found in the raw object annotation
+    :param eyes: (list or None) eye to use. By default set to use both, which will create one channel per eye and per
+    event. MONOCULAR NOT IMPLEMENTED
+    :return: raw_new (mne raw object) raw object with the added channels encoding the events and their duration
     """
     # Create the new channels, one per eye:
     if eyes is None:
