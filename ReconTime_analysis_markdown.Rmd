@@ -270,6 +270,8 @@ p3
 ```{r}
 
 source("R_rainclouds.R")
+
+
 # prepare data 
 n = length(subNums)
 
@@ -298,7 +300,7 @@ ggplot(rp_data, aes(x = SOA, y = mean_RT, fill = SOA_lock)) +
   # connecting individual data points (onset-locked)
   geom_line(data = rp_data %>% filter(SOA_lock =="onset"), aes(x=SOAj+.02, y = mean_RT, group=sub_id), color = 'lightblue',linetype = 1, size=0.1)+
   # connecting individual data points (offset-locked)
-  geom_line(data = rp_data %>% filter(SOA_lock =="offset"), aes(x=SOAj+.02, y = mean_RT, group=sub_id), color = 'pink',linetype = 1, size=0.1)+ 
+  geom_line(data = rp_data %>% filter(SOA_lock =="offset"), aes(x=SOAj+.02, y = mean_RT, group=sub_id), color = 'pink',linetype = 1, linewidth=0.1)+ 
   # individual data points (each subject)
   geom_point(aes(x = as.numeric(SOAj)+.02, y = mean_RT, colour = SOA_lock), size = 2, shape = 20) +
   # box plots
@@ -371,7 +373,7 @@ qqnorm(residuals(reduced_model))
 ```
 
 
-# exploratory offset analayses - models
+# exploratory split by SOA-lock analayses - models
 
 ```{r}
 # offset general linear mixed effect model
@@ -381,8 +383,22 @@ offset_event_table = all_event_table %>% filter(SOA_lock == 'offset')
 
 offset_model = glmer(RT_aud ~ c_SOA*c_duration*is_task_relevant + (1*c_SOA*c_duration*is_task_relevant|sub_num), family=Gamma(link="identity"), data=offset_event_table)
 summary(offset_model)
+Anova(offset_model)
 plot(fitted(offset_model ),residuals(offset_model))
 qqnorm(residuals(offset_model))
+
+
+# onset general linear mixed effect model
+
+onset_event_table = all_event_table %>% filter(SOA_lock == 'onset')
+
+
+onset_model = glmer(RT_aud ~ c_SOA*c_duration*is_task_relevant + (1*c_SOA*c_duration*is_task_relevant|sub_num), family=Gamma(link="identity"), data=offset_event_table)
+summary(onset_model)
+Anova(onset_model)
+plot(fitted(onset_model ),residuals(onset_model))
+qqnorm(residuals(onset_model))
+
 
 ```
 
@@ -404,6 +420,34 @@ pitch_plot = ggplot(data=SOA_SOA_lock_pitch_data, aes(x=SOA*1000, y=mean_RT*1000
   xlab('SOA [ms]')+
   scale_color_manual(values=c('red','blue','green'))
 pitch_plot
+
+# duration with only SOA and no SOA lock 
+
+SOA_duration_data = all_event_table %>%  group_by(SOA, duration) %>%
+                                      summarise(mean_RT = mean(RT_aud, na.rm = TRUE),
+                                                         sd_RT = mean(RT_aud, na.rm = TRUE))
+
+SOA_duration_id_data = all_event_table %>%  group_by(SOA, duration, sub_id) %>%
+                                      summarise(mean_RT = mean(RT_aud, na.rm = TRUE),
+                                                         sd_RT = mean(RT_aud, na.rm = TRUE))
+
+SOA_duration_plot = ggplot(data=SOA_duration_data, aes(x=SOA*1000, y=mean_RT*1000, group=as.character(duration))) +
+  geom_line(aes(color=as.character(duration)))+
+  geom_point()+
+  # connecting individual data points (onset-locked)
+  geom_line(data = SOA_duration_id_data %>% filter(duration == 0.5), aes(x=SOA*1000, y = mean_RT*1000, group=sub_id), color = 'pink',linetype = 1, size=0.1)+
+  # connecting individual data points (onset-locked)
+  geom_line(data = SOA_duration_id_data %>% filter(duration == 1), aes(x=SOA*1000, y = mean_RT*1000, group=sub_id), color = 'lightblue',linetype = 1, size=0.1)+
+  # connecting individual data points (offset-locked)
+  geom_line(data = SOA_duration_id_data %>% filter(duration == 1.5), aes(x=SOA*1000, y = mean_RT*1000, group=sub_id), color = 'lightgreen',linetype = 1, linewidth=0.1)+ 
+  # individual data points (each subject)
+  geom_point(data = SOA_duration_id_data, aes(x = SOA*1000, y = mean_RT*1000, colour = as.character(duration)), size = 1, shape = 20)+
+  ylim(c(400,700))+
+  ylab("Reaction time [ms]")+
+  xlab('SOA [ms]')+
+  scale_color_manual(values=c('red','blue','darkgreen'))
+SOA_duration_plot
+
 
 
 # category 
@@ -480,15 +524,13 @@ library(brms)
 install.packages("dampack")
 library(dampack)
 
-
-
 # data simulation and priors
 #gamma_params = gamma_params(mean(all_event_table$RT_aud, na.rm = TRUE), sd(event_table$RT_aud, na.rm = TRUE), scale = FALSE)
 
 #prior1 = rgamma(n=1000,shape=gamma_params$shape,rate=gamma_params$rate)
 
 
-#brm_SOA_SOA_lock_model = brm(RT_aud ~ SOA*SOA_lock +(1|sub_id), all_event_table, family=Gamma(),save_all_pars = TRUE)
+#brm_SOA_SOA_lock_model = brm(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant + (1*c_SOA*is_onset*c_duration*is_task_relevant|sub_num), all_event_table, family=Gamma(link="identity"),save_pars = save_pars(all = TRUE))
 #summary(brm_SOA_SOA_lock_model)
 #confint(brm_SOA_SOA_lock_model)
 #plot(brm_SOA_SOA_lock_model)
