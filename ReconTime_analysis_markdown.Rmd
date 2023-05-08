@@ -99,6 +99,61 @@ if ( exists('all_event_table')){
 }
 ```
 
+# make downsampling for introspective task 
+
+```{r}
+
+all_event_table = all_event_table %>% filter(SOA != 0.116)
+
+all_event_table = all_event_table[sample(1:nrow(all_event_table)), ]
+
+
+task_relevance_lvl = c('non-target', 'irrelevant')
+SOA_lock_lvl = c('onset', 'offset')
+SOA_lvl = c(0,0.232,0.466)
+duration_lvl = c(0.5,1,1.5)
+sub_id_lvl = sub_ids
+
+
+for (o in sub_id_lvl){
+  for (i in SOA_lvl){
+    for (ii in SOA_lock_lvl) {
+      for (iii in task_relevance_lvl) {
+        for (iv in duration_lvl) {
+          
+          cell_trials = sum(all_event_table$sub_id == o & all_event_table$SOA == i & all_event_table$SOA_lock == ii & all_event_table$task_relevance == iii & all_event_table$duration == iv, na.rm = TRUE)
+          
+          cell_table = all_event_table %>% filter(sub_id == o & SOA == i & SOA_lock == ii & task_relevance == iii & duration == iv)
+          
+          cell_table = cell_table[1:round(40/3), ]
+          
+          if (exists("new_event_table")){
+new_event_table = rbind(new_event_table, cell_table)
+          } else {
+            new_event_table = cell_table
+          }
+         
+        }}}}}
+
+# check if downsampling was successful 
+for (o in sub_id_lvl){
+  for (i in SOA_lvl){
+    for (ii in SOA_lock_lvl) {
+      for (iii in task_relevance_lvl) {
+          
+          cell_trials = sum(new_event_table$sub_id == o & new_event_table$SOA == i & new_event_table$SOA_lock == ii & new_event_table$task_relevance == iii, na.rm = TRUE)
+          
+
+          if(cell_trials != 39){
+            cell_name = paste(i,ii,iii,iv,sep= '-')
+            warning(paste0('Subject ',o,' has ', cell_trials,' trials for cell: ', cell_name, '\n'))
+          }
+      }}}}
+
+all_event_table = new_event_table
+
+```
+
 # apply trial exclusion
 
 ```{r}
@@ -269,7 +324,7 @@ p3
 
 ```{r}
 
-source("R_rainclouds.R")
+#source("R_rainclouds.R")
 
 
 # prepare data 
@@ -370,6 +425,9 @@ Anova(reduced_model)
 plot(fitted(reduced_model),residuals(reduced_model))
 qqnorm(residuals(reduced_model))
 
+summ = summary(reduced_model)
+
+write.csv(summ['coefficients'],file='GZLM_CG_M1_result.csv')
 ```
 
 
