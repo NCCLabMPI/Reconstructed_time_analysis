@@ -99,61 +99,6 @@ if ( exists('all_event_table')){
 }
 ```
 
-# make downsampling for introspective task 
-
-```{r}
-
-all_event_table = all_event_table %>% filter(SOA != 0.116)
-
-all_event_table = all_event_table[sample(1:nrow(all_event_table)), ]
-
-
-task_relevance_lvl = c('non-target', 'irrelevant')
-SOA_lock_lvl = c('onset', 'offset')
-SOA_lvl = c(0,0.232,0.466)
-duration_lvl = c(0.5,1,1.5)
-sub_id_lvl = sub_ids
-
-
-for (o in sub_id_lvl){
-  for (i in SOA_lvl){
-    for (ii in SOA_lock_lvl) {
-      for (iii in task_relevance_lvl) {
-        for (iv in duration_lvl) {
-          
-          cell_trials = sum(all_event_table$sub_id == o & all_event_table$SOA == i & all_event_table$SOA_lock == ii & all_event_table$task_relevance == iii & all_event_table$duration == iv, na.rm = TRUE)
-          
-          cell_table = all_event_table %>% filter(sub_id == o & SOA == i & SOA_lock == ii & task_relevance == iii & duration == iv)
-          
-          cell_table = cell_table[1:round(40/3), ]
-          
-          if (exists("new_event_table")){
-new_event_table = rbind(new_event_table, cell_table)
-          } else {
-            new_event_table = cell_table
-          }
-         
-        }}}}}
-
-# check if downsampling was successful 
-for (o in sub_id_lvl){
-  for (i in SOA_lvl){
-    for (ii in SOA_lock_lvl) {
-      for (iii in task_relevance_lvl) {
-          
-          cell_trials = sum(new_event_table$sub_id == o & new_event_table$SOA == i & new_event_table$SOA_lock == ii & new_event_table$task_relevance == iii, na.rm = TRUE)
-          
-
-          if(cell_trials != 39){
-            cell_name = paste(i,ii,iii,iv,sep= '-')
-            warning(paste0('Subject ',o,' has ', cell_trials,' trials for cell: ', cell_name, '\n'))
-          }
-      }}}}
-
-all_event_table = new_event_table
-
-```
-
 # apply trial exclusion
 
 ```{r}
@@ -413,7 +358,10 @@ ggplot(all_data, aes(SOA_lock, mean_RT, fill=interaction(duration, task_relevanc
 
 # full general linear mixed effect model
 
-full_model = glmer(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant + (1*c_SOA*is_onset*c_duration*is_task_relevant|sub_num), family=Gamma(link="identity"), data=all_event_table)
+full_model = glmer(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant +
+                     (1*c_SOA*is_onset*c_duration*is_task_relevant|sub_num),
+                   family=Gamma(link="identity"), data=all_event_table)
+
 summary(full_model)
 Anova(full_model)
 plot(fitted(full_model),residuals(full_model))
@@ -421,7 +369,10 @@ qqnorm(residuals(full_model))
 
 # reduced general linear mixed effect model (without duration, if duration is not significant in the full model)
 
-reduced_model = glmer(RT_aud ~ c_SOA*is_onset*is_task_relevant + (1*c_SOA*is_onset*is_task_relevant|sub_num), family=Gamma(link="identity"), data=all_event_table)
+reduced_model = glmer(RT_aud ~ c_SOA*is_onset*is_task_relevant +
+                        (1*c_SOA*is_onset*is_task_relevant|sub_num),
+                      family=Gamma(link="identity"), data=all_event_table)
+
 summary(reduced_model)
 Anova(reduced_model)
 plot(fitted(reduced_model),residuals(reduced_model))
@@ -438,7 +389,10 @@ qqnorm(residuals(reduced_model))
 offset_event_table = all_event_table %>% filter(SOA_lock == 'offset')
 
 
-offset_model = glmer(RT_aud ~ c_SOA*c_duration*is_task_relevant + (1*c_SOA*c_duration*is_task_relevant|sub_num), family=Gamma(link="identity"), data=offset_event_table)
+offset_model = glmer(RT_aud ~ c_SOA*c_duration*is_task_relevant +
+                       (1*c_SOA*c_duration*is_task_relevant|sub_num),
+                     family=Gamma(link="identity"), data=offset_event_table)
+
 summary(offset_model)
 Anova(offset_model)
 plot(fitted(offset_model ),residuals(offset_model))
@@ -450,7 +404,10 @@ qqnorm(residuals(offset_model))
 onset_event_table = all_event_table %>% filter(SOA_lock == 'onset')
 
 
-onset_model = glmer(RT_aud ~ c_SOA*c_duration*is_task_relevant + (1*c_SOA*c_duration*is_task_relevant|sub_num), family=Gamma(link="identity"), data=onset_event_table)
+onset_model = glmer(RT_aud ~ c_SOA*c_duration*is_task_relevant +
+                      (1*c_SOA*c_duration*is_task_relevant|sub_num),
+                    family=Gamma(link="identity"), data=onset_event_table)
+
 summary(onset_model)
 Anova(onset_model)
 plot(fitted(onset_model ),residuals(onset_model))
@@ -572,7 +529,11 @@ summary(ori_model)
 
 # mega model
 
-mega_model = glmer(RT_aud ~ c_SOA*c_is_onset*c_duration*c_task_relevant + (1*c_SOA*c_is_onset*c_duration*c_task_relevant | sub_num)+ (1*c_SOA*c_is_onset*c_duration*c_task_relevant | c_pitch)+ (1*c_SOA*c_is_onset*c_duration*c_task_relevant | c_cate_num), family=Gamma(link="identity"), data=all_event_table)
+mega_model = glmer(RT_aud ~ c_SOA*c_is_onset*c_duration*c_task_relevant +
+                     (1*c_SOA*c_is_onset*c_duration*c_task_relevant | sub_num) +
+                     (1*c_SOA*c_is_onset*c_duration*c_task_relevant | c_pitch) +
+                     (1*c_SOA*c_is_onset*c_duration*c_task_relevant | category), 
+                   family=Gamma(link="identity"), data=all_event_table)
 summary(mega_model)
 Anova(mega_model)
 
@@ -649,8 +610,126 @@ req_sample_size = ceiling(v + u + 1)
 
 
 ```
-(Intercept)               0.516229   0.060345   8.555
-SOA                      -0.149264   0.021116  -7.069
-SOA_lockonset             0.053079   0.027122   1.957
-duration                  0.004461   0.006218   0.717
-task_relevancenon-target  0.031554   0.016313   1.934
+
+# make downsampling for introspective task 
+
+```{r}
+
+# for new loaded all_event_table
+
+# prepare variables 
+insign = 0
+
+for (rep in 1:100){
+# repeat 100 times and check how often offset PRP would be significant
+  
+# remove old data tables 
+rm(reduced_event_table, reduced_offset_model, reduced_offset_event_table, new_event_table, cell_table, anov)
+
+# fitler out 116 ms trials
+reduced_event_table = all_event_table %>% filter(SOA != 0.116)
+
+# shuffle rows
+reduced_event_table = reduced_event_table[sample(1:nrow(reduced_event_table)), ]
+
+
+task_relevance_lvl = c('non-target', 'irrelevant')
+SOA_lock_lvl = c('onset', 'offset')
+SOA_lvl = c(0,0.232,0.466)
+duration_lvl = c(0.5,1,1.5)
+sub_id_lvl = sub_ids
+
+
+for (o in sub_id_lvl){
+  for (i in SOA_lvl){
+    for (ii in SOA_lock_lvl) {
+      for (iii in task_relevance_lvl) {
+        for (iv in duration_lvl) {
+          
+          cell_trials = sum(reduced_event_table$sub_id == o & reduced_event_table$SOA == i & reduced_event_table$SOA_lock == ii & reduced_event_table$task_relevance == iii & reduced_event_table$duration == iv, na.rm = TRUE)
+          
+          cell_table = reduced_event_table %>% filter(sub_id == o & SOA == i & SOA_lock == ii & task_relevance == iii & duration == iv)
+          
+          cell_table = cell_table[1:round(40/3), ]
+          
+          if (exists("new_event_table")){
+new_event_table = rbind(new_event_table, cell_table)
+          } else {
+            new_event_table = cell_table
+          }
+         
+        }}}}}
+
+# check if downsampling was successful 
+for (o in sub_id_lvl){
+  for (i in SOA_lvl){
+    for (ii in SOA_lock_lvl) {
+      for (iii in task_relevance_lvl) {
+          
+          cell_trials = sum(new_event_table$sub_id == o & new_event_table$SOA == i & new_event_table$SOA_lock == ii & new_event_table$task_relevance == iii, na.rm = TRUE)
+          
+
+          if(cell_trials != 39){
+            cell_name = paste(i,ii,iii,iv,sep= '-')
+            warning(paste0('Subject ',o,' has ', cell_trials,' trials for cell: ', cell_name, '\n'))
+          }
+      }}}}
+
+reduced_event_table = new_event_table
+
+
+# apply trial exclusion
+
+# remove target trials 
+reduced_event_table = reduced_event_table[reduced_event_table$task_relevance != 'target', ]
+
+# remove false alarm 
+reduced_event_table = reduced_event_table[reduced_event_table$trial_response_vis != 'fa', ]
+
+# remove RT < 100 ms
+reduced_event_table = reduced_event_table[reduced_event_table$RT_aud > 0.1, ]
+
+# remove incorrect auditory responses
+reduced_event_table = reduced_event_table[reduced_event_table$trial_accuracy_aud == 1, ]
+
+# remove NaNs from auditory responses
+reduced_event_table = reduced_event_table[!is.na(reduced_event_table$trial_accuracy_aud), ]
+
+
+## TRANSFORM DATA
+
+
+# make task relevance and SOA lock numeric
+reduced_event_table = reduced_event_table %>% mutate(is_task_relevant = ifelse(task_relevance == 'non-target',1,0)) 
+reduced_event_table = reduced_event_table %>% mutate(is_onset = ifelse(SOA_lock == 'onset',1,0))
+
+
+# center variables 
+reduced_event_table = reduced_event_table %>% mutate(c_task_relevant = is_task_relevant - mean(is_task_relevant))
+reduced_event_table = reduced_event_table %>% mutate(c_is_onset = is_onset - mean(is_onset))
+reduced_event_table = reduced_event_table %>% mutate(c_SOA = SOA - mean(SOA))
+reduced_event_table = reduced_event_table %>% mutate(c_duration = duration - mean(duration))
+
+
+
+# offset general linear mixed effect model
+reduced_offset_event_table = reduced_event_table %>% filter(SOA_lock == 'offset')
+
+
+reduced_offset_model = glmer(RT_aud ~ c_SOA*is_task_relevant +
+                               (1*c_SOA*is_task_relevant|sub_num) +
+                               (1*c_SOA*is_task_relevant|c_duration),
+                             family=Gamma(link="identity"), data=reduced_offset_event_table)
+
+summary(reduced_offset_model)
+anov = Anova(reduced_offset_model)
+
+p[rep] = anov['c_SOA','Pr(>Chisq)']
+
+if (p[rep] < 0.05){
+insign = insign + 1
+}
+
+}
+```
+
