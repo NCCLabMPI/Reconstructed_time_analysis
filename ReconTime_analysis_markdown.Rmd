@@ -259,6 +259,7 @@ all_event_table = all_event_table %>% mutate(c_is_onset = is_onset - mean(is_ons
 all_event_table = all_event_table %>% mutate(c_SOA = SOA - mean(SOA))
 all_event_table = all_event_table %>% mutate(c_duration = duration - mean(duration))
 all_event_table = all_event_table %>% mutate(c_pitch = (pitch-1050)/100) # makes pitches 0.5 for high and -0.5 for low
+all_event_table = all_event_table %>% mutate(c_cate_num = cate_num - mean(cate_num)) # center cate num
 
 ```
 # plotting
@@ -324,7 +325,7 @@ p3
 
 ```{r}
 
-#source("R_rainclouds.R")
+source("R_rainclouds.R")
 
 
 # prepare data 
@@ -357,18 +358,19 @@ ggplot(rp_data, aes(x = SOA, y = mean_RT, fill = SOA_lock)) +
   # connecting individual data points (offset-locked)
   geom_line(data = rp_data %>% filter(SOA_lock =="offset"), aes(x=SOAj+.02, y = mean_RT, group=sub_id), color = 'pink',linetype = 1, linewidth=0.1)+ 
   # individual data points (each subject)
-  geom_point(aes(x = as.numeric(SOAj)+.02, y = mean_RT, colour = SOA_lock), size = 2, shape = 20) +
+  geom_point(aes(x = as.numeric(SOAj)+.02, y = mean_RT, colour = SOA_lock), size = 0.5, shape = 20) +
   # box plots
   geom_boxplot(aes(x = SOA, y = mean_RT, fill = interaction(SOA_lock,SOA)),outlier.shape = NA, alpha = .5, width = .02, colour = "black")+
   # error bars
   geom_errorbar(data = sum_data, aes(x = as.numeric(SOA)+.02, y = RT_mean, group = SOA_lock, colour = SOA_lock, ymin = RT_mean-RT_sem, ymax = RT_mean+RT_sem), width = .005)+ 
   # mean line
-  geom_line(data = sum_data, aes(x = as.numeric(SOA)+.02, y = RT_mean, group = SOA_lock, colour = SOA_lock),linetype = 2, size=0.7)+
+  geom_line(data = sum_data, aes(x = as.numeric(SOA)+.02, y = RT_mean, group = SOA_lock, colour = SOA_lock),linetype = 2, size=0.5)+
   # mean points
-  geom_point(data = sum_data, aes(x = as.numeric(SOA)+.02, y = RT_mean, group = SOA_lock, colour = SOA_lock), shape = 18, size=3)+
+  geom_point(data = sum_data, aes(x = as.numeric(SOA)+.02, y = RT_mean, group = SOA_lock, colour = SOA_lock), shape = 18, size=1)+
   # adjust colors 
   scale_fill_manual(values=fill_colors )+scale_color_manual(values = line_colors)
 
+ggsave('../figures/raincloud.png', width = 6, height = 4)
 
 
 ```
@@ -425,9 +427,6 @@ Anova(reduced_model)
 plot(fitted(reduced_model),residuals(reduced_model))
 qqnorm(residuals(reduced_model))
 
-summ = summary(reduced_model)
-
-write.csv(summ['coefficients'],file='GZLM_CG_M1_result.csv')
 ```
 
 
@@ -451,7 +450,7 @@ qqnorm(residuals(offset_model))
 onset_event_table = all_event_table %>% filter(SOA_lock == 'onset')
 
 
-onset_model = glmer(RT_aud ~ c_SOA*c_duration*is_task_relevant + (1*c_SOA*c_duration*is_task_relevant|sub_num), family=Gamma(link="identity"), data=offset_event_table)
+onset_model = glmer(RT_aud ~ c_SOA*c_duration*is_task_relevant + (1*c_SOA*c_duration*is_task_relevant|sub_num), family=Gamma(link="identity"), data=onset_event_table)
 summary(onset_model)
 Anova(onset_model)
 plot(fitted(onset_model ),residuals(onset_model))
@@ -570,6 +569,13 @@ summary(cate_model)
 # orientation 
 ori_model = glmer(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant*ori_num + (1*c_SOA*is_onset*c_duration*is_task_relevant*ori_num|sub_num), family=Gamma(link="identity"), data=all_event_table)
 summary(ori_model)
+
+# mega model
+
+mega_model = glmer(RT_aud ~ c_SOA*c_is_onset*c_duration*c_task_relevant + (1*c_SOA*c_is_onset*c_duration*c_task_relevant | sub_num)+ (1*c_SOA*c_is_onset*c_duration*c_task_relevant | c_pitch)+ (1*c_SOA*c_is_onset*c_duration*c_task_relevant | c_cate_num), family=Gamma(link="identity"), data=all_event_table)
+summary(mega_model)
+Anova(mega_model)
+
 
 
 ```
