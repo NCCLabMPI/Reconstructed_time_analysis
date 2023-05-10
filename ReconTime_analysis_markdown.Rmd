@@ -460,10 +460,10 @@ f_offset_model = glmer(RT_aud ~ f_SOA*f_duration*is_task_relevant +
                      family=Gamma(link="identity"), data=f_offset_event_table)
 
 em1 <- emmeans(f_offset_model, "f_SOA", by = "f_duration")
-contrast(em1, "pairwise", adjust = "Tukey")
+contrast(em1, "pairwise", adjust = "bonferroni")
 
 em2 <- emmeans(f_offset_model, "f_SOA")
-contrast(em2, "pairwise", adjust = "Tukey")
+contrast(em2, "pairwise", adjust = "bonferroni")
 
 # onset general linear mixed effect model
 
