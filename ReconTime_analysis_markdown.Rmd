@@ -37,13 +37,9 @@ if (!('lme4' %in% installed.packages()))
 {install.packages('lme4')}
 library(lme4)
 
-if (!('lmerTest' %in% installed.packages()))
-{install.packages('lmerTest')}
-library(lmerTest)
-
-if (!('optimx' %in% installed.packages()))
-{install.packages('optimx')}
-library(optimx)
+if (!('emmeans' %in% installed.packages()))
+{install.packages('emmeans')}
+library(emmeans)
 
 if (!('car' %in% installed.packages()))
 {install.packages('car', dependencies = TRUE)}
@@ -97,11 +93,13 @@ if ( exists('all_event_table')){
   all_event_table = event_table
 }
 }
+
 ```
 
 # apply trial exclusion
 
 ```{r}
+
 # without exclusion
 raw_event_table = all_event_table
 
@@ -207,6 +205,7 @@ all_event_table = all_event_table %>% mutate(c_pitch = (pitch-1050)/100) # makes
 all_event_table = all_event_table %>% mutate(c_cate_num = cate_num - mean(cate_num)) # center cate num
 
 ```
+
 # plotting
 
 ```{R}
@@ -381,7 +380,7 @@ qqnorm(residuals(reduced_model))
 ```
 
 
-# exploratory split by SOA-lock analayses - models
+# split by SOA-lock analayses - models
 
 ```{r}
 # offset general linear mixed effect model
@@ -398,6 +397,20 @@ Anova(offset_model)
 plot(fitted(offset_model ),residuals(offset_model))
 qqnorm(residuals(offset_model))
 
+# post-hoc ttest with factorial SOA and duration
+
+f_offset_event_table = offset_event_table %>% mutate(f_SOA = as.factor(SOA))
+f_offset_event_table = f_offset_event_table %>% mutate(f_duration = as.factor(duration))
+
+f_offset_model = glmer(RT_aud ~ f_SOA*f_duration*is_task_relevant +
+                       (1*f_SOA*f_duration*is_task_relevant|sub_num),
+                     family=Gamma(link="identity"), data=f_offset_event_table)
+
+em1 <- emmeans(f_offset_model, "f_SOA", by = "f_duration")
+contrast(em1, "pairwise", adjust = "Tukey")
+
+em2 <- emmeans(f_offset_model, "f_SOA")
+contrast(em2, "pairwise", adjust = "Tukey")
 
 # onset general linear mixed effect model
 
@@ -526,8 +539,13 @@ summary(cate_model)
 # orientation 
 ori_model = glmer(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant*ori_num + (1*c_SOA*is_onset*c_duration*is_task_relevant*ori_num|sub_num), family=Gamma(link="identity"), data=all_event_table)
 summary(ori_model)
+```
 
-# mega model
+# exploratory more random effects 
+
+```{r}
+
+# with category and pitch as random effects 
 
 mega_model = glmer(RT_aud ~ c_SOA*c_is_onset*c_duration*c_task_relevant +
                      (1*c_SOA*c_is_onset*c_duration*c_task_relevant | sub_num) +
@@ -537,6 +555,16 @@ mega_model = glmer(RT_aud ~ c_SOA*c_is_onset*c_duration*c_task_relevant +
 summary(mega_model)
 Anova(mega_model)
 
+# with duration, category and pitch as random effects 
+
+mega_model2 = glmer(RT_aud ~ c_SOA*c_is_onset*c_task_relevant +
+                     (1*c_SOA*c_is_onset*c_task_relevant | sub_num) +
+                     (1*c_SOA*c_is_onset*c_task_relevant | c_duration) +
+                     (1*c_SOA*c_is_onset*c_task_relevant | c_pitch) +
+                     (1*c_SOA*c_is_onset*c_task_relevant | category), 
+                   family=Gamma(link="identity"), data=all_event_table)
+summary(mega_model2)
+Anova(mega_model2)
 
 
 ```
@@ -619,12 +647,17 @@ req_sample_size = ceiling(v + u + 1)
 
 # prepare variables 
 insign = 0
+p = 1:100
+p[1:100] = NaN
 
-for (rep in 1:100){
 # repeat 100 times and check how often offset PRP would be significant
+for (rep in 1:100){
+print(rep)
   
 # remove old data tables 
+options(warn=-1)
 rm(reduced_event_table, reduced_offset_model, reduced_offset_event_table, new_event_table, cell_table, anov)
+options(warn=0)
 
 # fitler out 116 ms trials
 reduced_event_table = all_event_table %>% filter(SOA != 0.116)
@@ -726,10 +759,12 @@ anov = Anova(reduced_offset_model)
 
 p[rep] = anov['c_SOA','Pr(>Chisq)']
 
-if (p[rep] < 0.05){
+if (p[rep] > 0.05){
 insign = insign + 1
 }
 
 }
+
+hist(p, 20) + abline(v=0.05, col="red") + abline(v=0.01, col="blue")
 ```
 
