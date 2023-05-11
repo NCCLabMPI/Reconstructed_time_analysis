@@ -448,7 +448,7 @@ Anova(offset_model)
 plot(fitted(offset_model),residuals(offset_model))
 qqnorm(residuals(offset_model))
 
-# post-hoc ttest with factorial SOA and duration
+# post-hoc pairwise comparison with factorial SOA and duration
 
 f_offset_event_table = offset_event_table %>% mutate(f_SOA = as.factor(SOA))
 f_offset_event_table = f_offset_event_table %>% mutate(f_duration = as.factor(duration))
@@ -628,9 +628,9 @@ Anova(mega_model2)
 
 ```{r}
 
-library(brms)
-install.packages("dampack")
-library(dampack)
+#library(brms)
+#install.packages("dampack")
+#library(dampack)
 
 # data simulation and priors
 #gamma_params = gamma_params(mean(all_event_table$RT_aud, na.rm = TRUE), sd(event_table$RT_aud, na.rm = TRUE), scale = FALSE)
@@ -814,12 +814,12 @@ anov = Anova(reduced_offset_model)
 
 p[rep] = anov['c_SOA','Pr(>Chisq)']
 
-if (p[rep] > 0.05){
-insign = insign + 1
-}
+if (p[rep] > 0.05){insign = insign + 1}
 
 }
 
-hist(p, 20) + abline(v=0.05, col="red") + abline(v=0.01, col="blue")
+hist(p, 20, main="Histogram of p's (red = 0.05, blue = 0.01)")
+abline(v=0.05, col="red")
+abline(v=0.01, col="blue")
 ```
 
