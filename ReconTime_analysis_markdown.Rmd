@@ -45,7 +45,15 @@ if (!('car' %in% installed.packages()))
 {install.packages('car', dependencies = TRUE)}
 library(car)
 
+if (!('rsq' %in% installed.packages()))
+{install.packages('rsq', dependencies = TRUE)}
+library(rsq)
 
+if (!('ggeffects' %in% installed.packages()))
+{install.packages('ggeffects', dependencies = TRUE)}
+library(ggeffects)
+
+install.packages("sjPlot")
 ```
 
 # details of subjects  
@@ -407,7 +415,7 @@ ggplot(all_data, aes(SOA_lock, mean_RT, fill=interaction(duration, task_relevanc
 # full general linear mixed effect model
 
 full_model = glmer(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant +
-                     (1*c_SOA*is_onset*c_duration*is_task_relevant|sub_num),
+                     (1*c_SOA*is_onset*c_duration*is_task_relevant|sub_id),
                    family=Gamma(link="identity"), data=all_event_table)
 
 summary(full_model)
@@ -418,7 +426,7 @@ qqnorm(residuals(full_model))
 # reduced general linear mixed effect model (without duration, if duration is not significant in the full model)
 
 reduced_model = glmer(RT_aud ~ c_SOA*is_onset*is_task_relevant +
-                        (1*c_SOA*is_onset*is_task_relevant|sub_num),
+                        (1*c_SOA*is_onset*is_task_relevant|sub_id),
                       family=Gamma(link="identity"), data=all_event_table)
 
 summary(reduced_model)
@@ -438,7 +446,7 @@ offset_event_table = all_event_table %>% filter(SOA_lock == 'offset')
 
 
 offset_model = glmer(RT_aud ~ c_SOA*c_duration*is_task_relevant +
-                       (1*c_SOA*c_duration*is_task_relevant | sub_num) +                     
+                       (1*c_SOA*c_duration*is_task_relevant | sub_id) +                     
                      (1*c_SOA*c_duration*c_task_relevant | c_pitch) +
                      (1*c_SOA*c_duration*c_task_relevant | category),
                      family=Gamma(link="identity"), data=offset_event_table)
@@ -450,14 +458,17 @@ qqnorm(residuals(offset_model))
 
 # post-hoc pairwise comparison with factorial SOA and duration
 
-f_offset_event_table = offset_event_table %>% mutate(f_SOA = as.factor(SOA))
-f_offset_event_table = f_offset_event_table %>% mutate(f_duration = as.factor(duration))
+f_offset_event_table = offset_event_table %>% mutate(f_SOA = factor(SOA, ordered = TRUE, levels = c("0", "0.116", "0.232", "0.466")))
+f_offset_event_table = f_offset_event_table %>% mutate(f_duration = factor(duration, ordered = TRUE, levels = c("0.5", "1", "1.5")))
 
-f_offset_model = glmer(RT_aud ~ f_SOA*f_duration*is_task_relevant +
-                       (1*f_SOA*f_duration*is_task_relevant | sub_num) +                     
+f_offset_model = glmer(RT_aud ~ f_SOA*f_duration*c_task_relevant +
+                       (1*f_SOA*f_duration*c_task_relevant | sub_id) +                     
                      (1*f_SOA*f_duration*c_task_relevant | c_pitch) +
                      (1*f_SOA*f_duration*c_task_relevant | category),
                      family=Gamma(link="identity"), data=f_offset_event_table)
+
+Anova(f_offset_model)
+rsq.glmm(f_offset_model)
 
 em1 <- emmeans(f_offset_model, "f_SOA", by = "f_duration")
 contrast(em1, "pairwise", adjust = "bonferroni")
@@ -471,7 +482,7 @@ onset_event_table = all_event_table %>% filter(SOA_lock == 'onset')
 
 
 onset_model = glmer(RT_aud ~ c_SOA*c_duration*is_task_relevant +
-                       (1*c_SOA*c_duration*is_task_relevant | sub_num) +                     
+                       (1*c_SOA*c_duration*is_task_relevant | sub_id) +                     
                      (1*c_SOA*c_duration*c_task_relevant | c_pitch) +
                      (1*c_SOA*c_duration*c_task_relevant | category),
                      family=Gamma(link="identity"), data=onset_event_table)
@@ -480,6 +491,51 @@ summary(onset_model)
 Anova(onset_model)
 plot(fitted(onset_model ),residuals(onset_model))
 qqnorm(residuals(onset_model))
+
+
+```
+
+# predicted values
+
+```{r}
+cols = c("pink","red","darkred","purple","blue","cyan","darkgreen","green","yellow","orange")
+
+
+fit_off = glmer(RT_aud ~ SOA + (1*SOA| sub_id),
+                     family=Gamma(link="identity"), data=offset_event_table)
+
+pr3 = ggpredict(fit, c("SOA", "sub_id"))
+plot(pr3)+ scale_colour_manual(values = cols)
+
+
+
+fit = glmer(RT_aud ~ SOA*SOA_lock + (1*SOA*SOA_lock| sub_id),
+                     family=Gamma(link="identity"), data=all_event_table)
+
+plot_model(fit, type = "pred", terms = c("SOA", "sub_id", "SOA_lock"))
+
+pr = ggpredict(fit, c("SOA", "sub_id", "SOA_lock"),type = "fixed")
+plot(pr)+ scale_colour_manual(values = cols)
+
+pr1 = ggpredict(fit, c("SOA", "SOA_lock"),type = "fixed")
+plot(pr1)
+
+pred = predict(fit,re.form=~0)
+
+predicted_values = modelr::data_grid(all_event_table, SOA,SOA_lock, sub_id) %>% 
+                   modelr::add_predictions(fit)
+
+predicted_values %>% 
+  ggplot(aes(SOA, pred, color = sub_id, linetype = SOA_lock))+
+  geom_line()+
+  geom_jitter(data = all_event_table, aes(SOA, RT_aud, color = sub_id),width = 0.02, size=0.5)+
+  ylim(c(0.1,1))
+
+p <- ggplot(all_event_table, aes(x = SOA, y = RT_aud, colour = sub_id, group = SOA_lock)) +
+  geom_jitter(width = 0.02, size=0.5) +
+  geom_line(aes(y = pred, group=SOA_lock),size=0.5)+
+  ylim(c(0.1,1))
+print(p)
 
 
 ```
@@ -584,15 +640,15 @@ acc_plot
 ```{r}
 
 # pitch  
-pitch_model = glmer(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant*c_pitch + (1*c_SOA*is_onset*c_duration*is_task_relevant*c_pitch|sub_num), family=Gamma(link="identity"), data=all_event_table)
+pitch_model = glmer(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant*c_pitch + (1*c_SOA*is_onset*c_duration*is_task_relevant*c_pitch|sub_id), family=Gamma(link="identity"), data=all_event_table)
 summary(pitch_model)
 
 # category 
-cate_model = glmer(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant*cate_num + (1*c_SOA*is_onset*c_duration*is_task_relevant*cate_num|sub_num), family=Gamma(link="identity"), data=all_event_table)
+cate_model = glmer(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant*cate_num + (1*c_SOA*is_onset*c_duration*is_task_relevant*cate_num|sub_id), family=Gamma(link="identity"), data=all_event_table)
 summary(cate_model)
 
 # orientation 
-ori_model = glmer(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant*ori_num + (1*c_SOA*is_onset*c_duration*is_task_relevant*ori_num|sub_num), family=Gamma(link="identity"), data=all_event_table)
+ori_model = glmer(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant*ori_num + (1*c_SOA*is_onset*c_duration*is_task_relevant*ori_num|sub_id), family=Gamma(link="identity"), data=all_event_table)
 summary(ori_model)
 ```
 
@@ -603,7 +659,7 @@ summary(ori_model)
 # with category and pitch as random effects 
 
 mega_model = glmer(RT_aud ~ c_SOA*c_is_onset*c_duration*c_task_relevant +
-                     (1*c_SOA*c_is_onset*c_duration*c_task_relevant | sub_num) +
+                     (1*c_SOA*c_is_onset*c_duration*c_task_relevant | sub_id) +
                      (1*c_SOA*c_is_onset*c_duration*c_task_relevant | c_pitch) +
                      (1*c_SOA*c_is_onset*c_duration*c_task_relevant | category), 
                    family=Gamma(link="identity"), data=all_event_table)
@@ -613,14 +669,14 @@ Anova(mega_model)
 # with duration, category and pitch as random effects 
 
 mega_model2 = glmer(RT_aud ~ c_SOA*c_is_onset*c_task_relevant +
-                     (1*c_SOA*c_is_onset*c_task_relevant | sub_num) +
+                     (1*c_SOA*c_is_onset*c_task_relevant | sub_id) +
                      (1*c_SOA*c_is_onset*c_task_relevant | c_duration) +
                      (1*c_SOA*c_is_onset*c_task_relevant | c_pitch) +
                      (1*c_SOA*c_is_onset*c_task_relevant | category), 
                    family=Gamma(link="identity"), data=all_event_table)
 summary(mega_model2)
 Anova(mega_model2)
-
+rsq.glmm(mega_model2)
 
 ```
 
@@ -638,7 +694,7 @@ Anova(mega_model2)
 #prior1 = rgamma(n=1000,shape=gamma_params$shape,rate=gamma_params$rate)
 
 
-#brm_SOA_SOA_lock_model = brm(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant + (1*c_SOA*is_onset*c_duration*is_task_relevant|sub_num), all_event_table, family=Gamma(link="identity"),save_pars = save_pars(all = TRUE))
+#brm_SOA_SOA_lock_model = brm(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant + (1*c_SOA*is_onset*c_duration*is_task_relevant|sub_id), all_event_table, family=Gamma(link="identity"),save_pars = save_pars(all = TRUE))
 #summary(brm_SOA_SOA_lock_model)
 #confint(brm_SOA_SOA_lock_model)
 #plot(brm_SOA_SOA_lock_model)
@@ -805,7 +861,7 @@ reduced_offset_event_table = reduced_event_table %>% filter(SOA_lock == 'offset'
 
 
 reduced_offset_model = glmer(RT_aud ~ c_SOA*is_task_relevant +
-                               (1*c_SOA*is_task_relevant|sub_num) +
+                               (1*c_SOA*is_task_relevant|sub_id) +
                                (1*c_SOA*is_task_relevant|c_duration),
                              family=Gamma(link="identity"), data=reduced_offset_event_table)
 
