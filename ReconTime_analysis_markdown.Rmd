@@ -422,6 +422,7 @@ summary(full_model)
 Anova(full_model)
 plot(fitted(full_model),residuals(full_model))
 qqnorm(residuals(full_model))
+rsq.glmm(full_model)
 
 # reduced general linear mixed effect model (without duration, if duration is not significant in the full model)
 
@@ -433,7 +434,7 @@ summary(reduced_model)
 Anova(reduced_model)
 plot(fitted(reduced_model),residuals(reduced_model))
 qqnorm(residuals(reduced_model))
-
+rsq.glmm(reduced_model)
 ```
 
 
@@ -665,6 +666,7 @@ mega_model = glmer(RT_aud ~ c_SOA*c_is_onset*c_duration*c_task_relevant +
                    family=Gamma(link="identity"), data=all_event_table)
 summary(mega_model)
 Anova(mega_model)
+rsq.glmm(mega_model)
 
 # with duration, category and pitch as random effects 
 
