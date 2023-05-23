@@ -18,50 +18,15 @@ dir()
 # required packages
 
 ```{r packages} 
-if (!('tidyverse' %in% installed.packages()))
-{install.packages("tidyverse")}
-library(tidyverse)
 
-if (!('dplyr' %in% installed.packages()))
-{install.packages('dplyr')}
-library(dplyr)
+# get package manager package
+if (!('pacman' %in% installed.packages()))
+{install.packages("pacman")}
+library(pacman)
 
-if (!('ggdist' %in% installed.packages()))
-{install.packages('ggdist')}
-library(ggdist)
+# install all needed packages 
 
-if (!('brms' %in% installed.packages()))
-{install.packages('brms')}
-library(brms)
-
-if (!('lme4' %in% installed.packages()))
-{install.packages('lme4')}
-library(lme4)
-
-if (!('emmeans' %in% installed.packages()))
-{install.packages('emmeans')}
-library(emmeans)
-
-if (!('car' %in% installed.packages()))
-{install.packages('car', dependencies = TRUE)}
-library(car)
-
-if (!('rsq' %in% installed.packages()))
-{install.packages('rsq', dependencies = TRUE)}
-library(rsq)
-
-if (!('ggeffects' %in% installed.packages()))
-{install.packages('ggeffects', dependencies = TRUE)}
-library(ggeffects)
-
-if (!('sjPlot' %in% installed.packages()))
-{install.packages('sjPlot', dependencies = TRUE)}
-library(sjPlot)
-
-if (!('glmm.hp' %in% installed.packages()))
-{install.packages('glmm.hp', dependencies = TRUE)}
-library(glmm.hp)
-
+pacman::p_load('dplyr', 'ggdist', 'ggeffects', 'ggscatter', 'lme4', 'emmeans', 'car', 'rsq', 'sjPlot', 'brms')
 
 ```
 
