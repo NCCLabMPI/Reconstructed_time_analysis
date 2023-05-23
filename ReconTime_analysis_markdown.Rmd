@@ -4,19 +4,20 @@ output: html_document
 date: "2023-04-05"
 ---
 
-# clear
+# housekeeping
 
-```{r}
+```{r huosekeeping}
 # clear workspace
 rm(list = ls())
-```
 
-# Housekeeping
-
-```{r}
 wd = 'C:/Users/micha.engeser/Documents/GitHub/Reconstructed_time_analysis'
 setwd(wd)
 dir()
+```
+
+# required packages
+
+```{r packages} 
 if (!('tidyverse' %in% installed.packages()))
 {install.packages("tidyverse")}
 library(tidyverse)
@@ -66,7 +67,8 @@ library(glmm.hp)
 
 # details of subjects  
 
-```{r}
+```{r subjects}
+
 subNums = c(101, 102, 103, 105, 106, 107, 108, 109, 110, 111)
 ses = 1
 Lab_ID = 'SX'
@@ -75,7 +77,8 @@ task = 'prp'
 
 # loading files
 
-```{r}
+```{r loading}
+
 count = 0
 sub_ids = NaN
 for (subNum in subNums ){
@@ -114,7 +117,7 @@ if ( exists('all_event_table')){
 
 # apply trial exclusion
 
-```{r}
+```{r trial_exclusion}
 
 # without exclusion
 raw_event_table = all_event_table
@@ -163,7 +166,8 @@ for (o in sub_id_lvl){
 
 # transfrom data
 
-``` {r}
+``` {r transform_data}
+
 # add log transformed column
 all_event_table = all_event_table %>% mutate(log_RT_aud = log(RT_aud))
 
@@ -189,7 +193,7 @@ all_event_table = all_event_table %>% mutate(c_pitch = (pitch-1050)/100) # makes
 
 # performance
 
-``` {r}
+``` {r perfromance}
 perf = data.frame(matrix(ncol = 0, nrow = 1))
 perf$sub_id = "NaN"
 perf$hits = NaN
@@ -238,7 +242,7 @@ perf = perf %>% add_row(sub_id = 'sd',
 
 # plotting
 
-```{R}
+```{R plotting}
 # make duration a string
 event_table2 = all_event_table
 event_table2$duration = as.character(event_table2$duration)
@@ -312,7 +316,7 @@ p3
 
 # rain cloud plot
 
-```{r}
+```{r raincloud_plot}
 
 source("R_rainclouds.R")
 
@@ -365,7 +369,7 @@ ggsave('../figures/raincloud.png', width = 6, height = 4)
 
 # box plot 
 
-```{r}
+```{r boxplot}
 
 box_plot_data = all_event_table %>%  group_by(sub_id, SOA, SOA_lock, task_relevance, duration) %>% summarise(mean_RT = mean(RT_aud, na.rm = TRUE), sd_RT = sd(RT_aud, na.rm = TRUE))
 
@@ -380,7 +384,7 @@ ggplot(box_plot_data, aes(SOA_lock, mean_RT, fill=interaction(duration, task_rel
 
 # main analysis - model 1 
 
-```{r}
+```{r model1}
 
 ## general linear mixed effect model 1 
 
@@ -403,7 +407,7 @@ rsq.glmm(model1)
 
 # offset PRP analysis
 
-```{r}
+```{r offset_PRP}
 
 # post-hoc pairwise comparison
 
@@ -443,10 +447,28 @@ ggscatter(offset_SOA_data , x = "SOA", y = "mean_RT",
 ```
 
 
+# control model - model2
+
+```{r model2}
+
+
+# with duration, category and pitch as random effects 
+
+model2 = glmer(RT_aud ~ f_SOA*c_is_onset*c_task_relevant +
+                     (1*f_SOA*c_is_onset*c_task_relevant | sub_id) +
+                     (1*f_SOA*c_is_onset*c_task_relevant | f_duration) +
+                     (1*f_SOA*c_is_onset*c_task_relevant | c_pitch) +
+                     (1*f_SOA*c_is_onset*c_task_relevant | category), 
+                   family=Gamma(link="identity"), data=all_event_table)
+summary(model2)
+Anova(model2)
+rsq.glmm(model2)
+
+```
 
 # exploratory analayses - plots of pitch, category, orientation and performance
 
-```{r}
+```{r control_plots}
 
 # pitch  
 
@@ -513,30 +535,11 @@ acc_plot
 
 ```
 
-# control model - model2
-
-```{r}
-
-
-# with duration, category and pitch as random effects 
-
-model2 = glmer(RT_aud ~ f_SOA*c_is_onset*c_task_relevant +
-                     (1*f_SOA*c_is_onset*c_task_relevant | sub_id) +
-                     (1*f_SOA*c_is_onset*c_task_relevant | f_duration) +
-                     (1*f_SOA*c_is_onset*c_task_relevant | c_pitch) +
-                     (1*f_SOA*c_is_onset*c_task_relevant | category), 
-                   family=Gamma(link="identity"), data=all_event_table)
-summary(model2)
-Anova(model2)
-rsq.glmm(model2)
-
-```
-
 
 
 # predicted values
 
-```{r}
+```{r predicted_values}
 #cols = c("pink","red","darkred","purple","blue","cyan","darkgreen","green","yellow","orange")
 
 
@@ -580,7 +583,7 @@ rsq.glmm(model2)
 
 # bayesian exploratory analysis - incomplete!
 
-```{r}
+```{r bayesian}
 
 #library(brms)
 #install.packages("dampack")
@@ -615,7 +618,7 @@ rsq.glmm(model2)
 
 # power analysis
 
-```{r}
+```{r power_analysis}
 if (!('pwr' %in% installed.packages()))
 {install.packages("pwr")}
 library(pwr)
@@ -646,13 +649,13 @@ v = pwr.f2.test(u = u, v = , f2 = effect_size/4, sig.level = .05, power = power)
 req_sample_size = ceiling(v + u + 1)
 
 # show result
-print(req_sample_size )
+print(paste0("The required sample size is: ", req_sample_size))
 
 ```
 
 # make downsampling for introspective task 
 
-```{r}
+```{r downsampling}
 
 # for new loaded all_event_table
 
