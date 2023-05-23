@@ -378,21 +378,25 @@ ggplot(box_plot_data, aes(SOA_lock, mean_RT, fill=interaction(duration, task_rel
 
 ```
 
-# main analysis
+# main analysis - model 1 
 
 ```{r}
 
-# full general linear mixed effect model
+## general linear mixed effect model 1 
 
-full_model = glmer(RT_aud ~ f_SOA*is_onset*f_duration*is_task_relevant +
-                     (1*f_SOA*is_onset*f_duration*is_task_relevant|sub_id),
-                   family=Gamma(link="identity"), data=all_event_table)
+# fixed effects: SOA (ordinal), SOA-Lock (as is_onset,  numeric, centered), Task-relevance (as is relevant, numeric, centered)
+# random effects: Subject ID, Duration (ordinal)
 
-summary(full_model)
-Anova(full_model)
-plot(fitted(full_model),residuals(full_model))
-qqnorm(residuals(full_model))
-rsq.glmm(full_model)
+model1 = glmer(RT_aud ~ f_SOA*is_onset*is_task_relevant +
+                     (1*f_SOA*is_onset*is_task_relevant | sub_id)+
+                     (1*f_SOA*is_onset*is_task_relevant | f_duration),
+               family=Gamma(link="identity"), data=all_event_table)
+
+summary(model1)
+Anova(model1)
+plot(fitted(model1),residuals(model1))
+qqnorm(residuals(model1))
+rsq.glmm(model1)
 
 ```
 
