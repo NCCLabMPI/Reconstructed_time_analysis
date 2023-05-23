@@ -4,7 +4,7 @@ output: html_document
 date: "2023-04-05"
 ---
 
-#clear
+# clear
 
 ```{r}
 # clear workspace
@@ -121,8 +121,6 @@ raw_event_table = all_event_table
 
 # remove target trials 
 all_event_table = all_event_table[all_event_table$task_relevance != 'target', ]
-relevant_event_table = all_event_table[all_event_table$task_relevance == 'non-target', ]
-irrelevant_event_table = all_event_table[all_event_table$task_relevance == 'irrelevant', ]
 
 # remove false alarm 
 all_event_table = all_event_table[all_event_table$trial_response_vis != 'fa', ]
@@ -133,22 +131,9 @@ all_event_table = all_event_table[all_event_table$RT_aud > 0.1, ]
 # remove incorrect auditory responses
 all_event_table = all_event_table[all_event_table$trial_accuracy_aud == 1, ]
 
-# remove outliers
-
-# sample_mean = mean(all_event_table$RT_aud, na.rm = TRUE)
-# sample_sd = sd(all_event_table$RT_aud, na.rm = TRUE)
-# remove RT > 3x std
-# all_event_table = all_event_table[all_event_table$RT_aud < sample_mean + 4*sample_sd, ]
-
-# remove RT < 3x std
-# all_event_table = all_event_table[all_event_table$RT_aud > sample_mean - 4*sample_sd, ]
-
 # remove NaNs from auditory responses
 all_event_table = all_event_table[!is.na(all_event_table$trial_accuracy_aud), ]
 
-
-# sum(is.na(all_event_table$trial_accuracy_aud[all_event_table$SOA_lock == 'offset']), na.rm = TRUE)
-# sum(is.na(all_event_table$trial_accuracy_aud[all_event_table$SOA_lock == 'onset']), na.rm = TRUE)
 
 # check if any combination of condition (cell) has less than 30 trials 
 
@@ -176,30 +161,7 @@ for (o in sub_id_lvl){
 
 ```
 
-# process data 
-
-```{r}
-
-# take mean for each participant
-
-all_data = all_event_table %>%  group_by(sub_id, SOA, SOA_lock, task_relevance, duration) %>% summarise(mean_RT = mean(RT_aud, na.rm = TRUE), sd_RT = sd(RT_aud, na.rm = TRUE))
-
-SOA_SOA_lock_data = all_event_table %>%  group_by(SOA, SOA_lock) %>%
-                                      summarise(mean_RT = mean(RT_aud, na.rm = TRUE),
-                                                         sd_RT = mean(RT_aud, na.rm = TRUE))
-
-SOA_SOA_lock_task_relevance_data = all_event_table%>%  group_by(SOA, SOA_lock, task_relevance) %>%
-                                      summarise(mean_RT = mean(RT_aud, na.rm = TRUE),
-                                                         sd_RT = mean(RT_aud, na.rm = TRUE))
-
-SOA_SOA_lock_duration_data = all_event_table %>%  group_by(SOA, SOA_lock, duration) %>%
-                                      summarise(mean_RT = mean(RT_aud, na.rm = TRUE),
-                                                         sd_RT = mean(RT_aud, na.rm = TRUE))
-
-
-```
-
-## TRANSFORM DATA
+# transfrom data
 
 ``` {r}
 # add log transformed column
@@ -211,8 +173,9 @@ all_event_table = all_event_table %>% mutate(resp_window = (2-onset_SOA)+stim_ji
 # make task relevance and SOA lock numeric
 all_event_table = all_event_table %>% mutate(is_task_relevant = ifelse(task_relevance == 'non-target',1,0)) 
 all_event_table = all_event_table %>% mutate(is_onset = ifelse(SOA_lock == 'onset',1,0))
-all_event_table = all_event_table %>% mutate(ori_num = unclass(as.factor(orientation))) # 1=center, 2=left, 3=right 
-all_event_table = all_event_table %>% mutate(cate_num = unclass(as.factor(category))) # 1=face, 2=false_font, 3=letter, 4=object
+
+# make SOA and duration factors 
+
 
 # center variables 
 all_event_table = all_event_table %>% mutate(c_task_relevant = is_task_relevant - mean(is_task_relevant))
@@ -220,11 +183,10 @@ all_event_table = all_event_table %>% mutate(c_is_onset = is_onset - mean(is_ons
 all_event_table = all_event_table %>% mutate(c_SOA = SOA - mean(SOA))
 all_event_table = all_event_table %>% mutate(c_duration = duration - mean(duration))
 all_event_table = all_event_table %>% mutate(c_pitch = (pitch-1050)/100) # makes pitches 0.5 for high and -0.5 for low
-all_event_table = all_event_table %>% mutate(c_cate_num = cate_num - mean(cate_num)) # center cate num
 
 ```
 
-## Performance
+# performance
 
 ``` {r}
 perf = data.frame(matrix(ncol = 0, nrow = 1))
@@ -280,12 +242,8 @@ perf = perf %>% add_row(sub_id = 'sd',
 event_table2 = all_event_table
 event_table2$duration = as.character(event_table2$duration)
 
-# histograms
+### HISTOGRAMS
 
-#all
-hist_1 = ggplot(event_table2, aes(x=RT_aud)) + 
-  geom_histogram(bins = 30) + xlim(c(0,2))
-hist_1
 # split by duration
 hist_2 = ggplot(event_table2, aes(x=RT_aud, fill=duration)) +
   geom_histogram(alpha=0.6, position='identity') + xlim(c(0,2))
@@ -300,7 +258,14 @@ hist_4 = ggplot(event_table2, aes(x=RT_aud, fill=SOA_lock)) +
 hist_4
 
 
-# line plots 
+
+### LINE PLOTS -  RTaud vs SOA
+
+# by SOA lock 
+
+SOA_SOA_lock_data = all_event_table %>%  group_by(SOA, SOA_lock) %>%
+                                      summarise(mean_RT = mean(RT_aud, na.rm = TRUE),
+                                                         sd_RT = mean(RT_aud, na.rm = TRUE))
 
 p1 = ggplot(data=SOA_SOA_lock_data, aes(x=SOA*1000, y=mean_RT*1000, group=SOA_lock)) +
   geom_line(aes(linetype = SOA_lock))+
@@ -310,6 +275,12 @@ p1 = ggplot(data=SOA_SOA_lock_data, aes(x=SOA*1000, y=mean_RT*1000, group=SOA_lo
   xlab('SOA [ms]')
 p1
 
+# by duration 
+
+SOA_SOA_lock_duration_data = all_event_table %>%  group_by(SOA, SOA_lock, duration) %>%
+                                      summarise(mean_RT = mean(RT_aud, na.rm = TRUE),
+                                                         sd_RT = mean(RT_aud, na.rm = TRUE))
+
 p2 = ggplot(data=SOA_SOA_lock_duration_data, aes(x=SOA*1000, y=mean_RT*1000, group=interaction(as.character(duration), SOA_lock))) +
   geom_line(aes(color=as.character(duration), linetype = SOA_lock))+
   geom_point()+
@@ -318,6 +289,13 @@ p2 = ggplot(data=SOA_SOA_lock_duration_data, aes(x=SOA*1000, y=mean_RT*1000, gro
   xlab('SOA [ms]')+
   scale_color_manual(values=c('red','blue','green'))
 p2
+
+# by task-relevance
+
+SOA_SOA_lock_task_relevance_data = all_event_table%>%  group_by(SOA, SOA_lock, task_relevance) %>%
+                                      summarise(mean_RT = mean(RT_aud, na.rm = TRUE),
+                                                         sd_RT = mean(RT_aud, na.rm = TRUE))
+
 
 p3 = ggplot(data=SOA_SOA_lock_task_relevance_data, aes(x=SOA*1000, y=mean_RT*1000, group=interaction(task_relevance, SOA_lock))) +
   geom_line(aes(color=task_relevance, linetype = SOA_lock))+
@@ -336,7 +314,6 @@ p3
 ```{r}
 
 source("R_rainclouds.R")
-
 
 # prepare data 
 n = length(subNums)
@@ -389,28 +366,11 @@ ggsave('../figures/raincloud.png', width = 6, height = 4)
 
 ```{r}
 
-
-# box plots 
-box_plot_data = data.frame(matrix(ncol = 0, nrow = 0))
-counter2 = 0
-col_names = "nan"
-
-  for (i in SOA_lock_lvl){
-    for (ii in SOA_lvl) {
-      for (iii in task_relevance_lvl) {
-        for (iv in duration_lvl) {
-                    
-          counter2 = counter2 + 1 
-          col_names[counter2] = paste(i,ii,iii,iv,sep = "_")
-          for (o in 1:length(subNums)){
-
-          box_plot_data[o,counter2] = mean(all_event_table$RT_aud[all_event_table$sub_id == sub_id_lvl[o] & all_event_table$SOA_lock == i & all_event_table$SOA == ii & all_event_table$task_relevance == iii & all_event_table$duration == iv], na.rm = TRUE)
-}}}}}
-
+box_plot_data = all_event_table %>%  group_by(sub_id, SOA, SOA_lock, task_relevance, duration) %>% summarise(mean_RT = mean(RT_aud, na.rm = TRUE), sd_RT = sd(RT_aud, na.rm = TRUE))
 
 colors = c(rep("red",3),rep("darkred",3),rep("green",3),rep("darkgreen",3),rep("blue",3),rep("darkblue",3),rep("yellow",3), rep("orange",3))
 
-ggplot(all_data, aes(SOA_lock, mean_RT, fill=interaction(duration, task_relevance, SOA))) +
+ggplot(box_plot_data, aes(SOA_lock, mean_RT, fill=interaction(duration, task_relevance, SOA))) +
   stat_boxplot(geom ='errorbar')+
   geom_boxplot() +
   scale_fill_manual(values=colors)
@@ -423,7 +383,7 @@ ggplot(all_data, aes(SOA_lock, mean_RT, fill=interaction(duration, task_relevanc
 
 # full general linear mixed effect model
 
-full_model = glmer(RT_aud ~ c_SOA*is_onset*c_duration*is_task_relevant +
+full_model = glmer(RT_aud ~ f_SOA*is_onset*c_duration*is_task_relevant +
                      (1*c_SOA*is_onset*c_duration*is_task_relevant|sub_id),
                    family=Gamma(link="identity"), data=all_event_table)
 
@@ -433,21 +393,10 @@ plot(fitted(full_model),residuals(full_model))
 qqnorm(residuals(full_model))
 rsq.glmm(full_model)
 
-# reduced general linear mixed effect model (without duration, if duration is not significant in the full model)
-
-reduced_model = glmer(RT_aud ~ c_SOA*is_onset*is_task_relevant +
-                        (1*c_SOA*is_onset*is_task_relevant|sub_id),
-                      family=Gamma(link="identity"), data=all_event_table)
-
-summary(reduced_model)
-Anova(reduced_model)
-plot(fitted(reduced_model),residuals(reduced_model))
-qqnorm(residuals(reduced_model))
-rsq.glmm(reduced_model)
 ```
 
 
-# split by SOA-lock analayses - models
+# offset PRP analysis
 
 ```{r}
 # offset general linear mixed effect model
@@ -486,69 +435,12 @@ contrast(em1, "pairwise", adjust = "bonferroni")
 em2 <- emmeans(f_offset_model, "f_SOA")
 contrast(em2, "pairwise", adjust = "bonferroni")
 
-# onset general linear mixed effect model
 
-onset_event_table = all_event_table %>% filter(SOA_lock == 'onset')
-
-
-onset_model = glmer(RT_aud ~ c_SOA*c_duration*is_task_relevant +
-                       (1*c_SOA*c_duration*is_task_relevant | sub_id) +                     
-                     (1*c_SOA*c_duration*c_task_relevant | c_pitch) +
-                     (1*c_SOA*c_duration*c_task_relevant | category),
-                     family=Gamma(link="identity"), data=onset_event_table)
-
-summary(onset_model)
-Anova(onset_model)
-plot(fitted(onset_model ),residuals(onset_model))
-qqnorm(residuals(onset_model))
 
 
 ```
 
-# predicted values
 
-```{r}
-cols = c("pink","red","darkred","purple","blue","cyan","darkgreen","green","yellow","orange")
-
-
-fit_off = glmer(RT_aud ~ SOA + (1*SOA| sub_id),
-                     family=Gamma(link="identity"), data=offset_event_table)
-
-pr3 = ggpredict(fit, c("SOA", "sub_id"))
-plot(pr3)+ scale_colour_manual(values = cols)
-
-
-
-fit = glmer(RT_aud ~ SOA*SOA_lock + (1*SOA*SOA_lock| sub_id),
-                     family=Gamma(link="identity"), data=all_event_table)
-
-plot_model(fit, type = "pred", terms = c("SOA", "sub_id", "SOA_lock"))
-
-pr = ggpredict(fit, c("SOA", "sub_id", "SOA_lock"),type = "fixed")
-plot(pr)+ scale_colour_manual(values = cols)
-
-pr1 = ggpredict(fit, c("SOA", "SOA_lock"),type = "fixed")
-plot(pr1)
-
-pred = predict(fit,re.form=~0)
-
-predicted_values = modelr::data_grid(all_event_table, SOA,SOA_lock, sub_id) %>% 
-                   modelr::add_predictions(fit)
-
-predicted_values %>% 
-  ggplot(aes(SOA, pred, color = sub_id, linetype = SOA_lock))+
-  geom_line()+
-  geom_jitter(data = all_event_table, aes(SOA, RT_aud, color = sub_id),width = 0.02, size=0.5)+
-  ylim(c(0.1,1))
-
-p <- ggplot(all_event_table, aes(x = SOA, y = RT_aud, colour = sub_id, group = SOA_lock)) +
-  geom_jitter(width = 0.02, size=0.5) +
-  geom_line(aes(y = pred, group=SOA_lock),size=0.5)+
-  ylim(c(0.1,1))
-print(p)
-
-
-```
 
 # exploratory control analayses - plots
 
@@ -714,6 +606,52 @@ rsq.glmm(mega_model2)
 #summary(mega_model3)
 #Anova(mega_model3)
 #rsq.glmm(mega_model3)
+```
+
+
+
+# predicted values
+
+```{r}
+#cols = c("pink","red","darkred","purple","blue","cyan","darkgreen","green","yellow","orange")
+
+
+#fit_off = glmer(RT_aud ~ SOA + (1*SOA| sub_id),
+#                     family=Gamma(link="identity"), data=offset_event_table)
+
+#pr3 = ggpredict(fit, c("SOA", "sub_id"))
+#plot(pr3)+ scale_colour_manual(values = cols)
+
+
+
+#fit = glmer(RT_aud ~ SOA*SOA_lock + (1*SOA*SOA_lock| sub_id),
+#                     family=Gamma(link="identity"), data=all_event_table)
+
+#plot_model(fit, type = "pred", terms = c("SOA", "sub_id", "SOA_lock"))
+
+#pr = ggpredict(fit, c("SOA", "sub_id", "SOA_lock"),type = "fixed")
+#plot(pr)+ scale_colour_manual(values = cols)
+
+#pr1 = ggpredict(fit, c("SOA", "SOA_lock"),type = "fixed")
+#plot(pr1)
+
+#pred = predict(fit,re.form=~0)
+
+#predicted_values = modelr::data_grid(all_event_table, SOA,SOA_lock, sub_id) %>% 
+#                   modelr::add_predictions(fit)
+
+#predicted_values %>% 
+#  ggplot(aes(SOA, pred, color = sub_id, linetype = SOA_lock))+
+#  geom_line()+
+#  geom_jitter(data = all_event_table, aes(SOA, RT_aud, color = sub_id),width = 0.02, size=0.5)+
+#  ylim(c(0.1,1))
+
+#p <- ggplot(all_event_table, aes(x = SOA, y = RT_aud, colour = sub_id, group = SOA_lock)) +
+#  geom_jitter(width = 0.02, size=0.5) +
+#  geom_line(aes(y = pred, group=SOA_lock),size=0.5)+
+#  ylim(c(0.1,1))
+#print(p)
+
 ```
 
 # bayesian exploratory analysis - incomplete!
