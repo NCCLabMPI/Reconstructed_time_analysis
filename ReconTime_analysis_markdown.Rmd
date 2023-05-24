@@ -26,7 +26,7 @@ library(pacman)
 
 # install all needed packages 
 
-pacman::p_load('dplyr', 'ggdist', 'ggeffects', 'ggscatter', 'lme4', 'emmeans', 'car', 'rsq', 'sjPlot', 'brms')
+pacman::p_load('dplyr', 'ggdist', 'ggeffects', 'ggpubr', 'lme4', 'emmeans', 'car', 'rsq', 'sjPlot', 'brms')
 
 ```
 
@@ -428,6 +428,9 @@ model2 = glmer(RT_aud ~ f_SOA*c_is_onset*c_task_relevant +
 summary(model2)
 Anova(model2)
 rsq.glmm(model2)
+
+# compare the two models
+anova(model1, model2)
 
 ```
 
