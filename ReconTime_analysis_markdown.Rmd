@@ -26,7 +26,7 @@ library(pacman)
 
 # install all needed packages 
 
-pacman::p_load('dplyr', 'ggdist', 'ggeffects', 'ggpubr', 'lme4', 'emmeans', 'car', 'rsq', 'sjPlot', 'brms')
+pacman::p_load('dplyr', 'ggdist', 'ggeffects', 'ggpubr', 'lme4', 'emmeans', 'rstatix', 'car', 'rsq', 'sjPlot', 'brms')
 
 ```
 
@@ -374,6 +374,7 @@ rsq.glmm(model1)
 
 ```{r offset_PRP}
 
+# do pairwise comparions using tukey correted t-testing 
 # post-hoc pairwise comparison
 
 offset_event_table = all_event_table %>% filter(SOA_lock == "offset")
@@ -408,6 +409,51 @@ offset_SOA_data = offset_event_table %>%  group_by(SOA, sub_id) %>%
 ggscatter(offset_SOA_data , x = "SOA", y = "mean_RT", 
           add = "reg.line", conf.int = TRUE, 
           cor.coef = TRUE, cor.method = "pearson")
+
+
+#-------------------------------------------------------------------------------------
+# Turkey HSD
+
+aov_model <- aov(RT_aud ~ f_SOA*f_duration, data=offset_event_table)
+summary(aov_model)
+turky_pwc = TukeyHSD(aov_model, conf.level=.95)
+turky_pwc
+
+
+#-------------------------------------------------------------------------------------
+# simple t-test 
+
+offset_f_SOA_data = offset_event_table %>%  group_by(f_SOA, sub_id) %>%
+                                      summarise(mean_RT = mean(RT_aud, na.rm = TRUE))
+
+
+pwc_data <- data.frame(mean_RT = offset_f_SOA_data$mean_RT, SOA = factor(offset_f_SOA_data$f_SOA, ordered = FALSE))   
+
+
+# Pairwise comparisons
+direct_pwc <- pwc_data %>% 
+  pairwise_t_test(
+    mean_RT ~ SOA, paired = TRUE,
+    p.adjust.method = "bonferroni"
+    )
+direct_pwc 
+
+
+offset_SOA_duration_data = offset_event_table %>%  group_by(f_SOA, sub_id, f_duration) %>%
+                                      summarise(mean_RT = mean(RT_aud, na.rm = TRUE),
+                                                         sd_RT = mean(RT_aud, na.rm = TRUE))
+
+
+data("PlantGrowth")
+set.seed(1234)
+PlantGrowth %>% sample_n_by(group, size = 2)
+
+pwc <- PlantGrowth %>% 
+  pairwise_t_test(
+    weight ~ group, pool.sd = FALSE,
+    p.adjust.method = "bonferroni"
+    )
+pwc
 
 ```
 
