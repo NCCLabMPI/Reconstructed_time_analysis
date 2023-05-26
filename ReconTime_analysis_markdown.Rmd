@@ -402,6 +402,14 @@ contrast(em2, "pairwise", adjust = "bonferroni")
 
 # Regression of offset SOA 
 
+# full data
+
+ggscatter(offset_event_table , x = "SOA", y = "RT_aud", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson")
+
+
+# mean of subject data
 offset_SOA_data = offset_event_table %>%  group_by(SOA, sub_id) %>%
                                       summarise(mean_RT = mean(RT_aud, na.rm = TRUE),
                                                          sd_RT = mean(RT_aud, na.rm = TRUE))
@@ -438,22 +446,6 @@ direct_pwc <- pwc_data %>%
     )
 direct_pwc 
 
-
-offset_SOA_duration_data = offset_event_table %>%  group_by(f_SOA, sub_id, f_duration) %>%
-                                      summarise(mean_RT = mean(RT_aud, na.rm = TRUE),
-                                                         sd_RT = mean(RT_aud, na.rm = TRUE))
-
-
-data("PlantGrowth")
-set.seed(1234)
-PlantGrowth %>% sample_n_by(group, size = 2)
-
-pwc <- PlantGrowth %>% 
-  pairwise_t_test(
-    weight ~ group, pool.sd = FALSE,
-    p.adjust.method = "bonferroni"
-    )
-pwc
 
 ```
 
