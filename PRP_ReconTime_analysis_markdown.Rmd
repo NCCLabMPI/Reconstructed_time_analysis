@@ -34,7 +34,7 @@ pacman::p_load('dplyr', 'ggdist', 'ggeffects', 'ggpubr', 'lme4', 'emmeans', 'rst
 
 ```{r subjects}
 
-subNums = c(101, 102, 103, 105, 106, 107, 108, 109, 110, 111)
+subNums = c(101, 102, 103, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117)
 ses = 1
 Lab_ID = 'SX'
 task = 'prp'
@@ -397,7 +397,7 @@ contrast(em2, "pairwise", adjust = "bonferroni")
 em2 <- emmeans(offset_model, "f_SOA", by = c("f_duration", "c_task_relevant"))
 contrast(em2, "pairwise", adjust = "bonferroni")
 
-
+# MAYBE FIND ONE THAT DISPLAYS P VALUES WITH MORE VALUES AFTER THE PERIOD
 
 
 # Regression of offset SOA 
