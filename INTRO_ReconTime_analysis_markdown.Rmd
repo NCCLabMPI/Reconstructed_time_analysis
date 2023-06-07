@@ -13,11 +13,6 @@ rm(list = ls())
 wd = 'C:/Users/micha.engeser/Documents/GitHub/Reconstructed_time_analysis'
 setwd(wd)
 dir()
-```
-
-# required packages
-
-```{r packages} 
 
 # get package manager package
 if (!('pacman' %in% installed.packages()))
@@ -30,22 +25,21 @@ pacman::p_load('dplyr', 'ggdist', 'ggeffects', 'ggpubr', 'lme4', 'emmeans', 'rst
 
 ```
 
-# details of subjects  
-
-```{r subjects}
-
-subNums = c(101, 110, 113)
-sessions = c(2)
-Lab_ID = 'SX'
-task = 'introspection'
-```
 
 # loading files
 
 ```{r loading}
 
+# details of subjects  
+subNums = c(101, 105, 110, 113, 122)
+sessions = c(2,3)
+Lab_ID = 'SX'
+task = 'introspection'
 count = 0
 sub_ids = NaN
+
+# loading the files 
+
 for (subNum in subNums ){
   for (ses in sessions ){
 count = count + 1
@@ -59,6 +53,9 @@ setwd("..")
 parent_dir = getwd()
 setwd(wd)
 file = file.path(parent_dir, 'Reconstructed_time_experiment', 'data', sub_folder, ses_folder, file_name)
+
+# if file for subject and session exists load it
+if (file.exists(file)){
 event_table = read.csv(file)
 
 # make format consistent
@@ -78,6 +75,7 @@ if ( exists('all_event_table')){
 } else {
   all_event_table = event_table
 }
+}
 }}
 
 ```
@@ -94,6 +92,9 @@ all_event_table = all_event_table[all_event_table$task_relevance != 'target', ]
 
 # remove false alarm 
 all_event_table = all_event_table[all_event_table$trial_response_vis != 'fa', ]
+
+# make iRT of 0 a 1
+all_event_table$iRT_vis[all_event_table$iRT_vis == 0] = 1
 
 # remove RT < 100 ms
 all_event_table = all_event_table[all_event_table$RT_aud > 0.1, ]
@@ -323,7 +324,6 @@ p1
 
 
 
-
 # iRT aud by task-relevance
 
 SOA_SOA_lock_task_relevance_subj_i_aud_data = all_event_table %>% group_by(SOA, SOA_lock, task_relevance, sub_id) %>%
@@ -371,13 +371,13 @@ p5
 
 # full data
 
-ggscatter(raw_event_table , x = "iRT_aud", y = "RT_aud", 
+ggscatter(raw_event_table , x = "iRT_aud", y = "RT_aud",
           add = "reg.line", conf.int = TRUE, 
           cor.coef = TRUE, cor.method = "pearson")
 
 
 # mean of subject data
-RT_iRT_data = raw_event_table %>%  group_by(sub_id) %>%
+RT_iRT_data = raw_event_table %>% group_by(sub_id) %>%
                                       summarise(mean_RT = mean(RT_aud, na.rm = TRUE),
                                                          mean_iRT = mean(iRT_aud, na.rm = TRUE))
 
@@ -385,6 +385,11 @@ ggscatter(RT_iRT_data, x = "mean_iRT", y = "mean_RT",
           add = "reg.line", conf.int = TRUE, 
           cor.coef = TRUE, cor.method = "pearson")
 
+
+# iRT vis vs iRT aud
+ggscatter(raw_event_table , x = "iRT_aud", y = "iRT_vis", color='sub_id',
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson")
 
 ```
 
@@ -441,11 +446,11 @@ ggsave('../figures/raincloud.png', width = 6, height = 4)
 
 ```
 
-# box plot 
+# box plot - introspective RT aud
 
 ```{r boxplot}
 
-box_plot_data = all_event_table %>%  group_by(sub_id, SOA, SOA_lock, task_relevance, duration) %>% summarise(mean_RT = mean(RT_aud, na.rm = TRUE), sd_RT = sd(RT_aud, na.rm = TRUE))
+box_plot_data = all_event_table %>%  group_by(sub_id, SOA, SOA_lock, task_relevance, duration) %>% summarise(mean_RT = mean(iRT_aud, na.rm = TRUE), sd_RT = sd(iRT_aud, na.rm = TRUE))
 
 colors = c(rep("red",3),rep("darkred",3),rep("green",3),rep("darkgreen",3),rep("blue",3),rep("darkblue",3),rep("yellow",3), rep("orange",3))
 
@@ -465,17 +470,31 @@ ggplot(box_plot_data, aes(SOA_lock, mean_RT, fill=interaction(duration, task_rel
 # fixed effects: SOA (ordinal), SOA-Lock (as c_is_onset,  numeric, centered), Task-relevance (as is relevant, numeric, centered)
 # random effects: Subject ID, Duration (ordinal)
 
-model1 = glmer(RT_aud ~ f_SOA*c_is_onset*c_task_relevant +
+# auditory 
+aud_model1 = glmer(iRT_aud ~ f_SOA*c_is_onset*c_task_relevant +
                      (1*f_SOA*c_is_onset*c_task_relevant | sub_id)+
                      (1*f_SOA*c_is_onset*c_task_relevant | f_duration),
                family=Gamma(link="identity"), data=all_event_table)
 
-summary(model1)
-Anova(model1)
-plot(fitted(model1),residuals(model1))
-qqnorm(residuals(model1))
-rsq.glmm(model1)
+summary(aud_model1)
+Anova(aud_model1)
+plot(fitted(aud_model1),residuals(aud_model1))
+qqnorm(residuals(aud_model1))
+rsq.glmm(aud_model1)
 
+
+# visual
+
+vis_model1 = glmer(iRT_vis ~ f_SOA*c_is_onset*c_task_relevant +
+                     (1*f_SOA*c_is_onset*c_task_relevant | sub_id)+
+                     (1*f_SOA*c_is_onset*c_task_relevant | f_duration),
+               family=Gamma(link="identity"), data=all_event_table)
+
+summary(vis_model1)
+Anova(vis_model1)
+plot(fitted(vis_model1),residuals(vis_model1))
+qqnorm(residuals(vis_model1))
+rsq.glmm(vis_model1)
 ```
 
 
@@ -490,7 +509,7 @@ offset_event_table = all_event_table %>% filter(SOA_lock == "offset")
 
 # new model (needs to be adjusted probably)
 
-offset_model = glmer(RT_aud ~ f_SOA*f_duration*c_task_relevant +
+offset_model = glmer(iRT_aud ~ f_SOA*f_duration*c_task_relevant +
                        (1*f_SOA*f_duration*c_task_relevant | sub_id), 
                      family = Gamma(link="identity"), data = offset_event_table)
 
@@ -513,7 +532,7 @@ contrast(em2, "pairwise", adjust = "bonferroni")
 
 # full data
 
-ggscatter(offset_event_table , x = "SOA", y = "RT_aud", 
+ggscatter(offset_event_table , x = "SOA", y = "iRT_aud", 
           add = "reg.line", conf.int = TRUE, 
           cor.coef = TRUE, cor.method = "pearson")
 
@@ -566,7 +585,7 @@ direct_pwc
 
 # with duration, category and pitch as random effects 
 
-model2 = glmer(RT_aud ~ f_SOA*c_is_onset*c_task_relevant +
+model2 = glmer(iRT_aud ~ f_SOA*c_is_onset*c_task_relevant +
                      (1*f_SOA*c_is_onset*c_task_relevant | sub_id) +
                      (1*f_SOA*c_is_onset*c_task_relevant | f_duration) +
                      (1*f_SOA*c_is_onset*c_task_relevant | c_pitch) +
@@ -588,13 +607,13 @@ anova(model1, model2)
 # pitch  
 
 SOA_SOA_lock_pitch_data = all_event_table %>%  group_by(SOA, SOA_lock, c_pitch) %>%
-                                      summarise(mean_RT = mean(RT_aud, na.rm = TRUE),
-                                                         sd_RT = mean(RT_aud, na.rm = TRUE))
+                                      summarise(mean_iRT = mean(iRT_aud, na.rm = TRUE),
+                                                         sd_iRT = mean(iRT_aud, na.rm = TRUE))
 
-pitch_plot = ggplot(data=SOA_SOA_lock_pitch_data, aes(x=SOA*1000, y=mean_RT*1000, group=interaction(as.character(c_pitch), SOA_lock))) +
+pitch_plot = ggplot(data=SOA_SOA_lock_pitch_data, aes(x=SOA*1000, y=mean_iRT, group=interaction(as.character(c_pitch), SOA_lock))) +
   geom_line(aes(color=as.character(c_pitch), linetype = SOA_lock))+
   geom_point()+
-  ylim(c(400,700))+
+  ylim(c(200,500))+
   ylab("Reaction time [ms]")+
   xlab('SOA [ms]')+
   scale_color_manual(values=c('red','blue','green'))
@@ -604,49 +623,45 @@ pitch_plot
 # category 
 
 SOA_SOA_lock_category_data = all_event_table %>%  group_by(SOA, SOA_lock, category) %>%
-                                      summarise(mean_RT = mean(RT_aud, na.rm = TRUE),
-                                                         sd_RT = mean(RT_aud, na.rm = TRUE))
+                                      summarise(mean_iRT = mean(iRT_aud, na.rm = TRUE),
+                                                         sd_iRT = mean(iRT_aud, na.rm = TRUE))
 
-category_plot = ggplot(data=SOA_SOA_lock_category_data, aes(x=SOA*1000, y=mean_RT*1000, group=interaction(category, SOA_lock))) +
+category_plot = ggplot(data=SOA_SOA_lock_category_data, aes(x=SOA*1000, y=mean_iRT, group=interaction(category, SOA_lock))) +
   geom_line(aes(color=category, linetype = SOA_lock))+
   geom_point()+
-  ylim(c(400,700))+
+  ylim(c(200,500))+
   ylab("Reaction time [ms]")+
   xlab('SOA [ms]')+
   scale_color_manual(values=c('red','blue','green','orange'))
 category_plot
 
 
-# orientation
-
-SOA_SOA_lock_ori_data = all_event_table %>%  group_by(SOA, SOA_lock, orientation) %>%
-                                      summarise(mean_RT = mean(RT_aud, na.rm = TRUE),
-                                                         sd_RT = mean(RT_aud, na.rm = TRUE))
-
-ori_plot = ggplot(data=SOA_SOA_lock_ori_data, aes(x=SOA*1000, y=mean_RT*1000, group=interaction(orientation, SOA_lock))) +
-  geom_line(aes(color=orientation, linetype = SOA_lock))+
-  geom_point()+
-  ylim(c(400,700))+
-  ylab("Reaction time [ms]")+
-  xlab('SOA [ms]')+
-  scale_color_manual(values=c('red','blue','green'))
-ori_plot
-
-# auditory accuracy
-
-acc_data = raw_event_table %>%  group_by(SOA, SOA_lock, task_relevance) %>%
-                                      summarise(mean_acc = mean(trial_accuracy_aud, na.rm = TRUE),
-                                                         sd_acc = mean(trial_accuracy_aud, na.rm = TRUE))
-
-
-acc_plot = ggplot(data=acc_data, aes(x=SOA*1000, y=mean_acc*100, group=interaction(SOA_lock, task_relevance)))+
-  geom_line(aes(colour = task_relevance, linetype = SOA_lock))+
-  geom_point()+
-  ylim(c(80,100))+
-  ylab("Accuracy in %")+
-  xlab('SOA [ms]')
-acc_plot
-
-
 ```
 
+# visual iRT specific analyses
+
+```{r iRTvis}
+
+
+# remove NaNs from auditory responses
+task_event_table = raw_event_table[!is.na(all_event_table$trial_accuracy_aud), ]
+
+task_mean_iRT_vis = task_event_table %>%  group_by(task_relevance, sub_id) %>%
+                                      summarise(mean_iRT = mean(iRT_vis, na.rm = TRUE),
+                                                         sd_iRT = mean(iRT_vis, na.rm = TRUE))
+ggbarplot(task_mean_iRT_vis, x = "task_relevance", y = "mean_iRT", 
+  add = c("mean_se", "jitter"),  fill = "#BF504D")
+
+
+
+task_mean_iRT_vis_df <- data.frame(mean_iRT = task_mean_iRT_vis$mean_iRT, task_relevance = task_mean_iRT_vis$task_relevance) 
+
+# t-test
+iRT_aud_pwc <- task_mean_iRT_vis_df %>% 
+  pairwise_t_test(
+    mean_iRT ~ task_relevance, paired = TRUE,
+    p.adjust.method = "bonferroni"
+    )
+iRT_aud_pwc
+
+```
