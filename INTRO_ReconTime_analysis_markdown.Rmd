@@ -29,7 +29,6 @@ pacman::p_load('dplyr', 'ggdist', 'ggeffects', 'ggpubr', 'lme4', 'emmeans', 'rst
 # loading files
 
 ```{r loading}
-
 # details of subjects  
 subNums = c(101, 105, 110, 113, 122)
 sessions = c(2,3)
@@ -664,4 +663,28 @@ iRT_aud_pwc <- task_mean_iRT_vis_df %>%
     )
 iRT_aud_pwc
 
+```
+
+# how much does PRP effect depend on T1 variabitiy (see Marti et al 2010 and 2012)
+
+```{r }
+
+
+# need to made!!!!!!!!!!!!!!!!!!!!
+
+
+```
+
+
+# testing duration of iRT responses
+
+```{r intro duration}
+qn_dur= 1:dim(raw_event_table)-1
+
+for (line in 1:dim(raw_event_table)[1]-1){
+qn_dur[line] = raw_event_table$vis_stim_time[line+1] - raw_event_table$trial_end[line]
+}
+
+qn_dur = qn_dur[qn_dur > -0 & qn_dur < 10]
+mean(qn_dur)
 ```
