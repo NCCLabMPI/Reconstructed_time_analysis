@@ -30,7 +30,7 @@ pacman::p_load('dplyr', 'ggdist', 'ggeffects', 'ggpubr', 'lme4', 'emmeans', 'rst
 
 ```{r loading}
 # details of subjects  
-subNums = c(101, 105, 110, 113, 122)
+subNums = c(101, 105, 106, 109, 110, 113, 114, 118, 122)
 sessions = c(2,3)
 Lab_ID = 'SX'
 task = 'introspection'
@@ -672,19 +672,51 @@ iRT_aud_pwc
 
 # need to made!!!!!!!!!!!!!!!!!!!!
 
+raw_event_table = raw_event_table %>% mutate(f_SOA = factor(SOA, ordered = TRUE, levels = c("0", "0.232", "0.466")))
+
+ggscatter(raw_event_table, x = "iRT_vis", y = "RT_aud", color = 'f_SOA',
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson")
+
+
 
 ```
 
 
-# testing duration of iRT responses
+# testing duration of experiment
 
-```{r intro duration}
-qn_dur= 1:dim(raw_event_table)-1
+```{r durations}
 
-for (line in 1:dim(raw_event_table)[1]-1){
-qn_dur[line] = raw_event_table$vis_stim_time[line+1] - raw_event_table$trial_end[line]
-}
+# duration of core experiment (3 blocks, no practice or calibration task)
 
-qn_dur = qn_dur[qn_dur > -0 & qn_dur < 10]
-mean(qn_dur)
+# start counter 
+ses_counter = 0
+core_exp_time = NaN
+
+# loops through subjects and sessions and extract duration 
+for (sub_id in sub_ids){
+  for (ses in sessions){
+    
+    ses_counter = ses_counter + 1
+    test_table = raw_event_table[raw_event_table$sub_id == sub_id & raw_event_table$ses == ses, ]
+    
+    if(dim(test_table)[1] > 0){
+    core_exp_time[ses_counter] = test_table$trial_end[dim(test_table)[1]] - test_table$TargetScreenOnset[1]
+    }
+    
+  }}
+
+print(paste0('Total duration of core experiment was ', round(mean(core_exp_time, na.rm = TRUE)/60), ' min. per session'))
+
+print(paste0('Each miniblock was ', round(mean(core_exp_time, na.rm = TRUE)/60/12), ' min.'))
+
+
+# qn_dur= 1:dim(raw_event_table)-1
+# 
+# for (line in 1:dim(raw_event_table)[1]-1){
+# qn_dur[line] = raw_event_table$vis_stim_time[line+1] - raw_event_table$trial_end[line]
+# }
+# 
+# qn_dur = qn_dur[qn_dur > -0 & qn_dur < 10]
+# mean(qn_dur)
 ```
