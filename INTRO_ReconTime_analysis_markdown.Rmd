@@ -288,6 +288,7 @@ hist_5 = ggplot(data=event_table)+geom_histogram(aes(x=iRT_aud),col="red")+
 geom_histogram(aes(x=iRT_vis),col="blue")
 hist_5
 
+#
  
 
 SOA_SOA_lock_subj_data = all_event_table %>% group_by(SOA, SOA_lock, sub_id) %>%
