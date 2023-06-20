@@ -430,6 +430,25 @@ rsq.glmm(model1)
 
 ```
 
+# onset PRP analysis
+
+```{r offset_PRP}
+
+onset_event_table = all_event_table %>% filter(SOA_lock == "onset")
+
+# new model (needs to be adjusted probably)
+
+onset_model = glmer(RT_aud ~ f_SOA*c_task_relevant +
+                       (1*f_SOA*c_task_relevant | sub_id) + 
+                      (1*f_SOA*c_task_relevant | f_duration), 
+                     family = Gamma(link="identity"), data = onset_event_table)
+
+summary(onset_model)
+Anova(onset_model)
+rsq.glmm(onset_model)
+
+```
+
 
 # offset PRP analysis
 
@@ -446,6 +465,7 @@ offset_model = glmer(RT_aud ~ f_SOA*f_duration*c_task_relevant +
                        (1*f_SOA*f_duration*c_task_relevant | sub_id), 
                      family = Gamma(link="identity"), data = offset_event_table)
 
+summary(offset_model)
 Anova(offset_model)
 rsq.glmm(offset_model)
 
@@ -459,53 +479,6 @@ em2 <- emmeans(offset_model, "f_SOA", by = c("f_duration", "c_task_relevant"))
 contrast(em2, "pairwise", adjust = "bonferroni")
 
 # MAYBE FIND ONE THAT DISPLAYS P VALUES WITH MORE VALUES AFTER THE PERIOD
-
-
-# Regression of offset SOA 
-
-# full data
-
-ggscatter(offset_event_table , x = "SOA", y = "RT_aud", 
-          add = "reg.line", conf.int = TRUE, 
-          cor.coef = TRUE, cor.method = "pearson")
-
-
-# mean of subject data
-offset_SOA_data = offset_event_table %>%  group_by(SOA, sub_id) %>%
-                                      summarise(mean_RT = mean(RT_aud, na.rm = TRUE),
-                                                         sd_RT = mean(RT_aud, na.rm = TRUE))
-
-ggscatter(offset_SOA_data , x = "SOA", y = "mean_RT", 
-          add = "reg.line", conf.int = TRUE, 
-          cor.coef = TRUE, cor.method = "pearson")
-
-
-#-------------------------------------------------------------------------------------
-# Turkey HSD
-
-aov_model <- aov(RT_aud ~ f_SOA*f_duration, data=offset_event_table)
-summary(aov_model)
-turky_pwc = TukeyHSD(aov_model, conf.level=.95)
-turky_pwc
-
-
-#-------------------------------------------------------------------------------------
-# simple t-test 
-
-offset_f_SOA_data = offset_event_table %>%  group_by(f_SOA, sub_id) %>%
-                                      summarise(mean_RT = mean(RT_aud, na.rm = TRUE))
-
-
-pwc_data <- data.frame(mean_RT = offset_f_SOA_data$mean_RT, SOA = factor(offset_f_SOA_data$f_SOA, ordered = FALSE))   
-
-
-# Pairwise comparisons
-direct_pwc <- pwc_data %>% 
-  pairwise_t_test(
-    mean_RT ~ SOA, paired = TRUE,
-    p.adjust.method = "bonferroni"
-    )
-direct_pwc 
 
 
 ```
