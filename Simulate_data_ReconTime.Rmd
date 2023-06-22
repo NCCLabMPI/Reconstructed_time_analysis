@@ -97,7 +97,6 @@ p3 = ggplot(data=SOA_SOA_lock_task_relevance_data, aes(x=SOA*1000, y=mean_RT, gr
   xlab('SOA [ms]')+
   scale_color_manual(values=c('blue', 'red'), name = 'Task Relevance', labels=c('task-relevant non-target', 'irrelevant'), breaks=c('non-target', 'irrelevant'))+
   scale_linetype_manual(values=c("solid", "dashed"), name = 'SOA time-locked to', breaks=c('onset', 'offset'))+
-  # scale_color_discrete(lables = c('Relevant non-target', 'Irrelevant'))+
   theme_bw() +
   theme(axis.line = element_line(colour = "black"),
     panel.grid.major = element_blank(),

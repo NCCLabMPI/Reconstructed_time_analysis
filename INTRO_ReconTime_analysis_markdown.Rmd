@@ -30,7 +30,7 @@ pacman::p_load('dplyr', 'ggdist', 'ggeffects', 'ggpubr', 'lme4', 'emmeans', 'rst
 
 ```{r loading}
 # details of subjects  
-subNums = c(101, 105, 106, 109, 110, 113, 114, 118, 122)
+subNums = c(101, 105, 106, 109, 110, 113, 114, 115, 118, 122)
 sessions = c(2,3)
 Lab_ID = 'SX'
 task = 'introspection'
@@ -94,6 +94,7 @@ all_event_table = all_event_table[all_event_table$trial_response_vis != 'fa', ]
 
 # make iRT of 0 a 1
 all_event_table$iRT_vis[all_event_table$iRT_vis == 0] = 1
+all_event_table$iRT_aud[all_event_table$iRT_aud == 0] = 1
 
 # remove RT < 100 ms
 all_event_table = all_event_table[all_event_table$RT_aud > 0.1, ]
@@ -499,7 +500,6 @@ qqnorm(residuals(vis_model1))
 rsq.glmm(vis_model1)
 ```
 
-
 # offset PRP analysis
 
 ```{r offset_PRP}
@@ -548,33 +548,6 @@ ggscatter(offset_SOA_data , x = "SOA", y = "mean_RT",
           add = "reg.line", conf.int = TRUE, 
           cor.coef = TRUE, cor.method = "pearson")
 
-
-#-------------------------------------------------------------------------------------
-# Turkey HSD
-
-aov_model <- aov(RT_aud ~ f_SOA*f_duration, data=offset_event_table)
-summary(aov_model)
-turky_pwc = TukeyHSD(aov_model, conf.level=.95)
-turky_pwc
-
-
-#-------------------------------------------------------------------------------------
-# simple t-test 
-
-offset_f_SOA_data = offset_event_table %>%  group_by(f_SOA, sub_id) %>%
-                                      summarise(mean_RT = mean(RT_aud, na.rm = TRUE))
-
-
-pwc_data <- data.frame(mean_RT = offset_f_SOA_data$mean_RT, SOA = factor(offset_f_SOA_data$f_SOA, ordered = FALSE))   
-
-
-# Pairwise comparisons
-direct_pwc <- pwc_data %>% 
-  pairwise_t_test(
-    mean_RT ~ SOA, paired = TRUE,
-    p.adjust.method = "bonferroni"
-    )
-direct_pwc 
 
 
 ```
@@ -673,7 +646,7 @@ iRT_aud_pwc
 ```{r }
 
 
-# need to made!!!!!!!!!!!!!!!!!!!!
+# need to updated !!!!!!!!!!!!!!!!!!!!
 
 raw_event_table = raw_event_table %>% mutate(f_SOA = factor(SOA, ordered = TRUE, levels = c("0", "0.232", "0.466")))
 
