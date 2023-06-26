@@ -4,8 +4,33 @@ author: "Micha Engeser"
 date: "2023-06-16"
 output: html_document
 ---
-```{R}
 
+
+```{r huosekeeping}
+# clear workspace
+rm(list = ls())
+
+wd = 'C:/Users/micha.engeser/Documents/GitHub/Reconstructed_time_analysis'
+setwd(wd)
+dir()
+```
+
+# required packages
+
+```{r packages} 
+
+# get package manager package
+if (!('pacman' %in% installed.packages()))
+{install.packages("pacman")}
+library(pacman)
+
+# install all needed packages 
+
+pacman::p_load('dplyr', 'ggdist', 'ggeffects', 'ggpubr', 'lme4', 'emmeans', 'rstatix', 'car', 'rsq', 'sjPlot', 'brms')
+
+```
+
+```{r}
 # iniate table
 sim_data_table = data.frame(matrix(ncol = 0, nrow = 1))
 sim_data_table$sub_num = NaN
@@ -78,6 +103,9 @@ sim_data_table = sim_data_table %>% add_row(sub_num = o,
 # plotting RT by task-relevance
 
 ```{R}
+n = length(sub_num_lvl)
+
+
 # by task-relevance
 SOA_SOA_lock_task_relevance_subj_data = sim_data_table %>% group_by(SOA, SOA_lock, task_relevance, sub_num) %>%
                                       summarise(RT_mean = mean(RT_aud, na.rm = TRUE))
@@ -90,7 +118,6 @@ SOA_SOA_lock_task_relevance_data = SOA_SOA_lock_task_relevance_subj_data %>%  gr
 
 p3 = ggplot(data=SOA_SOA_lock_task_relevance_data, aes(x=SOA*1000, y=mean_RT, group=interaction(task_relevance, SOA_lock), color=task_relevance, linetype = SOA_lock)) +
   geom_line()+
-  geom_errorbar(aes(ymin = (mean_RT-sem_RT), ymax = (mean_RT+sem_RT)), width = 20)+
   geom_point()+
   ylim(c(400,900))+
   ylab("Auditory reaction time [ms]")+
@@ -133,19 +160,16 @@ SOA_SOA_lock_data = SOA_SOA_lock_subj_data %>%  group_by(SOA, SOA_lock) %>%
 p1 = ggplot(data=SOA_SOA_lock_data, aes(x=SOA*1000, y=mean_RT, group=SOA_lock, linetype = SOA_lock, color='objective RT')) +
   geom_line()+
   geom_point()+
-  geom_errorbar(aes(ymin = (mean_RT-sem_RT), ymax = (mean_RT+sem_RT)), width = 20)+
-  geom_line(aes(y=mean_iRT_aud, group=SOA_lock, linetype = SOA_lock, color='iRT aud'))+
-  geom_point(aes(y=mean_iRT_aud, group=SOA_lock, color='iRT aud'))+
-  geom_errorbar(aes(ymin = (mean_iRT_aud-sem_iRT_aud), ymax = (mean_iRT_aud+sem_iRT_aud), color='iRT aud'), width = 20)+
-  geom_line(aes(y=mean_iRT_vis, group=SOA_lock, linetype = SOA_lock, color='iRT vis'))+
-  geom_point(aes(y=mean_iRT_vis, group=SOA_lock, color='iRT vis'))+
-  geom_errorbar(aes(ymin = (mean_iRT_vis-sem_iRT_vis), ymax = (mean_iRT_vis+sem_iRT_vis), color='iRT vis'), width = 20)+
+  geom_line(aes(y=mean_iRT_aud, group=SOA_lock, linetype = SOA_lock, color='IT aud'))+
+  geom_point(aes(y=mean_iRT_aud, group=SOA_lock, color='IT aud'))+
+  geom_line(aes(y=mean_iRT_vis, group=SOA_lock, linetype = SOA_lock, color='IT vis'))+
+  geom_point(aes(y=mean_iRT_vis, group=SOA_lock, color='IT vis'))+
   ylim(c(100,900))+
   ylab("Reaction time [ms]")+
   xlab('SOA [ms]')+
   scale_linetype_manual(values=c("solid", "dashed"), name = 'SOA time-locked to', breaks=c('onset', 'offset'))+
     theme_bw() +
-  scale_color_manual(values=c('blue', 'red', 'darkgreen'), name = 'Measure', breaks=c('objective RT', 'iRT aud', 'iRT vis'))+
+  scale_color_manual(values=c('blue', 'red', 'darkgreen'), name = 'Measure', breaks=c('objective RT', 'IT aud', 'IT vis'))+
   theme(axis.line = element_line(colour = "black"),
     panel.grid.major = element_blank(),
     panel.grid.minor = element_blank(),

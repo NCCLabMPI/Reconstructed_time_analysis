@@ -467,7 +467,6 @@ Anova(model1)
 plot(fitted(model1),residuals(model1))
 qqnorm(residuals(model1))
 rsq.glmm(model1)
-
 ```
 
 # onset PRP analysis
