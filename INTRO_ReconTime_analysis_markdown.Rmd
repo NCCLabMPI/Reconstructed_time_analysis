@@ -84,9 +84,6 @@ if ( exists('all_event_table')){
 # without exclusion
 raw_event_table = all_event_table
 
-# remove target trials 
-all_event_table = all_event_table[all_event_table$task_relevance != 'target', ]
-
 # remove false alarm 
 all_event_table = all_event_table[all_event_table$trial_response_vis != 'fa', ]
 
@@ -103,6 +100,11 @@ all_event_table = all_event_table[all_event_table$RT_aud > 0.1, ]
 # remove NaNs from auditory responses
 all_event_table = all_event_table[!is.na(all_event_table$trial_accuracy_aud), ]
 
+# with targets
+target_event_table = all_event_table
+
+# remove target trials 
+all_event_table = all_event_table[all_event_table$task_relevance != 'target', ]
 
 # check if any combination of condition (cell) has less than 30 trials 
 
@@ -398,13 +400,13 @@ p5
 
 # full data
 
-ggscatter(raw_event_table , x = "iRT_aud", y = "RT_aud",
+ggscatter(target_event_table , x = "iRT_aud", y = "RT_aud",
           add = "reg.line", conf.int = TRUE, 
           cor.coef = TRUE, cor.method = "pearson")
 
 
 # mean of subject data
-RT_iRT_data = raw_event_table %>% group_by(sub_id) %>%
+RT_iRT_data = target_event_table %>% group_by(sub_id) %>%
                                       summarise(mean_RT = mean(RT_aud, na.rm = TRUE),
                                                          mean_iRT = mean(iRT_aud, na.rm = TRUE))
 
@@ -675,22 +677,48 @@ iRT_aud_pwc
 
 # need to updated !!!!!!!!!!!!!!!!!!!!
 
-raw_event_table = raw_event_table %>% mutate(f_SOA = factor(SOA, ordered = TRUE, levels = c("0", "0.232", "0.466")))
+target_event_table = target_event_table %>% mutate(f_SOA = factor(SOA, ordered = TRUE, levels = c("0", "0.232", "0.466")))
 
 
-ggscatter(raw_event_table, x = "iRT_vis", y = "RT_aud",
+c1 = ggscatter(target_event_table, x = "iRT_vis", y = "RT_aud",
    color = "SOA_lock", palette = "jco",
    add = "reg.line", conf.int = TRUE, cor.coef = TRUE, cor.method = "pearson") + stat_cor(aes(color = SOA_lock), label.y = c(2.6,2.4,2.2))
+c1
 
-# needs to be split by SOA lock
-ggscatter(raw_event_table, x = "iRT_vis", y = "RT_aud",
+# split by SOA and SOA_lock
+c2a = ggscatter(target_event_table[target_event_table$SOA_lock == 'onset', ], x = "iRT_vis", y = "RT_aud",
    color = "f_SOA", palette = "jco",
-   add = "reg.line", conf.int = TRUE, cor.coef = TRUE, cor.method = "pearson") + stat_cor(aes(color = f_SOA), label.y = c(2.6,2.4,2.2))
+   add = "reg.line", conf.int = TRUE, cor.coef = TRUE, cor.method = "pearson") +
+  stat_cor(aes(color = f_SOA), label.y = c(2.6,2.4,2.2)) +
+  ylim(c(0,3))+
+  ggtitle("onset")
+
+c2b = ggscatter(target_event_table[target_event_table$SOA_lock == 'offset', ], x = "iRT_vis", y = "RT_aud",
+   color = "f_SOA", palette = "jco",
+   add = "reg.line", conf.int = TRUE, cor.coef = TRUE, cor.method = "pearson") + 
+  stat_cor(aes(color = f_SOA), label.y = c(2.6,2.4,2.2)) + 
+  ylim(c(0,3))+
+  ggtitle("offset")
+
+ggarrange(c2a, c2b, ncol=2, common.legend = TRUE, legend="bottom")
 
 
-ggscatter(raw_event_table, x = "iRT_vis", y = "RT_aud",
+# split by task-relevance and SOA_lock
+c3a = ggscatter(target_event_table[target_event_table$SOA_lock == 'onset', ], x = "iRT_vis", y = "RT_aud",
+   color = "task_relevance", palette = "jco", add = "reg.line", conf.int = TRUE, cor.coef = TRUE, cor.method = "pearson") +
+  stat_cor(aes(color = task_relevance), label.y = c(2.6,2.4,2.2)) +
+  ylim(c(0,3)) +
+  ggtitle("onset")
+
+c3b = ggscatter(target_event_table[target_event_table$SOA_lock == 'offset', ], x = "iRT_vis", y = "RT_aud",
    color = "task_relevance", palette = "jco",
-   add = "reg.line", conf.int = TRUE, cor.coef = TRUE, cor.method = "pearson") + stat_cor(aes(color = task_relevance), label.y = c(2.6,2.4,2.2))
+   add = "reg.line", conf.int = TRUE, cor.coef = TRUE, cor.method = "pearson") +
+  stat_cor(aes(color = task_relevance), label.y = c(2.6,2.4,2.2)) +
+  ylim(c(0,3))+
+  ggtitle("offset")
+
+ggarrange(c3a, c3b, ncol=2, common.legend = TRUE, legend="bottom")
+
 ```
 
 
