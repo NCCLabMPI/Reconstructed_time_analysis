@@ -53,7 +53,7 @@ parent_dir = getwd()
 setwd(wd)
 file = file.path(parent_dir, 'Reconstructed_time_experiment', 'data', sub_folder, ses_folder, file_name)
 
-# if file for subject and session exists load it
+# load file
 event_table = read.csv(file)
 
 # make format consistent
@@ -269,9 +269,9 @@ p22 = ggplot(data=SOA_SOA_lock_duration_data2, aes(x=onset_SOA*1000, y=mean_RT*1
   geom_line()+
   geom_errorbar(aes(ymin = (mean_RT-sem_RT)*1000, ymax = (mean_RT+sem_RT)*1000), width = 20)+
   geom_point()+
-  ylim(c(450,700))+
+  ylim(c(450,800))+
   ylab("Reaction time [ms]")+
-  xlab('SOA [ms]')+
+  xlab('SOA to onset [ms]')+
   scale_color_manual(values=c('red','blue','darkgreen'), name = 'Duration [ms]', labels=c('500', '1000', '1500'))+
   scale_linetype_manual(values=c("solid", "dashed"), name = 'SOA time-locked to', breaks=c('onset', 'offset'))+
   theme_bw() +
@@ -674,9 +674,6 @@ iRT_aud_pwc
 
 ```{r }
 
-
-# need to updated !!!!!!!!!!!!!!!!!!!!
-
 target_event_table = target_event_table %>% mutate(f_SOA = factor(SOA, ordered = TRUE, levels = c("0", "0.232", "0.466")))
 
 
@@ -684,6 +681,8 @@ c1 = ggscatter(target_event_table, x = "iRT_vis", y = "RT_aud",
    color = "SOA_lock", palette = "jco",
    add = "reg.line", conf.int = TRUE, cor.coef = TRUE, cor.method = "pearson") + stat_cor(aes(color = SOA_lock), label.y = c(2.6,2.4,2.2))
 c1
+
+
 
 # split by SOA and SOA_lock
 c2a = ggscatter(target_event_table[target_event_table$SOA_lock == 'onset', ], x = "iRT_vis", y = "RT_aud",
@@ -701,6 +700,7 @@ c2b = ggscatter(target_event_table[target_event_table$SOA_lock == 'offset', ], x
   ggtitle("offset")
 
 ggarrange(c2a, c2b, ncol=2, common.legend = TRUE, legend="bottom")
+
 
 
 # split by task-relevance and SOA_lock
