@@ -541,59 +541,6 @@ qqnorm(residuals(vis_model1))
 rsq.glmm(vis_model1)
 ```
 
-# offset PRP analysis
-
-```{r offset_PRP}
-
-# do pairwise comparions using tukey correted t-testing 
-# post-hoc pairwise comparison
-
-offset_event_table = all_event_table %>% filter(SOA_lock == "offset")
-
-# new model (needs to be adjusted probably)
-
-offset_model = glmer(iRT_aud ~ f_SOA*f_duration*c_task_relevant +
-                       (1*f_SOA*f_duration*c_task_relevant | sub_id), 
-                     family = Gamma(link="identity"), data = offset_event_table)
-
-Anova(offset_model)
-rsq.glmm(offset_model)
-
-em1 <- emmeans(offset_model, "f_SOA", by = "f_duration")
-contrast(em1, "pairwise", adjust = "bonferroni")
-
-em2 <- emmeans(offset_model, "f_SOA")
-contrast(em2, "pairwise", adjust = "bonferroni")
-
-em2 <- emmeans(offset_model, "f_SOA", by = c("f_duration", "c_task_relevant"))
-contrast(em2, "pairwise", adjust = "bonferroni")
-
-# MAYBE FIND ONE THAT DISPLAYS P VALUES WITH MORE VALUES AFTER THE PERIOD
-
-
-# Regression of offset SOA 
-
-# full data
-
-ggscatter(offset_event_table , x = "SOA", y = "iRT_aud", 
-          add = "reg.line", conf.int = TRUE, 
-          cor.coef = TRUE, cor.method = "pearson")
-
-
-# mean of subject data
-offset_SOA_data = offset_event_table %>%  group_by(SOA, sub_id) %>%
-                                      summarise(mean_RT = mean(RT_aud, na.rm = TRUE),
-                                                         sd_RT = mean(RT_aud, na.rm = TRUE))
-
-ggscatter(offset_SOA_data , x = "SOA", y = "mean_RT", 
-          add = "reg.line", conf.int = TRUE, 
-          cor.coef = TRUE, cor.method = "pearson")
-
-
-
-```
-
-
 # control model - model2
 
 ```{r model2}
