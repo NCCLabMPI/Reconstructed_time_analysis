@@ -356,7 +356,7 @@ p1 = ggplot(data=SOA_SOA_lock_data, aes(x=SOA*1000, y=mean_RT, group=SOA_lock, l
   xlab('SOA [ms]')+
   scale_linetype_manual(values=c("solid", "dashed"), name = 'SOA time-locked to', breaks=c('onset', 'offset'))+
     theme_bw() +
-  scale_color_manual(values=c('black', 'deeppink', 'darkgreen'), name = 'Measure', breaks=c('objective RT', 'IT aud', 'IT vis'))+
+  scale_color_manual(values=c('black', '#e600ac', 'darkgreen'), name = 'Measure', breaks=c('objective RT', 'IT aud', 'IT vis'))+
   theme(axis.line = element_line(colour = "black"),
     panel.grid.major = element_blank(),
     panel.grid.minor = element_blank(),
@@ -619,7 +619,7 @@ ggbarplot(task_mean_iRT_vis, x = "task_relevance", y = "mean_iRT",
   xlab('Task-relevance')+
    theme(axis.text.x=element_blank(),
         axis.ticks.x=element_blank())+
-  scale_fill_manual(values = c("red","blue","green"), name = 'Task Relevance', labels=c('irrelevant', 'task-relevant non-target', 'target'))
+  scale_fill_manual(values = c("red","blue","lightgreen"), name = 'Task Relevance', labels=c('irrelevant', 'task-relevant non-target', 'target'))
 
 
 
@@ -650,50 +650,207 @@ c1
 
 
 # split by SOA and SOA_lock
-c2a = ggscatter(target_event_table[target_event_table$SOA_lock == 'onset', ], x = "iRT_vis", y = "RT_aud",
-   color = "f_SOA", palette = "jco",
-   add = "reg.line", conf.int = TRUE, cor.coef = TRUE, cor.method = "pearson") +
-  stat_cor(aes(color = f_SOA), label.y = c(2.6,2.4,2.2), method = "pearson", show.legend = FALSE) +
-  ylim(c(0,3))+
+c2a = ggplot(all_event_table[all_event_table$SOA_lock == 'onset', ], aes(x = iRT_vis, y = RT_aud*1000, color = f_SOA)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = TRUE, aes(group = f_SOA)) +
+  xlab("Visual introspective decision time [ms]") +
+  ylab("Objective auditory reaction time [ms]") +
+  scale_color_manual(values = c("#4775d1", '#ffbf00', "#666666"), name = "SOA [ms]", labels = c("0", "232", "466")) +
   ggtitle("onset")+
-  ylab("Objective auditory reaction time [ms]")+
-  xlab('Introspective visual decision time [ms]')
+  theme_bw() +
+  theme(axis.line = element_line(colour = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(linetype = "solid"),
+        panel.background = element_blank())+
+  stat_cor(color = 'black', label.y = 3000, method = "pearson", show.legend = FALSE)+
+  stat_cor(aes(color = f_SOA),label.y = c(2850,2700,2550), method = "pearson", show.legend = FALSE)
 
-c2b = ggscatter(target_event_table[target_event_table$SOA_lock == 'offset', ], x = "iRT_vis", y = "RT_aud",
-   color = "f_SOA", palette = "jco", add = "reg.line", conf.int = TRUE, cor.coef = TRUE, cor.method = "pearson") + 
-  stat_cor(aes(color = f_SOA), label.y = c(2.6,2.4,2.2),method = "pearson", show.legend = FALSE) + 
-  ylim(c(0,3))+
+c2b = ggplot(all_event_table[all_event_table$SOA_lock == 'offset', ], aes(x = iRT_vis, y = RT_aud*1000, color = f_SOA)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = TRUE, aes(group = f_SOA)) +
+  xlab("Visual introspective decision time [ms]") +
+  ylab("Objective auditory reaction time [ms]") +
+  scale_color_manual(values = c("#4775d1", '#ffbf00', "#666666"), name = "SOA [ms]", labels = c("0", "232", "466")) +
   ggtitle("offset")+
-  ylab("Objective auditory reaction time [ms]")+
-  xlab('Introspective visual decision time [ms]')
+  theme_bw() +
+  theme(axis.line = element_line(colour = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(linetype = "solid"),
+        panel.background = element_blank())+
+  stat_cor(color = 'black', label.y = 3000, method = "pearson", show.legend = FALSE)+
+  stat_cor(aes(color = f_SOA),label.y = c(2850,2700,2550), method = "pearson", show.legend = FALSE)
 
-c2_legend = get_legend(c2b)
 
-ggarrange(c2a, c2b, ncol=2, common.legend = TRUE, legend="bottom", legend.grob = c2_legend)
+ggarrange(c2a, c2b, ncol=2, common.legend = TRUE, legend="bottom")
 
 
 
 # split by task-relevance and SOA_lock
-c3a = ggscatter(target_event_table[target_event_table$SOA_lock == 'onset', ], x = "iRT_vis", y = "RT_aud",
-   color = "task_relevance", palette = "jco", add = "reg.line", conf.int = TRUE, cor.coef = TRUE, cor.method = "pearson") +
-  stat_cor(aes(color = task_relevance), label.y = c(2.6,2.4,2.2), show.legend = FALSE) +
-  ylim(c(0,3)) +
+c3a = ggplot(target_event_table[target_event_table$SOA_lock == 'onset', ], aes(x = iRT_vis, y = RT_aud*1000, color = task_relevance))+
+  geom_point() +
+  geom_smooth(method = "lm", se = TRUE, aes(group = task_relevance))+
+  xlab("Visual introspective decision time [ms]")+
+  ylab("Objective auditory reaction time [ms]")+
+  scale_color_manual(values = c("#4775d1", '#ffbf00', "#666666"), name = "Task relevance ", labels = c("Irrelevant", "Non-target", "Target"))+
   ggtitle("onset")+
-  ylab("Objective auditory reaction time [ms]")+
-  xlab('Introspective visual decision time [ms]')
+  theme_bw() +
+  theme(axis.line = element_line(colour = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(linetype = "solid"),
+        panel.background = element_blank())+
+  stat_cor(color = 'black', label.y = 3000, method = "pearson", show.legend = FALSE)+
+  stat_cor(aes(color = task_relevance),label.y = c(2850,2700,2550), method = "pearson", show.legend = FALSE)
 
-c3b = ggscatter(target_event_table[target_event_table$SOA_lock == 'offset', ], x = "iRT_vis", y = "RT_aud",
-   color = "task_relevance", palette = "jco",
-   add = "reg.line", conf.int = TRUE, cor.coef = TRUE, cor.method = "pearson") +
-  stat_cor(aes(color = task_relevance), label.y = c(2.6,2.4,2.2), show.legend = FALSE) +
-  ylim(c(0,3))+
+c3b = ggplot(target_event_table[target_event_table$SOA_lock == 'offset', ], aes(x = iRT_vis, y = RT_aud*1000, color = task_relevance))+
+  geom_point() +
+  geom_smooth(method = "lm", se = TRUE, aes(group = task_relevance))+
+  xlab("Visual introspective decision time [ms]")+
+  ylab("Objective auditory reaction time [ms]")+
+  scale_color_manual(values = c("#4775d1", '#ffbf00', "#666666"), name = "Task relevance ", labels = c("Irrelevant", "Non-target", "Target"))+
   ggtitle("offset")+
-  ylab("Objective auditory reaction time [ms]")+
-  xlab('Introspective visual decision time [ms]')
+  theme_bw() +
+  theme(axis.line = element_line(colour = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(linetype = "solid"),
+        panel.background = element_blank())+
+  stat_cor(color = 'black', label.y = 3000, method = "pearson", show.legend = FALSE)+
+  stat_cor(aes(color = task_relevance),label.y = c(2850,2700,2550), method = "pearson", show.legend = FALSE)
 
-c3_legend = get_legend(c3b)
 
-ggarrange(c3a, c3b, ncol=2, common.legend = TRUE, legend="bottom", legend.grob = c3_legend)
+ggarrange(c3a, c3b, ncol=2, common.legend = TRUE, legend="bottom")
+
+```
+
+```{r}
+
+# Create the scatter plot with regression lines
+c2a = ggplot(all_event_table[all_event_table$SOA_lock == 'onset', ], aes(x = iRT_vis, y = RT_aud*1000, color = f_SOA)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = TRUE, aes(group = f_SOA)) +
+  xlab("Visual introspective decision time [ms]") +
+  ylab("Objective auditory reaction time [ms]") +
+  scale_color_manual(values = c("#4775d1", '#ffbf00', "#666666"), name = "SOA [ms]", labels = c("0", "232", "466")) +
+  ggtitle("onset")+
+  theme_bw() +
+  theme(axis.line = element_line(colour = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(linetype = "solid"),
+        panel.background = element_blank())+
+  stat_cor(color = 'black', label.y = 3000, method = "pearson", show.legend = FALSE)+
+  stat_cor(aes(color = f_SOA),label.y = c(2850,2700,2550), method = "pearson", show.legend = FALSE)
+
+c2b = ggplot(all_event_table[all_event_table$SOA_lock == 'offset', ], aes(x = iRT_vis, y = RT_aud*1000, color = f_SOA)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = TRUE, aes(group = f_SOA)) +
+  xlab("Visual introspective decision time [ms]") +
+  ylab("Objective auditory reaction time [ms]") +
+  scale_color_manual(values = c("#4775d1", '#ffbf00', "#666666"), name = "SOA [ms]", labels = c("0", "232", "466")) +
+  ggtitle("offset")+
+  theme_bw() +
+  theme(axis.line = element_line(colour = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(linetype = "solid"),
+        panel.background = element_blank())+
+  stat_cor(color = 'black', label.y = 3000, method = "pearson", show.legend = FALSE)+
+  stat_cor(aes(color = f_SOA),label.y = c(2850,2700,2550), method = "pearson", show.legend = FALSE)
+
+
+ggarrange(c2a, c2b, ncol=2, common.legend = TRUE, legend="bottom")
+```
+
+# calibration performance
+
+```{r calibration}
+
+# loading the files 
+
+for (subNum in subNums ){
+  for (ses in sessions ){
+count = count + 1
+sub_ids[count] = paste0(Lab_ID, subNum)
+
+sub_folder = paste0('sub-', Lab_ID, subNum)
+ses_folder = paste0('ses-', ses)
+file_name = paste0(sub_folder, '_', ses_folder, '_run-1_task-calibration_events.csv')
+
+setwd("..")
+parent_dir = getwd()
+setwd(wd)
+file = file.path(parent_dir, 'Reconstructed_time_experiment', 'data', sub_folder, ses_folder, file_name)
+
+# load file
+cali_table = read.csv(file)
+
+# add subject number and session column 
+cali_table = cali_table %>% mutate(sub_num = subNum)
+cali_table = cali_table %>% mutate(sub_id = paste0(Lab_ID, subNum))
+cali_table = cali_table %>% mutate(ses = ses)
+cali_table = cali_table %>% mutate(estimation_error = -estimation_error)
+cali_table = cali_table %>% mutate(abs_est_error = abs(estimation_error))
+cali_table = cali_table %>% mutate(rel_est_error = abs_est_error/cali_ms)
+
+
+# concatanate the tables
+if ( exists('all_cali_table')){
+  all_cali_table = rbind(all_cali_table, cali_table)
+} else {
+  all_cali_table = cali_table
+}
+  }}
+
+# correlation estimated time and actual time 
+ggscatter(all_cali_table, x = "cali_ms", y = "iT",
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson")+
+  ggtitle("Calibration performance")+
+  xlab("Objective tones length [ms]") +
+  ylab("Estimated time [ms]") +
+  theme_bw() +
+  theme(axis.line = element_line(colour = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(linetype = "solid"),
+        panel.background = element_blank())
+
+
+# correlation estimated time and actual time by subject 
+ggscatter(all_cali_table, x = "cali_ms", y = "iT", color='sub_id',
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson")
+
+# correlation absolute estimation error time and actual time 
+ggscatter(all_cali_table, x = "cali_ms", y = "abs_est_error", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson")
+
+# correlation relative estimation error time and actual time 
+ggscatter(all_cali_table, x = "cali_ms", y = "rel_est_error", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson")
+
+# correlation relative estimation error time and actual time 
+ggscatter(all_cali_table, x = "cali_ms", y = "estimation_error", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson")+
+  ggtitle("Calibration error")+
+  xlab("Objective tones length [ms]") +
+  ylab("Estimation error [ms]") +
+  ylim(c(-750,500))+
+  theme_bw() +
+  theme(axis.line = element_line(colour = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(linetype = "solid"),
+        panel.background = element_blank())
+
+
+
 
 ```
 
@@ -725,13 +882,4 @@ print(paste0('Total duration of core experiment was ', round(mean(core_exp_time,
 
 print(paste0('Each miniblock was ', round(mean(core_exp_time, na.rm = TRUE)/60/12), ' min.'))
 
-
-# qn_dur= 1:dim(raw_event_table)-1
-# 
-# for (line in 1:dim(raw_event_table)[1]-1){
-# qn_dur[line] = raw_event_table$vis_stim_time[line+1] - raw_event_table$trial_end[line]
-# }
-# 
-# qn_dur = qn_dur[qn_dur > -0 & qn_dur < 10]
-# mean(qn_dur)
 ```
