@@ -433,10 +433,10 @@ ggscatter(raw_event_table, x = "iRT_aud", y = "iRT_vis", color='sub_id',
           cor.coef = TRUE, cor.method = "pearson")
 
 
-
 ```
 
-# rain cloud plot
+  ylab("Introspective visual reaction time [ms]")+
+  xlab('SOA [ms]')+# rain cloud plot
 
 ```{r raincloud_plot}
 
@@ -724,15 +724,15 @@ c3b = ggplot(target_event_table[target_event_table$SOA_lock == 'offset', ], aes(
 ggarrange(c3a, c3b, ncol=2, common.legend = TRUE, legend="bottom")
 
 ```
-
+# plot suggested by Stan
 ```{r}
 
 # Create the scatter plot with regression lines
-c2a = ggplot(all_event_table[all_event_table$SOA_lock == 'onset', ], aes(x = iRT_vis, y = RT_aud*1000, color = f_SOA)) +
+c2a = ggplot(all_event_table[all_event_table$SOA_lock == 'onset', ], aes(x = RT_aud*1000, y = iRT_aud, color = f_SOA)) +
   geom_point() +
   geom_smooth(method = "lm", se = TRUE, aes(group = f_SOA)) +
-  xlab("Visual introspective decision time [ms]") +
-  ylab("Objective auditory reaction time [ms]") +
+  xlab("Objective auditory reaction time [ms]") +
+  ylab("Auditory introspective decision time [ms]") +
   scale_color_manual(values = c("#4775d1", '#ffbf00', "#666666"), name = "SOA [ms]", labels = c("0", "232", "466")) +
   ggtitle("onset")+
   theme_bw() +
@@ -741,14 +741,14 @@ c2a = ggplot(all_event_table[all_event_table$SOA_lock == 'onset', ], aes(x = iRT
         panel.grid.minor = element_blank(),
         panel.border = element_rect(linetype = "solid"),
         panel.background = element_blank())+
-  stat_cor(color = 'black', label.y = 3000, method = "pearson", show.legend = FALSE)+
-  stat_cor(aes(color = f_SOA),label.y = c(2850,2700,2550), method = "pearson", show.legend = FALSE)
+  stat_cor(color = 'black', label.y = 1500, method = "pearson", show.legend = FALSE)+
+  stat_cor(aes(color = f_SOA),label.y = c(1400,1300,1200), method = "pearson", show.legend = FALSE)
 
-c2b = ggplot(all_event_table[all_event_table$SOA_lock == 'offset', ], aes(x = iRT_vis, y = RT_aud*1000, color = f_SOA)) +
+c2b = ggplot(all_event_table[all_event_table$SOA_lock == 'offset', ], aes(x = RT_aud*1000, y = iRT_aud, color = f_SOA)) +
   geom_point() +
   geom_smooth(method = "lm", se = TRUE, aes(group = f_SOA)) +
-  xlab("Visual introspective decision time [ms]") +
-  ylab("Objective auditory reaction time [ms]") +
+  xlab("Objective auditory reaction time [ms]") +
+  ylab("Auditory introspective decision time [ms]") +
   scale_color_manual(values = c("#4775d1", '#ffbf00', "#666666"), name = "SOA [ms]", labels = c("0", "232", "466")) +
   ggtitle("offset")+
   theme_bw() +
@@ -757,8 +757,8 @@ c2b = ggplot(all_event_table[all_event_table$SOA_lock == 'offset', ], aes(x = iR
         panel.grid.minor = element_blank(),
         panel.border = element_rect(linetype = "solid"),
         panel.background = element_blank())+
-  stat_cor(color = 'black', label.y = 3000, method = "pearson", show.legend = FALSE)+
-  stat_cor(aes(color = f_SOA),label.y = c(2850,2700,2550), method = "pearson", show.legend = FALSE)
+  stat_cor(color = 'black', label.y = 1500, method = "pearson", show.legend = FALSE)+
+  stat_cor(aes(color = f_SOA),label.y = c(1400,1300,1200), method = "pearson", show.legend = FALSE)
 
 
 ggarrange(c2a, c2b, ncol=2, common.legend = TRUE, legend="bottom")
@@ -822,7 +822,16 @@ ggscatter(all_cali_table, x = "cali_ms", y = "iT",
 # correlation estimated time and actual time by subject 
 ggscatter(all_cali_table, x = "cali_ms", y = "iT", color='sub_id',
           add = "reg.line", conf.int = TRUE, 
-          cor.coef = TRUE, cor.method = "pearson")
+          cor.coef = TRUE, cor.method = "pearson")+
+  ggtitle("Calibration performance")+
+  xlab("Objective tones length [ms]") +
+  ylab("Estimated time [ms]") +
+  theme_bw() +
+  theme(axis.line = element_line(colour = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(linetype = "solid"),
+        panel.background = element_blank())
 
 # correlation absolute estimation error time and actual time 
 ggscatter(all_cali_table, x = "cali_ms", y = "abs_est_error", 

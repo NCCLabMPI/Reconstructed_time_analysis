@@ -246,9 +246,16 @@ p1 = ggplot(data=SOA_SOA_lock_data, aes(x=SOA*1000, y=mean_RT*1000, group=SOA_lo
   geom_line()+
   geom_point()+
   geom_errorbar(aes(ymin = (mean_RT-sem_RT)*1000, ymax = (mean_RT+sem_RT)*1000), width = 20)+
+  scale_linetype_manual(values=c("solid", "dashed"), name = 'SOA time-locked to', breaks=c('onset', 'offset'))+
   ylim(c(400,700))+
   ylab("Reaction time [ms]")+
-  xlab('SOA [ms]')
+  xlab('SOA [ms]')+
+    theme_bw() +
+  theme(axis.line = element_line(colour = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(linetype = "solid"),
+        panel.background = element_blank()) 
 p1
 
 # by duration 
@@ -391,45 +398,45 @@ ggplot(rp_data, aes(x = SOA, y = mean_RT, fill = SOA_lock)) +
 
 ```{r raincloud_plot2}
 
-# source("R_rainclouds.R")
-# 
-# # prepare data 
-# n = length(subNums)
-# 
-# rp_data = all_event_table %>%  group_by(SOA, SOA_lock, sub_id) %>%
-#                                       summarise(mean_RT = mean(RT_aud, na.rm = TRUE),
-#                                                          sd_RT = sd(RT_aud, na.rm = TRUE))
-# 
-# sum_data = rp_data %>%  group_by(SOA, SOA_lock) %>%
-#                                       summarise(RT_mean = mean(mean_RT, na.rm = TRUE),
-#                                                          RT_median = median(mean_RT, na.rm = TRUE),
-#                                                          RT_sd = sd(mean_RT, na.rm = TRUE),
-#                                                          RT_sem = RT_sd / sqrt(n))
-# 
-# rp_data$SOAj = jitter(rp_data$SOA, amount = .005)
-# 
-# 
-# # define colors
-# fill_colors = c(rep("pink",5),rep("lightblue",5))
-# line_colors = c("onset" = "blue", "offset" = "red")
-# 
-# #Rainclouds for repeated measures, additional plotting options 
-# 
-# ggplot(all_event_table, aes(x = SOA, y = RT_aud, fill = SOA_lock)) +
-#   # individual data points
-#   geom_jitter(aes(x = SOA, y = RT_aud, colour = SOA_lock), size = 0.1, width = 0.013) +
-#   # distribution plot
-#   geom_flat_violin(aes(fill = interaction(SOA_lock,SOA)),position = position_nudge(x = .02, y = 0), adjust = 1.5, trim = FALSE, alpha = .5, colour = NA)+
-#   # boxplot
-#   geom_boxplot(aes(x = SOA,y = RT_aud, fill = interaction(SOA_lock,SOA)),outlier.shape = NA, alpha = .5, width = .02, colour = "black")+
-#   # error bars
-#   geom_errorbar(data = sum_data, aes(x = as.numeric(SOA)+.02, y = RT_mean, group = SOA_lock, colour = SOA_lock, ymin = RT_mean-RT_sem, ymax = RT_mean+RT_sem), width = .005)+ 
-#   # mean line
-#   geom_line(data = sum_data, aes(x = as.numeric(SOA)+.02, y = RT_mean, group = SOA_lock, colour = SOA_lock),linetype = 2, size=0.5)+
-#   # mean points
-#   geom_point(data = sum_data, aes(x = as.numeric(SOA)+.02, y = RT_mean, group = SOA_lock, colour = SOA_lock), shape = 18, size=1)+
-#   # adjust colors 
-#   scale_fill_manual(values=fill_colors )+scale_color_manual(values = line_colors)
+source("R_rainclouds.R")
+
+# prepare data
+n = length(subNums)
+
+rp_data = all_event_table %>%  group_by(SOA, SOA_lock, sub_id) %>%
+                                      summarise(mean_RT = mean(RT_aud, na.rm = TRUE),
+                                                         sd_RT = sd(RT_aud, na.rm = TRUE))
+
+sum_data = rp_data %>%  group_by(SOA, SOA_lock) %>%
+                                      summarise(RT_mean = mean(mean_RT, na.rm = TRUE),
+                                                         RT_median = median(mean_RT, na.rm = TRUE),
+                                                         RT_sd = sd(mean_RT, na.rm = TRUE),
+                                                         RT_sem = RT_sd / sqrt(n))
+
+rp_data$SOAj = jitter(rp_data$SOA, amount = .005)
+
+
+# define colors
+fill_colors = c(rep("pink",5),rep("lightblue",5))
+line_colors = c("onset" = "blue", "offset" = "red")
+
+#Rainclouds for repeated measures, additional plotting options
+
+ggplot(all_event_table, aes(x = SOA, y = RT_aud, fill = SOA_lock)) +
+  # individual data points
+  geom_jitter(aes(x = SOA, y = RT_aud, colour = SOA_lock), size = 0.1, width = 0.013) +
+  # distribution plot
+  geom_flat_violin(aes(fill = interaction(SOA_lock,SOA)),position = position_nudge(x = .02, y = 0), adjust = 1.5, trim = FALSE, alpha = .5, colour = NA)+
+  # boxplot
+  geom_boxplot(aes(x = SOA,y = RT_aud, fill = interaction(SOA_lock,SOA)),outlier.shape = NA, alpha = .5, width = .02, colour = "black")+
+  # error bars
+  geom_errorbar(data = sum_data, aes(x = as.numeric(SOA)+.02, y = RT_mean, group = SOA_lock, colour = SOA_lock, ymin = RT_mean-RT_sem, ymax = RT_mean+RT_sem), width = .005)+
+  # mean line
+  geom_line(data = sum_data, aes(x = as.numeric(SOA)+.02, y = RT_mean, group = SOA_lock, colour = SOA_lock),linetype = 2, size=0.5)+
+  # mean points
+  geom_point(data = sum_data, aes(x = as.numeric(SOA)+.02, y = RT_mean, group = SOA_lock, colour = SOA_lock), shape = 18, size=1)+
+  # adjust colors
+  scale_fill_manual(values=fill_colors )+scale_color_manual(values = line_colors)
 
 
 ```
