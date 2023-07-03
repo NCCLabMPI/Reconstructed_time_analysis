@@ -733,7 +733,7 @@ c2a = ggplot(all_event_table[all_event_table$SOA_lock == 'onset', ], aes(x = RT_
   geom_smooth(method = "lm", se = TRUE, aes(group = f_SOA)) +
   xlab("Objective auditory reaction time [ms]") +
   ylab("Auditory introspective decision time [ms]") +
-  scale_color_manual(values = c("#4775d1", '#ffbf00', "#666666"), name = "SOA [ms]", labels = c("0", "232", "466")) +
+  scale_color_manual(values = c("#0073c2", '#ffbf00', "#666666"), name = "SOA [ms]", labels = c("0", "232", "466")) +
   ggtitle("onset")+
   theme_bw() +
   theme(axis.line = element_line(colour = "black"),
@@ -749,7 +749,7 @@ c2b = ggplot(all_event_table[all_event_table$SOA_lock == 'offset', ], aes(x = RT
   geom_smooth(method = "lm", se = TRUE, aes(group = f_SOA)) +
   xlab("Objective auditory reaction time [ms]") +
   ylab("Auditory introspective decision time [ms]") +
-  scale_color_manual(values = c("#4775d1", '#ffbf00', "#666666"), name = "SOA [ms]", labels = c("0", "232", "466")) +
+  scale_color_manual(values = c("#0073c2", '#ffbf00', "#666666"), name = "SOA [ms]", labels = c("0", "232", "466")) +
   ggtitle("offset")+
   theme_bw() +
   theme(axis.line = element_line(colour = "black"),
@@ -762,6 +762,77 @@ c2b = ggplot(all_event_table[all_event_table$SOA_lock == 'offset', ], aes(x = RT
 
 
 ggarrange(c2a, c2b, ncol=2, common.legend = TRUE, legend="bottom")
+
+
+# binned RTaud vs IRTaud
+
+bins = 1:30
+
+ITaud_bin = data.frame(matrix(ncol = 0, nrow = 1))
+ITaud_bin$bin = NaN
+ITaud_bin$mean = NaN
+ITaud_bin$sd = NaN
+ITaud_bin = ITaud_bin[-c(1), ]
+
+for (bin in bins){
+  
+  bin_table = all_event_table[all_event_table$RT_aud <= bin/10 & all_event_table$RT_aud >= (bin-1)/10, ]
+  ITaud_bin = ITaud_bin %>% add_row(bin = bin*100, mean = mean(bin_table$iRT_aud),
+  sd = sd(bin_table$iRT_aud))
+  
+}
+
+
+ggplot(ITaud_bin, aes(x= factor(bin), y = mean)) +  
+  geom_bar(stat = "identity", position = position_dodge()) + 
+  geom_errorbar(aes(ymin = mean-sd, ymax = mean+sd)) +
+  xlab("Objective auditory reaction time [ms]") +
+  ylab("Auditory introspective decision time [ms]")
+
+
+# median split
+
+all_event_table = all_event_table %>% mutate(iRT_vis_speed = ifelse(iRT_vis <= median(iRT_vis), "fast","slow"))
+
+
+ggbarplot(all_event_table, x = "f_SOA", y = "RT_aud", fill = "iRT_vis_speed", facet.by = "SOA_lock", position = position_dodge(0.9),
+  add = c("mean_se"))+
+  xlab("SOA [ms]") +
+  ylab("Auditory reaction time [ms]") +
+  scale_fill_manual(values = c("red","blue"), name = 'ITvis Speed', labels=c('fast', 'slow'))
+
+
+SOA_SOA_lock_iRT1_speed_subj_data = all_event_table %>% group_by(SOA, SOA_lock, sub_id, iRT_vis_speed) %>%
+                                      summarise(RT_mean = mean(RT_aud, na.rm = TRUE)*1000)
+
+SOA_SOA_lock_iRT1_speed_data = SOA_SOA_lock_iRT1_speed_subj_data %>%  group_by(SOA, SOA_lock, iRT_vis_speed) %>%
+                                      summarise(mean_RT = mean(RT_mean, na.rm = TRUE),
+                                                         sd_RT = sd(RT_mean, na.rm = TRUE),
+                                                         sem_RT = sd_RT / sqrt(n))
+
+
+ggplot(data=SOA_SOA_lock_iRT1_speed_data, aes(x=SOA*1000, y=mean_RT, group=interaction(iRT_vis_speed, SOA_lock), color=iRT_vis_speed, linetype = SOA_lock)) +
+  geom_line()+
+  geom_errorbar(aes(ymin = (mean_RT-sem_RT), ymax = (mean_RT+sem_RT)), width = 20)+
+  geom_point()+
+  ylim(c(400,900))+
+  ylab("Auditory Reaction time [ms]")+
+  xlab('SOA [ms]')+
+  scale_color_manual(values = c("darkgrey","black"), name = 'ITvis Speed')+
+  scale_linetype_manual(values=c("solid", "dashed"), name = 'SOA time-locked to', breaks=c('onset', 'offset'))+
+  theme_bw() +
+  theme(axis.line = element_line(colour = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(linetype = "solid"),
+        panel.background = element_blank()) 
+
+
+ggbarplot(all_event_table, x = "f_SOA", y = "RT_aud", fill = "iRT_vis_speed", facet.by = c("SOA_lock","iRT_vis_speed"), position = position_dodge(0.9),
+  add = c("mean_se"))+
+  xlab("SOA [ms]") +
+  ylab("Auditory reaction time [ms]") +
+  scale_fill_manual(values = c("pink","lightblue"), name = 'ITvis Speed', labels=c('fast', 'slow'))
 ```
 
 # calibration performance
