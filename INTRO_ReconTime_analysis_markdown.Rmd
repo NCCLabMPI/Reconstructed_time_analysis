@@ -985,8 +985,6 @@ ggscatter(all_cali_table, x = "cali_ms", y = "estimation_error",
         panel.background = element_blank())
 
 
-
-
 ```
 
 

@@ -321,6 +321,9 @@ SOA_SOA_lock_duration_data3 = SOA_SOA_lock_duration_subj_data3 %>%  group_by(ons
 # remove NaNs from auditory responses
 SOA_SOA_lock_duration_data3 = SOA_SOA_lock_duration_data3[!is.na(SOA_SOA_lock_duration_data3$mean_RT), ]
 
+# define order
+SOA_SOA_lock_duration_data3$task_relevance = factor(SOA_SOA_lock_duration_data3$task_relevance , levels=c('target','non-target','irrelevant'))
+
 p23 = ggplot(data=SOA_SOA_lock_duration_data3, aes(x=onset_SOA*1000, y=mean_RT*1000, group=interaction(as.character(duration), SOA_lock), color=as.character(duration), linetype = SOA_lock)) +
   geom_line()+
   geom_errorbar(aes(ymin = (mean_RT-sem_RT)*1000, ymax = (mean_RT+sem_RT)*1000), width = 20)+
@@ -927,4 +930,39 @@ print(paste0("The required sample size is: ", req_sample_size))
 # abline(v=0.05, col="red")
 # abline(v=0.01, col="blue")
 ```
+# auditory practice performance
 
+```{r aud practice}
+
+# loading the files 
+for (subNum in subNums ){
+count = count + 1
+sub_ids[count] = paste0(Lab_ID, subNum)
+
+sub_folder = paste0('sub-', Lab_ID, subNum)
+ses_folder = 'ses-1'
+file_name = paste0(sub_folder, '_ses-1_run-0_task-auditory_events')
+
+setwd("..")
+parent_dir = getwd()
+setwd(wd)
+file = file.path(parent_dir, 'Reconstructed_time_experiment', 'data', sub_folder, ses_folder, file_name)
+
+# load file
+aud_pratice_table = read.csv(file)
+
+# add subject number and session column 
+aud_pratice_table = aud_pratice_table %>% mutate(sub_num = subNum)
+aud_pratice_table = aud_pratice_table %>% mutate(sub_id = paste0(Lab_ID, subNum))
+aud_pratice_table = aud_pratice_table %>% mutate(ses = 1)
+
+# concatanate the tables
+if ( exists('all_aud_pratice_table')){
+  all_aud_pratice_table = rbind(all_aud_pratice_table, aud_pratice_table)
+} else {
+  all_aud_pratice_table = aud_pratice_table
+}
+}
+
+mean_RTaud_practice = mean(all_aud_pratice_table$RT_aud)
+sd_RTaud_practice = sd(all_aud_pratice_table$RT_aud)
