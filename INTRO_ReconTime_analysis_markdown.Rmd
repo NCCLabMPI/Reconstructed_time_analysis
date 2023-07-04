@@ -155,6 +155,7 @@ all_event_table = all_event_table %>% mutate(c_task_relevant = is_task_relevant 
 all_event_table = all_event_table %>% mutate(c_is_onset = is_onset - mean(is_onset))
 all_event_table = all_event_table %>% mutate(c_SOA = SOA - mean(SOA))
 all_event_table = all_event_table %>% mutate(c_duration = duration - mean(duration))
+all_event_table = all_event_table %>% mutate(c_iRT_vis = (iRT_vis - mean(iRT_vis))/1000)
 all_event_table = all_event_table %>% mutate(c_pitch = (pitch-1050)/100) # makes pitches 0.5 for high and -0.5 for low
 
 ```
@@ -310,6 +311,35 @@ p3 = ggplot(data=SOA_SOA_lock_task_relevance_data, aes(x=SOA*1000, y=mean_RT, gr
         panel.border = element_rect(linetype = "solid"),
         panel.background = element_blank()) 
 p3
+
+
+# RT by task-relevance, with targets 
+
+SOA_SOA_lock_task_relevance_subj_target_data = target_event_table %>% group_by(SOA, SOA_lock, task_relevance, sub_id) %>%
+                                      summarise(RT_mean = mean(RT_aud, na.rm = TRUE)*1000)
+
+SOA_SOA_lock_task_relevance_target_data = SOA_SOA_lock_task_relevance_subj_target_data %>%  group_by(SOA, SOA_lock, task_relevance) %>%
+                                      summarise(mean_RT = mean(RT_mean, na.rm = TRUE),
+                                                         sd_RT = sd(RT_mean, na.rm = TRUE),
+                                                         sem_RT = sd_RT / sqrt(n))
+
+
+p4 = ggplot(data=SOA_SOA_lock_task_relevance_target_data, aes(x=SOA*1000, y=mean_RT, group=interaction(task_relevance, SOA_lock), color=task_relevance, linetype = SOA_lock)) +
+  geom_line()+
+  geom_errorbar(aes(ymin = (mean_RT-sem_RT), ymax = (mean_RT+sem_RT)), width = 20)+
+  geom_point()+
+  #ylim(c(400,900))+
+  ylab("Reaction time [ms]")+
+  xlab('SOA [ms]')+
+  scale_color_manual(values=c('lightgreen','blue', 'red'), name = 'Task Relevance', labels=c('target', 'task-relevant non-target', 'irrelevant'), breaks=c('target', 'non-target', 'irrelevant'))+
+  scale_linetype_manual(values=c("solid", "dashed"), name = 'SOA time-locked to', breaks=c('onset', 'offset'))+
+  theme_bw() +
+  theme(axis.line = element_line(colour = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(linetype = "solid"),
+        panel.background = element_blank()) 
+p4
 
 ```
 
@@ -833,6 +863,31 @@ ggbarplot(all_event_table, x = "f_SOA", y = "RT_aud", fill = "iRT_vis_speed", fa
   xlab("SOA [ms]") +
   ylab("Auditory reaction time [ms]") +
   scale_fill_manual(values = c("pink","lightblue"), name = 'ITvis Speed', labels=c('fast', 'slow'))
+
+
+model_T1speed = glmer(RT_aud ~ f_SOA*c_is_onset*c_task_relevant*iRT_vis_speed +
+                     (1*f_SOA*c_is_onset*c_task_relevant*iRT_vis_speed | sub_id)+
+                     (1*f_SOA*c_is_onset*c_task_relevant*iRT_vis_speed | f_duration),
+               family=Gamma(link="identity"), data=all_event_table)
+
+summary(model_T1speed)
+Anova(model_T1speed)
+plot(fitted(model_T1speed),residuals(model_T1speed))
+qqnorm(residuals(model_T1speed))
+rsq.glmm(model_T1speed)
+
+
+model_T1 = glmer(RT_aud ~ f_SOA*c_is_onset*c_task_relevant*c_iRT_vis +
+                     (1*f_SOA*c_is_onset*c_task_relevant*c_iRT_vis| sub_id)+
+                     (1*f_SOA*c_is_onset*c_task_relevant*c_iRT_vis | f_duration),
+               family=Gamma(link="identity"), data=all_event_table)
+
+summary(model_T1)
+Anova(model_T1)
+plot(fitted(model_T1),residuals(model_T1))
+qqnorm(residuals(model_T1))
+rsq.glmm(model_T1)
+
 ```
 
 # calibration performance
