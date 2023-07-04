@@ -681,6 +681,26 @@ acc_plot = ggplot(data=acc_data, aes(x=SOA*1000, y=mean_acc*100, group=interacti
   xlab('SOA [ms]')
 acc_plot
 
+```
+
+
+
+# effect size of PRP
+
+```{r effect size}
+effect_size_table = data.frame(matrix(ncol = 0, nrow = 1))
+
+effect_size_table$target = mean(target_event_table %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'target') %>% pull(RT_aud), na.rm = TRUE) - mean(target_event_table %>% filter(SOA == 0.466 & SOA_lock == 'offset' & task_relevance == 'target' & duration == 1.5) %>% pull(RT_aud), na.rm = TRUE)
+
+effect_size_table$non_target_onset = mean(target_event_table %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(RT_aud), na.rm = TRUE) - mean(target_event_table %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(RT_aud), na.rm = TRUE)
+
+effect_size_table$irrelevant_onset = mean(target_event_table %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(RT_aud), na.rm = TRUE) - mean(target_event_table %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(RT_aud), na.rm = TRUE)
+
+effect_size_table$offset_short = mean(all_event_table %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 0.5) %>% pull(RT_aud), na.rm = TRUE) - mean(all_event_table %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 0.5) %>% pull(RT_aud), na.rm = TRUE)
+
+effect_size_table$offset_intermediate = mean(all_event_table %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1) %>% pull(RT_aud), na.rm = TRUE) - mean(all_event_table %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1) %>% pull(RT_aud), na.rm = TRUE)
+
+effect_size_table$offset_long = mean(all_event_table %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1.5) %>% pull(RT_aud), na.rm = TRUE) - mean(all_event_table %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1.5) %>% pull(RT_aud), na.rm = TRUE)
 
 ```
 
@@ -930,6 +950,7 @@ print(paste0("The required sample size is: ", req_sample_size))
 # abline(v=0.05, col="red")
 # abline(v=0.01, col="blue")
 ```
+
 # auditory practice performance
 
 ```{r aud practice}
@@ -941,7 +962,7 @@ sub_ids[count] = paste0(Lab_ID, subNum)
 
 sub_folder = paste0('sub-', Lab_ID, subNum)
 ses_folder = 'ses-1'
-file_name = paste0(sub_folder, '_ses-1_run-0_task-auditory_events')
+file_name = paste0(sub_folder, '_ses-1_run-0_task-auditory_events.csv')
 
 setwd("..")
 parent_dir = getwd()
@@ -957,12 +978,23 @@ aud_pratice_table = aud_pratice_table %>% mutate(sub_id = paste0(Lab_ID, subNum)
 aud_pratice_table = aud_pratice_table %>% mutate(ses = 1)
 
 # concatanate the tables
-if ( exists('all_aud_pratice_table')){
+if (exists('all_aud_pratice_table')){
   all_aud_pratice_table = rbind(all_aud_pratice_table, aud_pratice_table)
 } else {
   all_aud_pratice_table = aud_pratice_table
 }
 }
 
-mean_RTaud_practice = mean(all_aud_pratice_table$RT_aud)
-sd_RTaud_practice = sd(all_aud_pratice_table$RT_aud)
+all_aud_pratice_table = all_aud_pratice_table %>% mutate(RT_aud = time_of_resp_aud - aud_stim_time)
+
+# trial exclusion
+# remove RT < 100 ms
+all_aud_pratice_table = all_aud_pratice_table[all_aud_pratice_table$RT_aud > 0.1, ]
+
+# remove NaNs from auditory responses
+all_aud_pratice_table = all_aud_pratice_table[!is.na(all_aud_pratice_table$RT_aud), ]
+
+mean_RTaud_practice = mean(all_aud_pratice_table$RT_aud, na.rm = TRUE)
+sd_RTaud_practice = sd(all_aud_pratice_table$RT_aud, na.rm = TRUE)
+
+```
