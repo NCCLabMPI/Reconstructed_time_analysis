@@ -67,6 +67,9 @@ colnames(event_table)[which(names(event_table) == "trial_repsonse_vis")] <- "tri
 event_table = event_table %>% mutate(sub_num = subNum)
 event_table = event_table %>% mutate(ses = ses)
 
+# z-score of iRT_vis and division in high an low
+event_table = event_table %>% mutate(z_iRT_vis = (iRT_vis-mean(iRT_vis))/sd(iRT_vis))
+
 # concatanate the tables
 if ( exists('all_event_table')){
   all_event_table = rbind(all_event_table, event_table)
@@ -672,7 +675,7 @@ iRT_aud_pwc
 target_event_table = target_event_table %>% mutate(f_SOA = factor(SOA, ordered = TRUE, levels = c("0", "0.232", "0.466")))
 
 
-c1 = ggscatter(target_event_table, x = "iRT_vis", y = "RT_aud",
+c1 = ggscatter(target_event_table, x = "z_iRT_vis", y = "RT_aud",
    color = "SOA_lock", palette = "jco",
    add = "reg.line", conf.int = TRUE, cor.coef = TRUE, cor.method = "pearson") + stat_cor(aes(color = SOA_lock), label.y = c(2.6,2.4,2.2))
 c1
@@ -680,13 +683,14 @@ c1
 
 
 # split by SOA and SOA_lock
-c2a = ggplot(all_event_table[all_event_table$SOA_lock == 'onset', ], aes(x = iRT_vis, y = RT_aud*1000, color = f_SOA)) +
+
+c2 = ggplot(all_event_table, aes(x = z_iRT_vis, y = RT_aud*1000, color = f_SOA)) +
   geom_point() +
   geom_smooth(method = "lm", se = TRUE, aes(group = f_SOA)) +
   xlab("Visual introspective decision time [ms]") +
   ylab("Objective auditory reaction time [ms]") +
   scale_color_manual(values = c("#4775d1", '#ffbf00', "#666666"), name = "SOA [ms]", labels = c("0", "232", "466")) +
-  ggtitle("onset")+
+  facet_grid(. ~ SOA_lock)+
   theme_bw() +
   theme(axis.line = element_line(colour = "black"),
         panel.grid.major = element_blank(),
@@ -695,36 +699,16 @@ c2a = ggplot(all_event_table[all_event_table$SOA_lock == 'onset', ], aes(x = iRT
         panel.background = element_blank())+
   stat_cor(color = 'black', label.y = 3000, method = "pearson", show.legend = FALSE)+
   stat_cor(aes(color = f_SOA),label.y = c(2850,2700,2550), method = "pearson", show.legend = FALSE)
-
-c2b = ggplot(all_event_table[all_event_table$SOA_lock == 'offset', ], aes(x = iRT_vis, y = RT_aud*1000, color = f_SOA)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = TRUE, aes(group = f_SOA)) +
-  xlab("Visual introspective decision time [ms]") +
-  ylab("Objective auditory reaction time [ms]") +
-  scale_color_manual(values = c("#4775d1", '#ffbf00', "#666666"), name = "SOA [ms]", labels = c("0", "232", "466")) +
-  ggtitle("offset")+
-  theme_bw() +
-  theme(axis.line = element_line(colour = "black"),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        panel.border = element_rect(linetype = "solid"),
-        panel.background = element_blank())+
-  stat_cor(color = 'black', label.y = 3000, method = "pearson", show.legend = FALSE)+
-  stat_cor(aes(color = f_SOA),label.y = c(2850,2700,2550), method = "pearson", show.legend = FALSE)
-
-
-ggarrange(c2a, c2b, ncol=2, common.legend = TRUE, legend="bottom")
-
-
+c2
 
 # split by task-relevance and SOA_lock
-c3a = ggplot(target_event_table[target_event_table$SOA_lock == 'onset', ], aes(x = iRT_vis, y = RT_aud*1000, color = task_relevance))+
+c3 = ggplot(target_event_table, aes(x = z_iRT_vis, y = RT_aud*1000, color = task_relevance))+
   geom_point() +
   geom_smooth(method = "lm", se = TRUE, aes(group = task_relevance))+
   xlab("Visual introspective decision time [ms]")+
   ylab("Objective auditory reaction time [ms]")+
   scale_color_manual(values = c("#4775d1", '#ffbf00', "#666666"), name = "Task relevance ", labels = c("Irrelevant", "Non-target", "Target"))+
-  ggtitle("onset")+
+  facet_grid(. ~ SOA_lock)+
   theme_bw() +
   theme(axis.line = element_line(colour = "black"),
         panel.grid.major = element_blank(),
@@ -733,38 +717,22 @@ c3a = ggplot(target_event_table[target_event_table$SOA_lock == 'onset', ], aes(x
         panel.background = element_blank())+
   stat_cor(color = 'black', label.y = 3000, method = "pearson", show.legend = FALSE)+
   stat_cor(aes(color = task_relevance),label.y = c(2850,2700,2550), method = "pearson", show.legend = FALSE)
-
-c3b = ggplot(target_event_table[target_event_table$SOA_lock == 'offset', ], aes(x = iRT_vis, y = RT_aud*1000, color = task_relevance))+
-  geom_point() +
-  geom_smooth(method = "lm", se = TRUE, aes(group = task_relevance))+
-  xlab("Visual introspective decision time [ms]")+
-  ylab("Objective auditory reaction time [ms]")+
-  scale_color_manual(values = c("#4775d1", '#ffbf00', "#666666"), name = "Task relevance ", labels = c("Irrelevant", "Non-target", "Target"))+
-  ggtitle("offset")+
-  theme_bw() +
-  theme(axis.line = element_line(colour = "black"),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        panel.border = element_rect(linetype = "solid"),
-        panel.background = element_blank())+
-  stat_cor(color = 'black', label.y = 3000, method = "pearson", show.legend = FALSE)+
-  stat_cor(aes(color = task_relevance),label.y = c(2850,2700,2550), method = "pearson", show.legend = FALSE)
-
-
-ggarrange(c3a, c3b, ncol=2, common.legend = TRUE, legend="bottom")
+c3
 
 ```
+
 # plot suggested by Stan
+
 ```{r}
 
 # Create the scatter plot with regression lines
-c2a = ggplot(all_event_table[all_event_table$SOA_lock == 'onset', ], aes(x = RT_aud*1000, y = iRT_aud, color = f_SOA)) +
+c3 = ggplot(all_event_table, aes(x = RT_aud*1000, y = iRT_aud, color = f_SOA)) +
   geom_point() +
   geom_smooth(method = "lm", se = TRUE, aes(group = f_SOA)) +
   xlab("Objective auditory reaction time [ms]") +
   ylab("Auditory introspective decision time [ms]") +
   scale_color_manual(values = c("#0073c2", '#ffbf00', "#666666"), name = "SOA [ms]", labels = c("0", "232", "466")) +
-  ggtitle("onset")+
+  facet_grid(task_relevance ~ SOA_lock)+
   theme_bw() +
   theme(axis.line = element_line(colour = "black"),
         panel.grid.major = element_blank(),
@@ -773,26 +741,7 @@ c2a = ggplot(all_event_table[all_event_table$SOA_lock == 'onset', ], aes(x = RT_
         panel.background = element_blank())+
   stat_cor(color = 'black', label.y = 1500, method = "pearson", show.legend = FALSE)+
   stat_cor(aes(color = f_SOA),label.y = c(1400,1300,1200), method = "pearson", show.legend = FALSE)
-
-c2b = ggplot(all_event_table[all_event_table$SOA_lock == 'offset', ], aes(x = RT_aud*1000, y = iRT_aud, color = f_SOA)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = TRUE, aes(group = f_SOA)) +
-  xlab("Objective auditory reaction time [ms]") +
-  ylab("Auditory introspective decision time [ms]") +
-  scale_color_manual(values = c("#0073c2", '#ffbf00', "#666666"), name = "SOA [ms]", labels = c("0", "232", "466")) +
-  ggtitle("offset")+
-  theme_bw() +
-  theme(axis.line = element_line(colour = "black"),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        panel.border = element_rect(linetype = "solid"),
-        panel.background = element_blank())+
-  stat_cor(color = 'black', label.y = 1500, method = "pearson", show.legend = FALSE)+
-  stat_cor(aes(color = f_SOA),label.y = c(1400,1300,1200), method = "pearson", show.legend = FALSE)
-
-
-ggarrange(c2a, c2b, ncol=2, common.legend = TRUE, legend="bottom")
-
+c3
 
 # binned RTaud vs IRTaud
 
@@ -807,7 +756,7 @@ ITaud_bin = ITaud_bin[-c(1), ]
 for (bin in bins){
   
   bin_table = all_event_table[all_event_table$RT_aud <= bin/10 & all_event_table$RT_aud >= (bin-1)/10, ]
-  ITaud_bin = ITaud_bin %>% add_row(bin = bin*100, mean = mean(bin_table$iRT_aud),
+  ITaud_bin = ITaud_bin %>% add_row(bin = bin*100, mean = mean(bin_table$z_iRT_aud),
   sd = sd(bin_table$iRT_aud))
   
 }
@@ -822,7 +771,7 @@ ggplot(ITaud_bin, aes(x= factor(bin), y = mean)) +
 
 # median split
 
-all_event_table = all_event_table %>% mutate(iRT_vis_speed = ifelse(iRT_vis <= median(iRT_vis), "fast","slow"))
+all_event_table = all_event_table %>% mutate(iRT_vis_speed = ifelse(z_iRT_vis <= median(z_iRT_vis), "fast","slow"))
 
 
 ggbarplot(all_event_table, x = "f_SOA", y = "RT_aud", fill = "iRT_vis_speed", facet.by = "SOA_lock", position = position_dodge(0.9),
@@ -877,9 +826,9 @@ qqnorm(residuals(model_T1speed))
 rsq.glmm(model_T1speed)
 
 
-model_T1 = glmer(RT_aud ~ f_SOA*c_is_onset*c_task_relevant*c_iRT_vis +
-                     (1*f_SOA*c_is_onset*c_task_relevant*c_iRT_vis| sub_id)+
-                     (1*f_SOA*c_is_onset*c_task_relevant*c_iRT_vis | f_duration),
+model_T1 = glmer(RT_aud ~ f_SOA*c_is_onset*c_task_relevant*z_iRT_vis +
+                     (1*f_SOA*c_is_onset*c_task_relevant*z_iRT_vis| sub_id)+
+                     (1*f_SOA*c_is_onset*c_task_relevant*z_iRT_vis | f_duration),
                family=Gamma(link="identity"), data=all_event_table)
 
 summary(model_T1)
