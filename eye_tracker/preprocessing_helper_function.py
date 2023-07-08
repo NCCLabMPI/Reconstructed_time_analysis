@@ -92,37 +92,39 @@ def extract_eyelink_events(raw, description="blink", eyes=None):
     :param raw: (mne raw object) raw object containing the annotations and continuous recordings
     :param description: (string) identifier for the event in question (blink, saccades, fixations...). The description
     must match the description found in the raw object annotation
-    :param eyes: (list or None) eye to use. By default set to use both, which will create one channel per eye and per
+    :param eyes: (list or None) eye to use. By default, set to use both, which will create one channel per eye and per
     event. MONOCULAR NOT IMPLEMENTED
     :return: raw_new (mne raw object) raw object with the added channels encoding the events and their duration
     """
     # Create the new channels, one per eye:
     if eyes is None:
         eyes = ["L", "R"]
-    description_l_ch, description_r_ch = np.zeros(raw.times.shape), np.zeros(raw.times.shape)
-    # Extract the relevant events from the annotation file:
-    evts_inds_l = np.where(raw.annotations.description == "_".join([description, "L"]))[0]
-    evts_inds_r = np.where(raw.annotations.description == "_".join([description, "R"]))[0]
-    # Extract the onset of each of these:
-    evts_onset_l = raw.annotations.onset[evts_inds_l]
-    evts_dur_l = raw.annotations.duration[evts_inds_l]
-    evts_onset_r = raw.annotations.onset[evts_inds_r]
-    evts_dur_r = raw.annotations.duration[evts_inds_r]
 
-    # Loop through each event for the left eye:
-    for evt_ind, evt in enumerate(evts_onset_l):
-        onset_ind = np.where(raw.times <= evt)[0][-1]
-        offset_ind = np.where(raw.times <= evt + evts_dur_l[evt_ind])[0][-1]
-        description_l_ch[onset_ind:offset_ind] = 1
-    # Same for the right eye:
-    for evt_ind, evt in enumerate(evts_onset_r):
-        onset_ind = np.where(raw.times <= evt)[0][-1]
-        offset_ind = np.where(raw.times <= evt + evts_dur_r[evt_ind])[0][-1]
-        description_r_ch[onset_ind:offset_ind] = 1
+    desc_vectors = []
+    for eye in eyes:
+        # Extract the events
+        evts_ind = np.where(raw.annotations.description == "_".join([description, eye]))[0]
+        # Extract the onset and duration of the said event:
+        evt_onset = raw.annotations.onset[evts_ind]
+        evt_offset = evt_onset + raw.annotations.duration[evts_ind]
+        # Convert to samples:
+        onset = (evt_onset * raw.info["sfreq"]).astype(int)
+        offset = (evt_offset * raw.info["sfreq"]).astype(int)
+
+        # Set the regressor to 1 where the event is happening:
+        desc_vector = np.zeros(raw.n_times)
+        # Measure time this for loop takes:
+        import time
+        start = time.time()
+        for i in range(len(onset)):
+            desc_vector[onset[i]:offset[i]] = 1
+        end = time.time()
+        print("Time to create the regressor: ", end - start)
+        desc_vectors.append(desc_vector)
 
     # Add these two channels to the raw data:
     data = raw.get_data()
-    data = np.concatenate([data, np.array([description_l_ch, description_r_ch])])
+    data = np.concatenate([data, np.array(desc_vectors)])
     channels = raw.ch_names
     channels.extend(["".join([eye, description]) for eye in eyes])
     info = mne.create_info(channels, ch_types=["eeg"] * len(channels), sfreq=raw.info["sfreq"])
