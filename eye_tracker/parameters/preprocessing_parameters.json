@@ -9,6 +9,7 @@
     "extract_saccades",
     "extract_fixation",
     "epochs"
+
   ],
   "extract_blinks": {
     "eyes": ["L", "R"],
@@ -26,11 +27,10 @@
     "visual_onset": {
       "picks": "all",
       "tmin": -1,
-      "tmax": 2.5,
+      "tmax": 3.5,
       "baseline": null,
       "events_of_interest": [
-          "response",
-          "jitter onset"
+          "vis_onset"
       ],
       "reject_by_annotation": false,
       "metadata_column": ["event type", "task relevance", "duration", "category", "orientation", "identity",
@@ -39,7 +39,7 @@
     "visual_offset": {
       "picks": "all",
       "tmin": -1,
-      "tmax": 2.5,
+      "tmax": 3.5,
       "baseline": null,
       "events_of_interest": [
           "fixation_onset"
@@ -51,7 +51,7 @@
     "audio_onset": {
       "picks": "all",
       "tmin": -1,
-      "tmax": 2.5,
+      "tmax": 3.5,
       "baseline": null,
       "events_of_interest": [
           "audio_onset"
