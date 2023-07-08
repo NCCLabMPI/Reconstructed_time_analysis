@@ -3,6 +3,8 @@ import mne
 import json
 from pathlib import Path
 from eye_tracker.preprocessing_helper_function import extract_eyelink_events, epoch_data
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 def preprocessing(subject, parameters):
@@ -55,11 +57,58 @@ def preprocessing(subject, parameters):
                 file_name = "sub-{}_ses-{}_task-{}_{}_desc-{}-epo.fif".format(subject, session, task, data_type,
                                                                               epoch_name)
                 # Save:
-                epochs.save(Path(save_root, file_name))
+                epochs.save(Path(save_root, file_name), overwrite=True)
+
+                # Depending on whehter or no the events were extracted:
+                if "extract_blinks" in preprocessing_steps:
+                    # Plot the blinks rate:
+                    fig, ax = plt.subplots(2)
+                    ax[0].imshow(np.squeeze(epochs.get_data(picks="Lblink")), aspect="auto", origin="lower",
+                                 extent=[epochs.times[0], epochs.times[-1], 0, len(epochs)])
+                    ax[1].imshow(np.squeeze(epochs.get_data(picks="Rblink")), aspect="auto", origin="lower",
+                                 extent=[epochs.times[0], epochs.times[-1], 0, len(epochs)])
+                    ax[0].set_title("Left eye")
+                    ax[1].set_title("Right eye")
+                    ax[1].set_xlabel("Time (s)")
+                    ax[1].set_ylabel("Trials")
+                    file_name = "sub-{}_ses-{}_task-{}_{}_desc-{}_blinks.png".format(subject, session, task,
+                                                                                     data_type, epoch_name)
+                    plt.savefig(Path(save_root, file_name))
+                    plt.close()
+                if "extract_saccades" in preprocessing_steps:
+                    # Plot the blinks rate:
+                    fig, ax = plt.subplots(2)
+                    ax[0].imshow(np.squeeze(epochs.get_data(picks="Lsaccade")), aspect="auto", origin="lower",
+                                 extent=[epochs.times[0], epochs.times[-1], 0, len(epochs)])
+                    ax[1].imshow(np.squeeze(epochs.get_data(picks="Rsaccade")), aspect="auto", origin="lower",
+                                 extent=[epochs.times[0], epochs.times[-1], 0, len(epochs)])
+                    ax[0].set_title("Left eye")
+                    ax[1].set_title("Right eye")
+                    ax[1].set_xlabel("Time (s)")
+                    ax[1].set_ylabel("Trials")
+                    file_name = "sub-{}_ses-{}_task-{}_{}_desc-{}_saccades.png".format(subject, session, task,
+                                                                                       data_type, epoch_name)
+                    plt.savefig(Path(save_root, file_name))
+                    plt.close()
+                if "extract_fixation" in preprocessing_steps:
+                    # Plot the blinks rate:
+                    fig, ax = plt.subplots(2)
+                    ax[0].imshow(np.squeeze(epochs.get_data(picks="Lfixation")), aspect="auto", origin="lower",
+                                 extent=[epochs.times[0], epochs.times[-1], 0, len(epochs)])
+                    ax[1].imshow(np.squeeze(epochs.get_data(picks="Rfixation")), aspect="auto", origin="lower",
+                                 extent=[epochs.times[0], epochs.times[-1], 0, len(epochs)])
+                    ax[0].set_title("Left eye")
+                    ax[1].set_title("Right eye")
+                    ax[1].set_xlabel("Time (s)")
+                    ax[1].set_ylabel("Trials")
+                    file_name = "sub-{}_ses-{}_task-{}_{}_desc-{}_fixation.png".format(subject, session, task,
+                                                                                       data_type, epoch_name)
+                    plt.savefig(Path(save_root, file_name))
+                    plt.close()
 
 
 if __name__ == "__main__":
-    subjects_list = ["SX102", "SX103", "SX104"]
+    subjects_list = ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX110", "SX111"]
     parameters_file = r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker" \
                       r"\parameters\preprocessing_parameters.json "
     for sub in subjects_list:
