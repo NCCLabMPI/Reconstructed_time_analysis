@@ -63,7 +63,7 @@ def bids_converter_handler(subject, session, task, run, config="bids_conversion_
         # Check that the number of triggers matches the number of events:
         validate_triggers(events, log_file)
         # Plot the events:
-        quality_checks_plots(raw_trig, events, param["event_dict"], subject, session, i, "meg", log_file,
+        quality_checks_plots(raw_trig, events, param["event_dict"], subject, session, i+1, "meg", log_file,
                              save_path=bids_path.directory, show_plots=show_events)
         # Integrate the log file events with the triggers to create more sensical events:
         annotations = integrate_log_events(events, log_file, param["event_dict"],
@@ -73,6 +73,11 @@ def bids_converter_handler(subject, session, task, run, config="bids_conversion_
         # Save to BIDS:
         mne_bids.write_raw_bids(raw, bids_path,
                                 overwrite=True, format='FIF')
+
+        # Save the param file to the bids directory:
+        param_path = Path(bids_path.directory, "sub-" + subject + "_ses-" + session + "_task-" + task + "_param.json")
+        with open(param_path, "w") as f:
+            json.dump(param, f, indent=4)
 
 
 if __name__ == "__main__":
