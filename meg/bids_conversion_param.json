@@ -1,0 +1,15 @@
+{
+  "raw_root": "C:\\Users\\alexander.lepauvre\\Documents\\PhD\\Reconstructed_Time\\meg_pilot\\18_07_2023",
+  "bids_root": "C:\\Users\\alexander.lepauvre\\Documents\\PhD\\Reconstructed_Time\\meg_pilot\\bids",
+  "trigger_channel": "UPPT001",
+  "n_runs_per_block": 4,
+  "blk_column_name": "block",
+  "event_dict": {
+    "visual": 1,
+    "audio": 2,
+    "fixation": 3,
+    "jitter": 4,
+    "response": 5
+  },
+  "trials_duration": 2.75
+}
