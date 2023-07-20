@@ -4,6 +4,11 @@
   "trigger_channel": "UPPT001",
   "n_runs_per_block": 4,
   "blk_column_name": "block",
+  "channel_types": {
+    "EEG058-3609": "eog",
+    "EEG059-3609": "ecg",
+    "EEG060-3609": "eog"
+  },
   "event_dict": {
     "visual": 1,
     "audio": 2,
