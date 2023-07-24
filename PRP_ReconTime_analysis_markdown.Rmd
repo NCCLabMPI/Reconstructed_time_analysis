@@ -400,34 +400,60 @@ p23 = ggplot(data=SOA_SOA_lock_duration_data3, aes(x=onset_SOA*1000, y=mean_RT*1
   facet_grid(. ~ task_relevance)
 p23
 
-# --------------------- #  
-SOA_SOA_lock_duration_subj_data4 = all_event_table %>% group_by(onset_SOA,SOA_lock, duration, sub_id, task_relevance) %>%
-                                      summarise(mean_RT = mean(RT_aud[{q<-rank(RT_aud)/length(RT_aud);q>=0.9}], na.rm = TRUE),
-                                                mean_RT_reg = mean(RT_aud, na.rm = TRUE),
-                                                         sd_RT = sd(RT_aud, na.rm = TRUE),
+# including RT vis 
+SOA_SOA_lock_duration_subj_data4 = target_event_table %>% group_by(onset_SOA,SOA_lock, duration, sub_id, task_relevance) %>%
+                                      summarise(RT_mean = mean(RT_aud, na.rm = TRUE))
+
+SOA_SOA_lock_duration_data4 = SOA_SOA_lock_duration_subj_data4 %>%  group_by(onset_SOA, SOA_lock,duration, task_relevance) %>%
+                                      summarise(mean_RT = mean(RT_mean, na.rm = TRUE),
+                                                         sd_RT = sd(RT_mean, na.rm = TRUE),
                                                          sem_RT = sd_RT / sqrt(n))
 
+
+vis_data4 = target_event_table %>% group_by(onset_SOA,SOA_lock, sub_id, task_relevance) %>%
+                                      summarise(RT_mean_vis = mean(RT_vis, na.rm = TRUE))
+
+vis_data4 = vis_data4 %>%  group_by(onset_SOA, SOA_lock, task_relevance) %>%
+                                      summarise(mean_RT_vis = mean(RT_mean_vis, na.rm = TRUE),
+                                                         sd_RT_vis = sd(RT_mean_vis, na.rm = TRUE),
+                                                         sem_RT_vis = sd_RT_vis / sqrt(n))
+
+
 # remove NaNs from auditory responses
-SOA_SOA_lock_duration_subj_data4 = SOA_SOA_lock_duration_subj_data4[!is.na(SOA_SOA_lock_duration_subj_data4$mean_RT), ]
+SOA_SOA_lock_duration_data4 = SOA_SOA_lock_duration_data4[!is.na(SOA_SOA_lock_duration_data4$mean_RT), ]
+vis_data4 = vis_data4[!is.na(vis_data4$mean_RT_vis), ]
 
+# define order
+SOA_SOA_lock_duration_data4$task_relevance = factor(SOA_SOA_lock_duration_data4$task_relevance , levels=c('target','non-target','irrelevant', labels = c('Target', 'Task-relevant non-target', 'Task-irrelevant non-target')))
+vis_data4$task_relevance = factor(vis_data4$task_relevance , levels=c('target','non-target','irrelevant', labels = c('Target', 'Task-relevant non-target', 'Task-irrelevant non-target')))
 
-p23 = ggplot(data=SOA_SOA_lock_duration_subj_data4, aes(x=onset_SOA*1000, y=mean_RT*1000, group=interaction(as.character(duration), SOA_lock), color=as.character(duration), linetype = SOA_lock)) +
-  geom_line()+
-  geom_errorbar(aes(ymin = (mean_RT-sem_RT)*1000, ymax = (mean_RT+sem_RT)*1000), width = 20)+
-  geom_point(size = 1)+
+p24 = ggplot(data = SOA_SOA_lock_duration_data4, aes(x = onset_SOA * 1000, y = mean_RT * 1000, group = interaction(as.character(duration), SOA_lock), color = as.character(duration), linetype = SOA_lock)) +
+  geom_line(data = vis_data4, aes(x = onset_SOA * 1000, y = mean_RT_vis * 1000, color = 'darkgrey', group = SOA_lock, linetype = SOA_lock)) +
+  geom_errorbar(data = vis_data4, aes(x = onset_SOA * 1000, y = mean_RT_vis * 1000, ymin = (mean_RT_vis - sem_RT_vis) * 1000, ymax = (mean_RT_vis + sem_RT_vis) * 1000, group = SOA_lock, color = 'darkgrey', width = 20)) +
+  geom_line() +
+  geom_errorbar(aes(ymin = (mean_RT - sem_RT) * 1000, ymax = (mean_RT + sem_RT) * 1000), width = 20) +
+  geom_point(size = 1) +
   labs(title = "Objective reaction time by task-relevance", tag = "A") +
-  ylab("Reaction time [ms]")+
-  xlab('SOA to onset [ms]')+
-  scale_color_manual(values=c('darkviolet','darkorange','darkred'), name = 'Duration [ms]', labels=c('500', '1000', '1500'))+
-  scale_linetype_manual(values=c("solid", "dashed"), name = 'SOA time-locked to', breaks=c('onset', 'offset'))+
+  ylab("Reaction time [ms]") +
+  xlab('SOA to onset [ms]') +
+  scale_color_manual(values = c('darkviolet', 'darkorange', 'darkred', 'darkgrey'),
+                     name = 'Measure',
+                     labels = c(expression("RT"[aud]~" [500 ms duration]  "),
+                                expression("RT"[aud]~" [1000 ms duration]"),
+                                expression("RT"[aud]~" [1500 ms duration]"),
+                                expression("RT"[vis]~" [all durations]        "))) +
+  scale_linetype_manual(values = c("solid", "dashed"),
+                        name = 'SOA time-locked to',
+                        breaks = c('onset', 'offset')) +
   theme_bw() +
   theme(axis.line = element_line(colour = "black"),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
         panel.border = element_rect(linetype = "solid"),
-        panel.background = element_blank()) +   
-  facet_grid(sub_id ~ task_relevance)
-p23
+        panel.background = element_blank()) +
+  facet_grid(. ~ task_relevance)
+
+p24
 
 
 # by task-relevance
@@ -554,8 +580,8 @@ n = length(subNums)
 
 rp_data = all_event_table %>%  group_by(SOA, SOA_lock, sub_id) %>%
                                       summarise(SOA = SOA*1000,
-                                                mean_RT = mean(z_RT_aud, na.rm = TRUE)*1000,
-                                                         sd_RT = sd(z_RT_aud, na.rm = TRUE)*1000)
+                                                mean_RT = mean(RT_aud, na.rm = TRUE)*1000,
+                                                         sd_RT = sd(RT_aud, na.rm = TRUE)*1000)
 
 sum_data = rp_data %>%  group_by(SOA, SOA_lock) %>%
                                       summarise(RT_mean = mean(mean_RT, na.rm = TRUE),
@@ -572,11 +598,12 @@ line_colors = c("onset" = "blue", "offset" = "red")
 
 #Rainclouds for repeated measures, additional plotting options
 
-rcp2 = ggplot(all_event_table, aes(x = SOA*1000, y = z_RT_aud*1000, fill = SOA_lock)) +
+rcp2 = ggplot(all_event_table, aes(x = SOA*1000, y = RT_aud*1000, fill = SOA_lock)) +
   # individual data points
-  geom_jitter(aes(x = SOA*1000, y = z_RT_aud*1000, colour = SOA_lock), size = 0.1, width = 12) +
+  geom_jitter(aes(x = SOA*1000, y = RT_aud*1000, colour = SOA_lock), size = 0.1, width = 12) +
   # distribution plot
   geom_flat_violin(aes(fill = interaction(SOA_lock,SOA*1000)),position = position_nudge(x = 18, y = 0), adjust = 1.5, trim = FALSE, alpha = .5, colour = NA)+
+
   # error bars
   geom_errorbar(data = sum_data, aes(x = as.numeric(SOA)+18, y = RT_mean, group = SOA_lock, colour = SOA_lock, ymin = RT_mean-RT_sem, ymax = RT_mean+RT_sem), width = 5)+
   # mean line
@@ -584,7 +611,7 @@ rcp2 = ggplot(all_event_table, aes(x = SOA*1000, y = z_RT_aud*1000, fill = SOA_l
   # mean points
   geom_point(data = sum_data, aes(x = as.numeric(SOA)+18, y = RT_mean, group = SOA_lock, colour = SOA_lock), shape = 18, size=1)+
     # boxplot
-  geom_boxplot(aes(x = SOA*1000-20,y = z_RT_aud*1000, fill = interaction(SOA_lock,SOA)),outlier.shape = NA, alpha = .5, width = 10, colour = "black")+
+  geom_boxplot(aes(x = SOA*1000-20,y = RT_aud*1000, fill = interaction(SOA_lock,SOA)),outlier.shape = NA, alpha = .5, width = 10, colour = "black")+
   # adjust colors
   scale_fill_manual(values=fill_colors)+scale_color_manual(values = line_colors)+
   # adjust colors 
