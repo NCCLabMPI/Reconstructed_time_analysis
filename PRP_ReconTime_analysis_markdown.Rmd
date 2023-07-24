@@ -70,7 +70,7 @@ colnames(event_table)[which(names(event_table) == "trial_repsonse_vis")] <- "tri
 # add subject number column 
 event_table = event_table %>% mutate(sub_num = subNum)
 
-# z-score of RT_vis and RTaud and division in high an low
+# z-score of RT_vis and RTaud
 event_table = event_table %>% mutate(z_RT_vis = (RT_vis-mean(RT_vis, na.rm = TRUE))/sd(RT_vis, na.rm = TRUE))
 event_table = event_table %>% mutate(z_RT_aud = (RT_aud-mean(RT_aud, na.rm = TRUE))/sd(RT_aud, na.rm = TRUE))
 
@@ -410,10 +410,13 @@ SOA_SOA_lock_duration_data4 = SOA_SOA_lock_duration_subj_data4 %>%  group_by(ons
                                                          sem_RT = sd_RT / sqrt(n))
 
 
-vis_data4 = target_event_table %>% group_by(onset_SOA,SOA_lock, sub_id, task_relevance) %>%
+vis_data4 = target_event_table %>% group_by(onset_SOA,SOA_lock, sub_id, task_relevance, duration) %>%
                                       summarise(RT_mean_vis = mean(RT_vis, na.rm = TRUE))
 
-vis_data4 = vis_data4 %>%  group_by(onset_SOA, SOA_lock, task_relevance) %>%
+# modify duration to show only one duration at the onset 
+vis_data4= vis_data4 %>% mutate(duration = ifelse(SOA_lock == 'onset',0,duration))
+
+vis_data4 = vis_data4 %>%  group_by(onset_SOA, SOA_lock, task_relevance, duration) %>%
                                       summarise(mean_RT_vis = mean(RT_mean_vis, na.rm = TRUE),
                                                          sd_RT_vis = sd(RT_mean_vis, na.rm = TRUE),
                                                          sem_RT_vis = sd_RT_vis / sqrt(n))
@@ -424,18 +427,27 @@ SOA_SOA_lock_duration_data4 = SOA_SOA_lock_duration_data4[!is.na(SOA_SOA_lock_du
 vis_data4 = vis_data4[!is.na(vis_data4$mean_RT_vis), ]
 
 # define order
-SOA_SOA_lock_duration_data4$task_relevance = factor(SOA_SOA_lock_duration_data4$task_relevance , levels=c('target','non-target','irrelevant', labels = c('Target', 'Task-relevant non-target', 'Task-irrelevant non-target')))
-vis_data4$task_relevance = factor(vis_data4$task_relevance , levels=c('target','non-target','irrelevant', labels = c('Target', 'Task-relevant non-target', 'Task-irrelevant non-target')))
+SOA_SOA_lock_duration_data4$task_relevance = factor(SOA_SOA_lock_duration_data4$task_relevance,
+                                   levels = c('target', 'non-target', 'irrelevant'),
+                                   labels = c('Target', 'Task-relevant non-target', 'Task-irrelevant non-target'))
+vis_data4$task_relevance = factor(vis_data4$task_relevance,
+                                   levels = c('target'),
+                                   labels = c('Target'))
+
+# modify duration to show only one duration at the onset 
+vis_data4= vis_data4 %>% mutate(duration = ifelse(SOA_lock == 'onset',0,duration))
+
 
 p24 = ggplot(data = SOA_SOA_lock_duration_data4, aes(x = onset_SOA * 1000, y = mean_RT * 1000, group = interaction(as.character(duration), SOA_lock), color = as.character(duration), linetype = SOA_lock)) +
-  geom_line(data = vis_data4, aes(x = onset_SOA * 1000, y = mean_RT_vis * 1000, color = 'darkgrey', group = SOA_lock, linetype = SOA_lock)) +
-  geom_errorbar(data = vis_data4, aes(x = onset_SOA * 1000, y = mean_RT_vis * 1000, ymin = (mean_RT_vis - sem_RT_vis) * 1000, ymax = (mean_RT_vis + sem_RT_vis) * 1000, group = SOA_lock, color = 'darkgrey', width = 20)) +
+  geom_line(data = vis_data4, aes(x = onset_SOA * 1000, y = mean_RT_vis * 1000, color = 'darkgrey', group = interaction(as.character(duration), SOA_lock), linetype = SOA_lock)) +
+  geom_errorbar(data = vis_data4, aes(x = onset_SOA * 1000, y = mean_RT_vis * 1000, ymin = (mean_RT_vis - sem_RT_vis) * 1000, ymax = (mean_RT_vis + sem_RT_vis) * 1000, group = interaction(as.character(duration), SOA_lock), color = 'darkgrey', width = 20)) +
+   geom_point(data = vis_data4, aes(x = onset_SOA * 1000, y = mean_RT_vis * 1000, color = 'RT vis', group = interaction(as.character(duration), SOA_lock), linetype = SOA_lock)) +
   geom_line() +
   geom_errorbar(aes(ymin = (mean_RT - sem_RT) * 1000, ymax = (mean_RT + sem_RT) * 1000), width = 20) +
   geom_point(size = 1) +
   labs(title = "Objective reaction time by task-relevance", tag = "A") +
   ylab("Reaction time [ms]") +
-  xlab('SOA to onset [ms]') +
+  xlab('SOA to visual onset [ms]') +
   scale_color_manual(values = c('darkviolet', 'darkorange', 'darkred', 'darkgrey'),
                      name = 'Measure',
                      labels = c(expression("RT"[aud]~" [500 ms duration]  "),
@@ -450,7 +462,9 @@ p24 = ggplot(data = SOA_SOA_lock_duration_data4, aes(x = onset_SOA * 1000, y = m
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
         panel.border = element_rect(linetype = "solid"),
-        panel.background = element_blank()) +
+        panel.background = element_blank(),
+        axis.text.x = element_text(color = "black"),
+        axis.text.y = element_text(color = "black")) +
   facet_grid(. ~ task_relevance)
 
 p24

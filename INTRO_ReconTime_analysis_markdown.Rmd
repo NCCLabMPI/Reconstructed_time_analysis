@@ -67,13 +67,13 @@ for (subNum in subNums ){
     event_table = event_table %>% mutate(sub_num = subNum)
     event_table = event_table %>% mutate(ses = ses)
     
-    # z-score of iRT_vis and iRT_aud and division in high an low
+    # z-score of iRT_vis and iRT_aud
     event_table = event_table %>% mutate(z_iRT_vis = (iRT_vis-mean(iRT_vis))/sd(iRT_vis))
     event_table = event_table %>% mutate(z_iRT_aud = (iRT_aud-mean(iRT_aud))/sd(iRT_aud))
     
-    # z-score of RT_vis and RTaud and division in high an low
-    event_table = event_table %>% mutate(z_RT_vis = (RT_vis-mean(RT_vis))/sd(RT_vis))
-    event_table = event_table %>% mutate(z_RT_aud = (RT_aud-mean(RT_aud))/sd(RT_aud))
+    # z-score of RT_vis and RTaud
+    event_table = event_table %>% mutate(z_RT_vis = (RT_vis-mean(RT_vis, na.rm = TRUE))/sd(RT_vis, na.rm = TRUE))
+    event_table = event_table %>% mutate(z_RT_aud = (RT_aud-mean(RT_aud, na.rm = TRUE))/sd(RT_aud, na.rm = TRUE))
     
     # concatanate the tables
     if ( exists('all_event_table')){
@@ -101,6 +101,14 @@ all_event_table$iRT_aud[all_event_table$iRT_aud == 0] = 1
 
 # remove RT < 100 ms
 all_event_table = all_event_table[all_event_table$RT_aud > 0.1, ]
+
+# add response window column 
+all_event_table = all_event_table %>% mutate(resp_window = (2-onset_SOA)+stim_jit )
+
+# remove RT > mean response window for offset, long duration adn long SOA 
+max_RT = mean(all_event_table$resp_window[all_event_table$SOA == 0.466 & all_event_table$SOA_lock == 'offset' & all_event_table$duration == 1.5], na.rm = TRUE)
+all_event_table = all_event_table[all_event_table$RT_aud < max_RT, ]
+
 
 # remove incorrect auditory responses
 # all_event_table = all_event_table[all_event_table$trial_accuracy_aud == 1, ]
@@ -147,9 +155,6 @@ for (o in sub_id_lvl){
 # add log transformed column
 all_event_table = all_event_table %>% mutate(log_RT_aud = log(RT_aud))
 
-# add response window column 
-all_event_table = all_event_table %>% mutate(resp_window = (2-onset_SOA)+stim_jit )
-
 # make task relevance and SOA lock numeric
 all_event_table = all_event_table %>% mutate(is_task_relevant = ifelse(task_relevance == 'non-target',1,0)) 
 all_event_table = all_event_table %>% mutate(is_onset = ifelse(SOA_lock == 'onset',1,0))
@@ -181,18 +186,20 @@ perf$hit_rate = NaN
 perf$fa_rate = NaN
 perf$aud_acc = NaN
 perf$RT_aud = NaN
+perf$RT_vis = NaN
 perf = perf[-c(1), ]
 
 for (sub_num in subNums) {
   perf = perf %>% add_row(sub_num = as.character(sub_num),
-                          hits = sum(raw_event_table$trial_response_vis =='hit' & raw_event_table$sub_num == sub_num),
-                          misses = sum(raw_event_table$trial_response_vis =='miss' & raw_event_table$sub_num == sub_num),
-                          crs = sum(raw_event_table$trial_response_vis =='cr' & raw_event_table$sub_num == sub_num),
-                          fas = sum(raw_event_table$trial_response_vis =='fa' & raw_event_table$sub_num == sub_num),
+                          hits = sum(target_event_table$trial_response_vis =='hit' & target_event_table$sub_num == sub_num),
+                          misses = sum(target_event_table$trial_response_vis =='miss' & target_event_table$sub_num == sub_num),
+                          crs = sum(target_event_table$trial_response_vis =='cr' & target_event_table$sub_num == sub_num),
+                          fas = sum(target_event_table$trial_response_vis =='fa' & target_event_table$sub_num == sub_num),
                           hit_rate = hits/(hits+misses)*100,
                           fa_rate = fas/(fas+crs)*100,
-                          aud_acc = mean(raw_event_table$trial_accuracy_aud[raw_event_table$sub_num == sub_num], na.rm = TRUE)*100,
-                          RT_aud = mean(raw_event_table$RT_aud[raw_event_table$sub_num == sub_num], na.rm = TRUE)*1000)
+                          aud_acc = mean(target_event_table$trial_accuracy_aud[target_event_table$sub_num == sub_num], na.rm = TRUE)*100,
+                          RT_aud = mean(target_event_table$RT_aud[target_event_table$sub_num == sub_num], na.rm = TRUE)*1000,
+                          RT_vis = mean(target_event_table$RT_vis[target_event_table$sub_num == sub_num], na.rm = TRUE)*1000)
 }
 
 perf = perf %>% add_row(sub_num = 'mean',
@@ -203,7 +210,8 @@ perf = perf %>% add_row(sub_num = 'mean',
                         hit_rate = mean(perf$hit_rate),
                         fa_rate = mean(perf$fa_rate),
                         aud_acc = mean(perf$aud_acc),
-                        RT_aud = mean(perf$RT_aud))
+                        RT_aud = mean(perf$RT_aud),
+                        RT_vis = mean(perf$RT_vis))
 
 perf = perf %>% add_row(sub_num = 'sd',
                         hits = sd(perf$hits[1:10]),
@@ -213,7 +221,8 @@ perf = perf %>% add_row(sub_num = 'sd',
                         hit_rate = sd(perf$hit_rate[1:10]),
                         fa_rate = sd(perf$fa_rate[1:10]),
                         aud_acc = sd(perf$aud_acc[1:10]),
-                        RT_aud = sd(perf$RT_aud[1:10]))
+                        RT_aud = sd(perf$RT_aud[1:10]),
+                        RT_vis = sd(perf$RT_vis[1:10]))
 
 ```
 
@@ -265,7 +274,7 @@ p23 = ggplot(data=SOA_SOA_lock_duration_data3, aes(x=onset_SOA*1000, y=mean_RT*1
   geom_errorbar(aes(ymin = (mean_RT-sem_RT)*1000, ymax = (mean_RT+sem_RT)*1000), width = 20)+
   geom_point()+
   ylab("Reaction time [ms]")+
-  xlab('SOA to onset [ms]')+
+  xlab('SOA to visual onset [ms]')+
   scale_color_manual(values=c('darkviolet','darkorange','darkred'), name = 'Duration [ms]', labels=c('500', '1000', '1500'))+
   scale_linetype_manual(values=c("solid", "dashed"), name = 'SOA time-locked to', breaks=c('onset', 'offset'))+
   theme_bw() +
@@ -337,10 +346,96 @@ p4
 
 ```
 
+# main plotting - iT 
+
+```{R main_plotting_IT}
+# p 1 by duration, extended time - by task relevance
+
+SOA_SOA_lock_subj_data4 = target_event_table %>% group_by(onset_SOA, SOA_lock, sub_id, task_relevance, duration) %>%
+  summarise(RT_mean = mean(RT_aud, na.rm = TRUE)*1000,
+            iT_aud_mean = mean(iRT_aud, na.rm = TRUE),
+            iT_vis_mean = mean(iRT_vis, na.rm = TRUE))
+
+# modify duration to show only one duration at the onset 
+SOA_SOA_lock_subj_data4= SOA_SOA_lock_subj_data4 %>% mutate(duration = ifelse(SOA_lock == 'onset',0,duration))
+
+
+SOA_SOA_lock_data4 = SOA_SOA_lock_subj_data4 %>%  group_by(onset_SOA, SOA_lock, task_relevance, duration) %>%
+  summarise(mean_RT = mean(RT_mean, na.rm = TRUE),
+            sd_RT = sd(RT_mean, na.rm = TRUE),
+            sem_RT = sd_RT/sqrt(n),
+            mean_iT_aud = mean(iT_aud_mean, na.rm = TRUE),
+            sd_iT_aud = sd(iT_aud_mean, na.rm = TRUE),
+            sem_iT_aud = sd_iT_aud/sqrt(n),
+            mean_iT_vis = mean(iT_vis_mean, na.rm = TRUE),
+            sd_iT_vis = sd(iT_vis_mean, na.rm = TRUE),
+            sem_iT_vis = sd_iT_vis/sqrt(n))
+
+# define order
+SOA_SOA_lock_data4$task_relevance = factor(SOA_SOA_lock_data4$task_relevance , levels=c('target','non-target','irrelevant'))
+
+
+vis_data4 = target_event_table %>% group_by(onset_SOA,SOA_lock, sub_id, task_relevance, duration) %>%
+                                      summarise(RT_mean_vis = mean(RT_vis, na.rm = TRUE))
+
+# modify duration to show only one duration at the onset 
+vis_data4= vis_data4 %>% mutate(duration = ifelse(SOA_lock == 'onset',0,duration))
+
+vis_data4 = vis_data4 %>%  group_by(onset_SOA, SOA_lock, task_relevance, duration) %>%
+                                      summarise(mean_RT_vis = mean(RT_mean_vis, na.rm = TRUE),
+                                                         sd_RT_vis = sd(RT_mean_vis, na.rm = TRUE),
+                                                         sem_RT_vis = sd_RT_vis / sqrt(n))
+
+
+# remove NaNs from auditory responses
+vis_data4 = vis_data4[!is.na(vis_data4$mean_RT_vis), ]
+
+# Define order and relabel levels for the task_relevance variable
+SOA_SOA_lock_data4$task_relevance <- factor(SOA_SOA_lock_data4$task_relevance,
+                                   levels = c('target', 'non-target', 'irrelevant'),
+                                   labels = c('Target', 'Task-relevant non-target', 'Task-irrelevant non-target'))
+vis_data4$task_relevance <- factor(vis_data4$task_relevance,
+                                   levels = c('target'),
+                                   labels = c('Target'))
+
+
+p13 <- ggplot(data = SOA_SOA_lock_data4, aes(x = onset_SOA * 1000, y = mean_RT, group = interaction(as.character(duration), SOA_lock), linetype = SOA_lock, color = 'RT aud')) +
+  geom_errorbar(aes(ymin = (mean_iT_vis - sem_iT_vis), ymax = (mean_iT_vis + sem_iT_vis), color = 'IT vis'), width = 20) +
+  geom_line(data = vis_data4, aes(x = onset_SOA * 1000, y = mean_RT_vis * 1000, color = 'RT vis', linetype = SOA_lock)) +
+  geom_errorbar(data = vis_data4, aes(x = onset_SOA * 1000, y = mean_RT_vis * 1000, ymin = (mean_RT_vis - sem_RT_vis) * 1000, ymax = (mean_RT_vis + sem_RT_vis) * 1000, color = 'RT vis'), width = 20) +
+  geom_point(data = vis_data4, aes(x = onset_SOA * 1000, y = mean_RT_vis * 1000, color = 'RT vis', linetype = SOA_lock)) +
+  geom_line() +
+  geom_point() +
+  geom_errorbar(aes(ymin = (mean_RT - sem_RT), ymax = (mean_RT + sem_RT)), width = 20) +
+  geom_line(aes(y = mean_iT_aud, linetype = SOA_lock, color = 'IT aud')) +
+  geom_point(aes(y = mean_iT_aud, color = 'IT aud')) +
+  geom_errorbar(aes(ymin = (mean_iT_aud - sem_iT_aud), ymax = (mean_iT_aud + sem_iT_aud), color = 'IT aud'), width = 20) +
+  geom_line(aes(y = mean_iT_vis, linetype = SOA_lock, color = 'IT vis')) +
+  geom_point(aes(y = mean_iT_vis, color = 'IT vis')) +
+  facet_grid(. ~ task_relevance) +
+  labs(title = "Subjective and objective reaction time", tag = "C") +
+  ylab("Time [ms]") +
+  xlab('SOA to visual onset [ms]') +
+  scale_linetype_manual(values = c("solid", "dashed"), name = 'SOA time-locked to', breaks = c('onset', 'offset')) +
+  scale_color_manual(values = c('RT aud' = 'black', 'RT vis' = 'darkgrey', 'IT aud' = 'darkgreen', 'IT vis' = '#e600ac'),
+                     name = 'Measure',
+                     labels = c(expression("RT"[aud]), expression("RT"[vis]~""), expression("IT"[aud]~" "), expression("IT"[vis]~"  "))) +
+  theme_bw() +
+  theme(axis.line = element_line(colour = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(linetype = "solid"),
+        panel.background = element_blank(),
+        axis.text.x = element_text(color = "black"),
+        axis.text.y = element_text(color = "black"))
+
+p13
+
+```
+
 # plotting - iT 
 
 ```{R plotting_IT}
-
 
 # for iRT
 hist_5 = ggplot(data=all_event_table)+geom_histogram(aes(x=iRT_aud),col="red")+
@@ -434,12 +529,13 @@ p12 = ggplot(data=SOA_SOA_lock_data2, aes(x=SOA*1000, y=mean_RT, group=SOA_lock,
         panel.background = element_blank()) 
 p12
 
+
 p23 = ggplot(data=SOA_SOA_lock_duration_data3, aes(x=onset_SOA*1000, y=mean_RT*1000, group=interaction(as.character(duration), SOA_lock), color=as.character(duration), linetype = SOA_lock)) +
   geom_line()+
   geom_errorbar(aes(ymin = (mean_RT-sem_RT)*1000, ymax = (mean_RT+sem_RT)*1000), width = 20)+
   geom_point()+
   ylab("Reaction time [ms]")+
-  xlab('SOA to onset [ms]')+
+  xlab('SOA to visual onset [ms]')+
   scale_color_manual(values=c('darkviolet','darkorange','darkred'), name = 'Duration [ms]', labels=c('500', '1000', '1500'))+
   scale_linetype_manual(values=c("solid", "dashed"), name = 'SOA time-locked to', breaks=c('onset', 'offset'))+
   theme_bw() +
@@ -450,6 +546,7 @@ p23 = ggplot(data=SOA_SOA_lock_duration_data3, aes(x=onset_SOA*1000, y=mean_RT*1
         panel.background = element_blank()) +   
   facet_grid(. ~ task_relevance)
 p23
+
 
 # iRT aud by task-relevance
 
@@ -498,9 +595,22 @@ p5
 
 # full data
 
-ggscatter(target_event_table , x = "iRT_aud", y = "RT_aud",
+cor_sin =ggscatter(target_event_table , x = "z_RT_aud", y = "iRT_aud",
           add = "reg.line", conf.int = TRUE, 
-          cor.coef = TRUE, cor.method = "pearson")
+          cor.coef = TRUE, cor.coef.coord = c(-2, 1000), cor.method = "pearson")+
+  labs(title = "Estimation performance single trials ", tag = "A")+
+  xlab("Mean z-scored objective auditory reaction time [ms]")+
+  ylab('Mean subjective auditory reaction time [ms]')+
+  xlim(c(-2,1000))+
+  theme_bw() +
+  theme(axis.line = element_line(colour = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(linetype = "solid"),
+        panel.background = element_blank(),
+        axis.text.x = element_text(color = "black"),
+        axis.text.y = element_text(color = "black"))
+cor_sin
 
 
 # mean of subject data
@@ -508,9 +618,20 @@ RT_iRT_data = target_event_table %>% group_by(sub_id) %>%
   summarise(mean_RT = mean(RT_aud, na.rm = TRUE),
             mean_iRT = mean(iRT_aud, na.rm = TRUE))
 
-ggscatter(RT_iRT_data, x = "mean_iRT", y = "mean_RT", 
+cor_sub = ggscatter(RT_iRT_data, x = "mean_RT", y = "mean_iRT", 
           add = "reg.line", conf.int = TRUE, 
-          cor.coef = TRUE, cor.method = "pearson")
+          cor.coef = TRUE, cor.coef.coord = c(190, 0.7), cor.method = "pearson")+
+  labs(title = "Estimation performance by subject ", tag = "B")+
+  xlab("Mean objective auditory reaction time [ms]")+
+  ylab('Mean subjective auditory reaction time [ms]')+theme_bw() +
+  theme(axis.line = element_line(colour = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(linetype = "solid"),
+        panel.background = element_blank(),
+        axis.text.x = element_text(color = "black"),
+        axis.text.y = element_text(color = "black"))
+cor_sub
 
 
 # iRT vis vs iRT aud
