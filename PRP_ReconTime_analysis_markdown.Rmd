@@ -192,28 +192,34 @@ for (iii in task_relevance_lvl2) {
       }}}}
 
 
-sum(target_event_table$SOA_lock == 'onset')
 
+# after trials removal 
+sum(target_event_table$SOA_lock == 'onset')
 sum(target_event_table$SOA_lock == 'offset')
 
-sum(target_event_table$SOA == 0)
+# before 
+sum(raw_event_table$SOA_lock == 'onset')
+sum(raw_event_table$SOA_lock == 'offset')
 
-sum(target_event_table$SOA == 0.466)
+# difference
+sum(raw_event_table$SOA_lock == 'onset') - sum(target_event_table$SOA_lock == 'onset')
+sum(raw_event_table$SOA_lock == 'offset') - sum(target_event_table$SOA_lock == 'offset')
 
-sum(target_event_table$duration == 0.5)
-
-sum(target_event_table$duration == 1.5)
-
-sum(target_event_table$task_relevance == 'irrelevant')
-
-sum(target_event_table$task_relevance == 'non-target')
-
-sum(target_event_table$task_relevance == 'target')
+# relative trial removal
+(sum(raw_event_table$SOA_lock == 'onset') - sum(target_event_table$SOA_lock == 'onset'))/sum(raw_event_table$SOA_lock == 'onset')
+(sum(raw_event_table$SOA_lock == 'offset') - sum(target_event_table$SOA_lock == 'offset'))/sum(raw_event_table$SOA_lock == 'offset')
 
 
-
+# sum(target_event_table$SOA == 0)
+# sum(target_event_table$SOA == 0.466)
+# sum(target_event_table$duration == 0.5)
+# sum(target_event_table$duration == 1.5)
+# sum(target_event_table$task_relevance == 'irrelevant')
+# sum(target_event_table$task_relevance == 'non-target')
+# sum(target_event_table$task_relevance == 'target')
 
 ```
+
 # performance
 
 ``` {r perfromance}
@@ -745,8 +751,11 @@ contrast(em1, "pairwise", adjust = "bonferroni")
 em2 <- emmeans(offset_model, "f_SOA")
 contrast(em2, "pairwise", adjust = "bonferroni")
 
-em2 <- emmeans(offset_model, "f_SOA", by = c("f_duration", "c_task_relevant"))
-contrast(em2, "pairwise", adjust = "bonferroni")
+em3 <- emmeans(offset_model, "f_SOA", by = c("f_duration", "c_task_relevant"))
+contrast(em3, "pairwise", adjust = "bonferroni")
+
+em4 <- emmeans(offset_model, c("f_SOA", "f_duration"))
+contrast(em4, "pairwise", adjust = "bonferroni")
 
 # MAYBE FIND ONE THAT DISPLAYS P VALUES WITH MORE VALUES AFTER THE PERIOD
 
@@ -879,6 +888,8 @@ effect_size_table[4, ] = c(sd(c(target_event_table %>% filter(SOA == 0 & SOA_loc
 
 # cohens d 
 effect_size_table[5, ] = (effect_size_table[1, ] - effect_size_table[2, ])/effect_size_table[4, ]
+
+mean(all_event_table %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1.5) %>% pull(RT_aud), na.rm = TRUE)
 
 ```
 
