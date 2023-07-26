@@ -173,6 +173,61 @@ all_event_table = all_event_table %>% mutate(c_pitch = (pitch-1050)/100) # makes
 
 ```
 
+# test exclusion criteria
+
+```{R test exclusion}
+
+summary(all_event_table$resp_window[all_event_table$SOA == 0.466 & all_event_table$SOA_lock == 'offset' & all_event_table$duration == 1.5], na.rm = TRUE)
+summary(all_event_table$resp_window[all_event_table$SOA == 0 & all_event_table$SOA_lock == 'onset' & all_event_table$duration == 0.5], na.rm = TRUE)
+
+sum(target_event_table$SOA == 0.466 & target_event_table$SOA_lock == 'offset' & target_event_table$duration == 1.5 & target_event_table$task_relevance == 'target')
+sum(target_event_table$SOA == 0 & target_event_table$SOA_lock == 'onset' & target_event_table$duration == 0.5 & target_event_table$task_relevance == 'irrelevant')
+
+task_relevance_lvl2 = c('non-target', 'irrelevant', 'target')
+
+
+for (iii in task_relevance_lvl2) {
+  for (i in SOA_lvl) {
+    for (ii in SOA_lock_lvl) {
+      for (iv in duration_lvl) {
+        
+        cell_trials = sum(target_event_table$SOA == i & target_event_table$SOA_lock == ii & target_event_table$task_relevance == iii & target_event_table$duration == iv, na.rm = TRUE)
+        
+        
+        cell_name = paste(i,ii,iii,iv,sep= '-')
+        print(paste0(cell_trials,' trials', ' for cell: ', cell_name))
+        
+      }}}}
+
+
+
+# after trials removal 
+sum(target_event_table$SOA_lock == 'onset')
+sum(target_event_table$SOA_lock == 'offset')
+
+# before 
+sum(raw_event_table$SOA_lock == 'onset')
+sum(raw_event_table$SOA_lock == 'offset')
+
+# difference
+sum(raw_event_table$SOA_lock == 'onset') - sum(target_event_table$SOA_lock == 'onset')
+sum(raw_event_table$SOA_lock == 'offset') - sum(target_event_table$SOA_lock == 'offset')
+
+# relative trial removal
+(sum(raw_event_table$SOA_lock == 'onset') - sum(target_event_table$SOA_lock == 'onset'))/sum(raw_event_table$SOA_lock == 'onset')
+(sum(raw_event_table$SOA_lock == 'offset') - sum(target_event_table$SOA_lock == 'offset'))/sum(raw_event_table$SOA_lock == 'offset')
+
+
+# sum(target_event_table$SOA == 0)
+# sum(target_event_table$SOA == 0.466)
+# sum(target_event_table$duration == 0.5)
+# sum(target_event_table$duration == 1.5)
+# sum(target_event_table$task_relevance == 'irrelevant')
+# sum(target_event_table$task_relevance == 'non-target')
+# sum(target_event_table$task_relevance == 'target')
+
+```
+
 # performance
 
 ``` {r perfromance}
@@ -191,15 +246,15 @@ perf = perf[-c(1), ]
 
 for (sub_num in subNums) {
   perf = perf %>% add_row(sub_num = as.character(sub_num),
-                          hits = sum(target_event_table$trial_response_vis =='hit' & target_event_table$sub_num == sub_num),
-                          misses = sum(target_event_table$trial_response_vis =='miss' & target_event_table$sub_num == sub_num),
-                          crs = sum(target_event_table$trial_response_vis =='cr' & target_event_table$sub_num == sub_num),
-                          fas = sum(target_event_table$trial_response_vis =='fa' & target_event_table$sub_num == sub_num),
+                          hits = sum(raw_event_table$trial_response_vis =='hit' & raw_event_table$sub_num == sub_num),
+                          misses = sum(raw_event_table$trial_response_vis =='miss' & raw_event_table$sub_num == sub_num),
+                          crs = sum(raw_event_table$trial_response_vis =='cr' & raw_event_table$sub_num == sub_num),
+                          fas = sum(raw_event_table$trial_response_vis =='fa' & raw_event_table$sub_num == sub_num),
                           hit_rate = hits/(hits+misses)*100,
                           fa_rate = fas/(fas+crs)*100,
-                          aud_acc = mean(target_event_table$trial_accuracy_aud[target_event_table$sub_num == sub_num], na.rm = TRUE)*100,
-                          RT_aud = mean(target_event_table$RT_aud[target_event_table$sub_num == sub_num], na.rm = TRUE)*1000,
-                          RT_vis = mean(target_event_table$RT_vis[target_event_table$sub_num == sub_num], na.rm = TRUE)*1000)
+                          aud_acc = mean(raw_event_table$trial_accuracy_aud[raw_event_table$sub_num == sub_num], na.rm = TRUE)*100,
+                          RT_aud = mean(raw_event_table$RT_aud[raw_event_table$sub_num == sub_num], na.rm = TRUE)*1000,
+                          RT_vis = mean(raw_event_table$RT_vis[raw_event_table$sub_num == sub_num], na.rm = TRUE)*1000)
 }
 
 perf = perf %>% add_row(sub_num = 'mean',
@@ -255,7 +310,7 @@ hist_4
 
 # RT and SOA by duration, extended time - by task relevance
 
-SOA_SOA_lock_duration_subj_data3 = target_event_table %>% group_by(onset_SOA,SOA_lock, duration, sub_id, task_relevance) %>%
+SOA_SOA_lock_duration_subj_data3 = raw_event_table %>% group_by(onset_SOA,SOA_lock, duration, sub_id, task_relevance) %>%
                                       summarise(RT_mean = mean(RT_aud, na.rm = TRUE))
 
 SOA_SOA_lock_duration_data3 = SOA_SOA_lock_duration_subj_data3 %>%  group_by(onset_SOA, SOA_lock,duration, task_relevance) %>%
@@ -349,6 +404,9 @@ p4
 # main plotting - iT 
 
 ```{R main_plotting_IT}
+
+n = length(subNums)
+
 # p 1 by duration, extended time - by task relevance
 
 SOA_SOA_lock_subj_data4 = target_event_table %>% group_by(onset_SOA, SOA_lock, sub_id, task_relevance, duration) %>%
@@ -393,7 +451,7 @@ vis_data4 = vis_data4[!is.na(vis_data4$mean_RT_vis), ]
 # Define order and relabel levels for the task_relevance variable
 SOA_SOA_lock_data4$task_relevance <- factor(SOA_SOA_lock_data4$task_relevance,
                                    levels = c('target', 'non-target', 'irrelevant'),
-                                   labels = c('Target', 'Task-relevant non-target', 'Task-irrelevant non-target'))
+                                   labels = c('Target', 'Relevant non-target', 'Irrelevant non-target'))
 vis_data4$task_relevance <- factor(vis_data4$task_relevance,
                                    levels = c('target'),
                                    labels = c('Target'))
@@ -595,13 +653,13 @@ p5
 
 # full data
 
-cor_sin =ggscatter(target_event_table , x = "z_RT_aud", y = "iRT_aud",
+cor_aud = ggscatter(target_event_table , x = "z_RT_aud", y = "iRT_aud",
           add = "reg.line", conf.int = TRUE, 
           cor.coef = TRUE, cor.coef.coord = c(-2, 1000), cor.method = "pearson")+
-  labs(title = "Estimation performance single trials ", tag = "A")+
-  xlab("Mean z-scored objective auditory reaction time [ms]")+
-  ylab('Mean subjective auditory reaction time [ms]')+
-  xlim(c(-2,1000))+
+  labs(title = "Estimation performance auditory task ", tag = "B")+
+  xlab("z-scored objective reaction time [ms]")+
+  ylab('Subjective  reaction time [ms]')+
+  xlim(c(-2,5))+
   theme_bw() +
   theme(axis.line = element_line(colour = "black"),
         panel.grid.major = element_blank(),
@@ -610,17 +668,17 @@ cor_sin =ggscatter(target_event_table , x = "z_RT_aud", y = "iRT_aud",
         panel.background = element_blank(),
         axis.text.x = element_text(color = "black"),
         axis.text.y = element_text(color = "black"))
-cor_sin
+print(cor_aud)
 
 
 # mean of subject data
 RT_iRT_data = target_event_table %>% group_by(sub_id) %>%
-  summarise(mean_RT = mean(RT_aud, na.rm = TRUE),
+  summarise(mean_RT = mean(RT_aud*1000, na.rm = TRUE),
             mean_iRT = mean(iRT_aud, na.rm = TRUE))
 
 cor_sub = ggscatter(RT_iRT_data, x = "mean_RT", y = "mean_iRT", 
           add = "reg.line", conf.int = TRUE, 
-          cor.coef = TRUE, cor.coef.coord = c(190, 0.7), cor.method = "pearson")+
+          cor.coef = TRUE, cor.coef.coord = c(500, 500), cor.method = "pearson")+
   labs(title = "Estimation performance by subject ", tag = "B")+
   xlab("Mean objective auditory reaction time [ms]")+
   ylab('Mean subjective auditory reaction time [ms]')+theme_bw() +
@@ -640,10 +698,32 @@ ggscatter(raw_event_table, x = "iRT_aud", y = "iRT_vis", color='sub_id',
           cor.coef = TRUE, cor.method = "pearson")
 
 
+# visual iRT
+
+cor_vis = ggscatter(target_event_table , x = "z_RT_vis", y = "iRT_vis",
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.coef.coord = c(-2, 1000), cor.method = "pearson")+
+  labs(title = "Estimation performance visual task (T1) ", tag = "A")+
+  xlab("z-scored objective areaction time [ms]")+
+  ylab('Subjective reaction time [ms]')+
+  xlim(c(-2,5))+
+  theme_bw() +
+  theme(axis.line = element_line(colour = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(linetype = "solid"),
+        panel.background = element_blank(),
+        axis.text.x = element_text(color = "black"),
+        axis.text.y = element_text(color = "black"))
+print(cor_vis)
+
+
+
+(cor_vis + cor_aud + plot_layout(ncol = 2, heights = c(1,3)))  /  (p13 + plot_layout(ncol = 1, heights = 10))
+
 ```
 
-ylab("Introspective visual reaction time [ms]")+
-xlab('SOA [ms]')+# rain cloud plot
+
 
 ```{r raincloud_plot}
 
@@ -1128,6 +1208,23 @@ b1 = ggplot(r2s_data, aes(x = factor(SOA), y = mean, fill = factor(SOA))) +
         panel.border = element_rect(linetype = "solid"),
         panel.background = element_blank())
 b1
+
+# Create the bar plot task relevance
+b2 = ggplot(r2s_data, aes(x = factor(SOA), y = mean, fill = factor(SOA))) +
+  geom_bar(stat = "identity", position = "dodge", color = "black") +
+  geom_errorbar(aes(ymin = mean - margin_of_error, ymax = mean + margin_of_error), width = 0.2, position = position_dodge(0.9)) +
+  facet_grid(. ~ SOA_lock)+
+  labs(title = "R"^2~"of RTaud ~ ITvis",
+       x = "SOA",
+       y = "Mean R"^2~"") +
+  scale_fill_manual(values = c("pink","lightblue", 'lightgreen'), name = 'SOA [ms]', labels=c('0', '232', '466'))+
+  theme_bw() +
+  theme(axis.line = element_line(colour = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(linetype = "solid"),
+        panel.background = element_blank())
+
 ```
 
 # effect size of PRP
@@ -1207,7 +1304,46 @@ IT_aud_effect_size_table[4, ] = c(sd(c(target_event_table %>% filter(SOA == 0 & 
 
 # cohens d 
 IT_aud_effect_size_table[5, ] = (IT_aud_effect_size_table[1, ] - IT_aud_effect_size_table[2, ])/IT_aud_effect_size_table[4, ]
+
+# IT vis -----------------------------------------# 
+
+
+IT_vis_effect_size_table = matrix(ncol = 6, nrow = 5)
+rownames(IT_vis_effect_size_table) = c("Mean_SOA0", "Mean_SOA466", "PRP_size", "joined_SD", "Cohensd")
+colnames(IT_vis_effect_size_table) = c("target", "non_target_onset", "irrelevant_onset", "offset_short", "offset_intermediate", "offset_long")
+
+# mean of SOA = 0
+IT_vis_effect_size_table[1, ] = c(mean(target_event_table %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'target') %>% pull(iRT_vis), na.rm = TRUE),
+                           mean(target_event_table %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(iRT_vis), na.rm = TRUE), 
+                           mean(target_event_table %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(iRT_vis), na.rm = TRUE), 
+                           mean(all_event_table %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 0.5) %>% pull(iRT_vis), na.rm = TRUE), 
+                           mean(all_event_table %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1) %>% pull(iRT_vis), na.rm = TRUE), 
+                           mean(all_event_table %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1.5) %>% pull(iRT_vis), na.rm = TRUE))
+
+# mean of SOA = 466
+IT_vis_effect_size_table[2, ] = c(mean(target_event_table %>% filter(SOA == 0.466 & SOA_lock == 'offset' & task_relevance == 'target' & duration == 1.5) %>% pull(iRT_vis), na.rm = TRUE),
+                           mean(target_event_table %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(iRT_vis), na.rm = TRUE),
+                           mean(target_event_table %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(iRT_vis), na.rm = TRUE),
+                           mean(all_event_table %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 0.5) %>% pull(iRT_vis), na.rm = TRUE),
+                           mean(all_event_table %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1) %>% pull(iRT_vis), na.rm = TRUE),
+                           mean(all_event_table %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1.5) %>% pull(iRT_vis), na.rm = TRUE))
+
+# PRP size
+IT_vis_effect_size_table[3, ] = IT_vis_effect_size_table[1, ] - IT_vis_effect_size_table[2, ] 
+
+# joined SD
+IT_vis_effect_size_table[4, ] = c(sd(c(target_event_table %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'target') %>% pull(iRT_vis),target_event_table %>% filter(SOA == 0.466 & SOA_lock == 'offset' & task_relevance == 'target' & duration == 1.5) %>% pull(iRT_vis))),
+                           sd(c(target_event_table %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(iRT_vis), target_event_table %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(iRT_vis))),
+                           sd(c(target_event_table %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(iRT_vis), target_event_table %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(iRT_vis))),
+                           sd(c(all_event_table %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 0.5) %>% pull(iRT_vis), all_event_table %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 0.5) %>% pull(iRT_vis))),
+                           sd(c(all_event_table %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1) %>% pull(iRT_vis), all_event_table %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1) %>% pull(iRT_vis))),
+                           sd(c(all_event_table %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1.5) %>% pull(iRT_vis), all_event_table %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1.5) %>% pull(iRT_vis))))
+
+# cohens d 
+IT_vis_effect_size_table[5, ] = (IT_vis_effect_size_table[1, ] - IT_vis_effect_size_table[2, ])/IT_vis_effect_size_table[4, ]
+
 ```
+
 # calibration performance
 
 ```{r calibration}
