@@ -473,10 +473,12 @@ p24 = ggplot(data = SOA_SOA_lock_duration_data4, aes(x = onset_SOA * 1000, y = m
         panel.grid.minor = element_blank(),
         panel.border = element_rect(linetype = "solid"),
         panel.background = element_blank(),
-        axis.text.x = element_text(color = "black"),
-        axis.text.y = element_text(color = "black"),
-        legend.title = element_text(size = 20),
-        legend.text = element_text(size = 15))
+        axis.text = element_text(color = "black", size = 10),
+        legend.text = element_text(size = 15),
+        legend.title = element_text(size = 15, face="bold"),
+        axis.title = element_text(size = 15, face="bold"),
+        plot.title = element_text(size = 15, face="bold"),
+        strip.text = element_text(size = 15))
 p24
 
 # by task-relevance
@@ -664,7 +666,7 @@ custom_labels <- labeller(SOA_lock = c("onset" = "Onset", "offset" = "Offset"),
 # define order of task relevance
 all_event_table$task_relevance <- factor(all_event_table$task_relevance, levels = c("non-target", "irrelevant"))
 
-RT_dis = ggplot(target_event_table, aes(x = z_RT_aud, color = as.factor(SOA))) +
+RT_dis = ggplot(all_event_table, aes(x = z_RT_aud, color = as.factor(SOA))) +
   stat_ecdf(geom = "step") +
   xlab("z-scored auditory reaction time [ms]") +
   ylab("Cumulative Probability") +
@@ -677,9 +679,13 @@ RT_dis = ggplot(target_event_table, aes(x = z_RT_aud, color = as.factor(SOA))) +
         panel.grid.minor = element_blank(),
         panel.border = element_rect(linetype = "solid"),
         panel.background = element_blank(),
-        axis.text.x = element_text(color = "black"),
-        axis.text.y = element_text(color = "black")) +   
-  facet_grid(SOA_lock ~ task_relevance, labeller = custom_labels)
+        axis.text = element_text(color = "black", size = 10),
+        legend.text = element_text(size = 15),
+        legend.title = element_text(size = 15, face="bold"),
+        axis.title = element_text(size = 15, face="bold"),
+        plot.title = element_text(size = 15, face="bold"),
+        strip.text = element_text(size = 15))+   
+  facet_grid(SOA_lock ~ duration, labeller = custom_labels)
 RT_dis
 
 # open grid.arrange library
@@ -689,8 +695,6 @@ library(gridExtra)
 exp1 = grid.arrange(p24, RT_dis, nrow = 2)
 
 
-layout <- rbind(c(3), c(2))
-grid.arrange(p24, RT_dis, ncol = 3, nrow = 2, widths = c(3, 2))
 
 ```
 # box plot 
@@ -862,16 +866,26 @@ ori_plot
 
 ```{r acc_model1}
 
-
-# auditory accuracy
-acc_data = raw_event_table %>%  group_by(SOA, SOA_lock, task_relevance) %>%
+p24 = ggplot(data = SOA_SOA_lock_duration_data4, aes(x = onset_SOA * 1000, y = mean_RT * 1000, group = interaction(as.character(duration), SOA_lock), color = as.character(duration), linetype = SOA_lock)) +
+  geom_line(data = vis_data4, aes(x = onset_SOA * 1000, y = mean_RT_vis * 1000, color = 'darkgrey', group = interaction(as.character(duration), SOA_lock))) +
+  geom_errorbar(data = vis_data4, aes(x = onset_SOA * 1000, y = mean_RT_vis * 1000, ymin = (mean_RT_vis - sem_RT_vis) * 1000, ymax = (mean_RT_vis + sem_RT_vis) * 1000, group = interaction(as.character(duration), SOA_lock), color = 'darkgrey', width = 20)) +
+  
+  
+# auditory accuracy plot
+acc_data = raw_event_table %>%  group_by(SOA, SOA_lock, task_relevance, sub_id) %>%
                                       summarise(mean_acc = mean(trial_accuracy_aud, na.rm = TRUE),
                                                          sd_acc = mean(trial_accuracy_aud, na.rm = TRUE))
 
+acc_data = acc_data %>%  group_by(SOA, SOA_lock, task_relevance) %>%
+                                      summarise(mean_acc2 = mean(mean_acc, na.rm = TRUE),
+                                                         sd_mean_acc = sd(mean_acc, na.rm = TRUE),
+                                                         sem_mean_acc = sd_mean_acc / sqrt(n))
 
-ggplot(data=acc_data, aes(x=SOA*1000, y=mean_acc*100, group=interaction(SOA_lock, task_relevance)))+
-  geom_line(aes(colour = task_relevance, linetype = SOA_lock))+
+
+acc_plot = ggplot(data=acc_data, aes(x=SOA*1000, y=mean_acc2*100, colour = task_relevance, linetype = SOA_lock, group=interaction(SOA_lock, task_relevance)))+
+  geom_line()+
   geom_point()+
+  geom_errorbar(aes(ymin = (mean_acc2 - sem_mean_acc) * 100, ymax = (mean_acc2 + sem_mean_acc) * 100, width = 10))+
   ylim(c(85,100))+
   ylab("Accuracy in %")+
   xlab('SOA [ms]')+  
@@ -890,6 +904,7 @@ ggplot(data=acc_data, aes(x=SOA*1000, y=mean_acc*100, group=interaction(SOA_lock
         panel.background = element_blank(),
         axis.text.x = element_text(color = "black"),
         axis.text.y = element_text(color = "black"))
+acc_plot
 
 ## general linear mixed effect for accuracy 
 

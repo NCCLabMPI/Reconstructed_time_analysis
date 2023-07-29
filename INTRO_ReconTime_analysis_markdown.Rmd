@@ -477,16 +477,19 @@ p13 <- ggplot(data = SOA_SOA_lock_data4, aes(x = onset_SOA * 1000, y = mean_RT, 
   scale_linetype_manual(values = c("solid", "dashed"), name = 'SOA time-locked to', breaks = c('onset', 'offset')) +
   scale_color_manual(values = c('RT aud' = 'black', 'RT vis' = 'darkgrey', 'IT aud' = 'darkgreen', 'IT vis' = '#e600ac'),
                      name = 'Measure',
-                     labels = c(expression("RT"[aud]), expression("RT"[vis]~""), expression("IT"[aud]~" "), expression("IT"[vis]~"  "))) +
+                     labels = c(expression("RT"[aud]), expression("RT"[vis]~" "), expression("IT"[aud]~" "), expression("IT"[vis]~"  "))) +
   theme_bw() +
   theme(axis.line = element_line(colour = "black"),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
         panel.border = element_rect(linetype = "solid"),
         panel.background = element_blank(),
-        axis.text.x = element_text(color = "black"),
-        axis.text.y = element_text(color = "black"))
-
+        axis.text = element_text(color = "black", size = 10),
+        legend.text = element_text(size = 15),
+        legend.title = element_text(size = 15, face="bold"),
+        axis.title = element_text(size = 15, face="bold"),
+        plot.title = element_text(size = 15, face="bold"),
+        strip.text = element_text(size = 15))
 p13
 
 ```
@@ -666,8 +669,12 @@ cor_aud = ggscatter(target_event_table , x = "z_RT_aud", y = "iRT_aud",
         panel.grid.minor = element_blank(),
         panel.border = element_rect(linetype = "solid"),
         panel.background = element_blank(),
-        axis.text.x = element_text(color = "black"),
-        axis.text.y = element_text(color = "black"))
+        axis.text = element_text(color = "black", size = 10),
+        legend.text = element_text(size = 15),
+        legend.title = element_text(size = 15, face="bold"),
+        axis.title = element_text(size = 15, face="bold"),
+        plot.title = element_text(size = 15, face="bold"))
+p13
 print(cor_aud)
 
 
@@ -713,8 +720,12 @@ cor_vis = ggscatter(target_event_table , x = "z_RT_vis", y = "iRT_vis",
         panel.grid.minor = element_blank(),
         panel.border = element_rect(linetype = "solid"),
         panel.background = element_blank(),
-        axis.text.x = element_text(color = "black"),
-        axis.text.y = element_text(color = "black"))
+        axis.text = element_text(color = "black", size = 10),
+        legend.text = element_text(size = 15),
+        legend.title = element_text(size = 15, face="bold"),
+        axis.title = element_text(size = 15, face="bold"),
+        plot.title = element_text(size = 15, face="bold"))
+p13
 print(cor_vis)
 
 
@@ -1438,6 +1449,24 @@ ggscatter(all_cali_table, x = "cali_ms", y = "estimation_error",
         panel.grid.minor = element_blank(),
         panel.border = element_rect(linetype = "solid"),
         panel.background = element_blank())
+
+
+# calibration performance split by subject
+cali_sub = ggplot(all_cali_table, aes(x = cali_ms, y = iT))+
+  geom_point() +
+  geom_smooth(method = "lm", se = TRUE)+
+  facet_wrap(~sub_id, nrow = 3, ncol = 3, scales = "free")+
+  xlab("Objective tones length [ms]")+
+  ylab("Estimated time [ms]")+
+  ylim(c(0,1300))+
+  theme_bw() +
+  theme(axis.line = element_line(colour = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(linetype = "solid"),
+        panel.background = element_blank())+
+  stat_cor(color = 'black', label.y = 1200, method = "pearson", show.legend = FALSE)
+cali_sub
 
 
 ```
