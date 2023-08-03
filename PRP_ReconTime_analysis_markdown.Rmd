@@ -91,7 +91,7 @@ if ( exists('all_event_table')){
 # without exclusion
 raw_event_table = all_event_table
 
-# remove false alarm 
+# remove false alarm
 all_event_table = all_event_table[all_event_table$trial_response_vis != 'fa', ]
 
 # remove RT < 100 ms
@@ -100,7 +100,7 @@ all_event_table = all_event_table[all_event_table$RT_aud > 0.1, ]
 # add response window column 
 all_event_table = all_event_table %>% mutate(resp_window = (2-onset_SOA)+stim_jit )
 
-# remove RT > mean response window for offset, long duration adn long SOA 
+# # remove RT > mean response window for offset, long duration adn long SOA 
 max_RT = mean(all_event_table$resp_window[all_event_table$SOA == 0.466 & all_event_table$SOA_lock == 'offset' & all_event_table$duration == 1.5], na.rm = TRUE)
 all_event_table = all_event_table[all_event_table$RT_aud < max_RT, ]
 
@@ -108,7 +108,7 @@ all_event_table = all_event_table[all_event_table$RT_aud < max_RT, ]
 all_event_table = all_event_table[all_event_table$trial_accuracy_aud == 1, ]
 
 # remove NaNs from auditory responses
-all_event_table = all_event_table[!is.na(all_event_table$trial_accuracy_aud), ]
+all_event_table = all_event_table[!is.na(all_event_table$RT_aud), ]
 
 # with targets
 target_event_table = all_event_table
@@ -222,7 +222,7 @@ sum(raw_event_table$SOA_lock == 'offset') - sum(target_event_table$SOA_lock == '
 
 # performance
 
-    ``` {r perfromance}
+``` {r perfromance}
 perf = data.frame(matrix(ncol = 0, nrow = 1))
 perf$sub_num = 'NaN'
 perf$hits = NaN
@@ -245,8 +245,8 @@ for (sub_num in subNums) {
                           hit_rate = hits/(hits+misses)*100,
                           fa_rate = fas/(fas+crs)*100,
                           aud_acc = mean(raw_event_table$trial_accuracy_aud[raw_event_table$sub_num == sub_num], na.rm = TRUE)*100,
-                          RT_aud = mean(raw_event_table$RT_aud[raw_event_table$sub_num == sub_num], na.rm = TRUE)*1000,
-                          RT_vis = mean(raw_event_table$RT_vis[raw_event_table$sub_num == sub_num], na.rm = TRUE)*1000)
+                          RT_aud = mean(target_event_table$RT_aud[raw_event_table$sub_num == sub_num], na.rm = TRUE)*1000,
+                          RT_vis = mean(target_event_table$RT_vis[raw_event_table$sub_num == sub_num], na.rm = TRUE)*1000)
 }
 
 perf = perf %>% add_row(sub_num = 'mean',
@@ -564,7 +564,7 @@ rp_data$SOAj = jitter(rp_data$SOA, amount = .005)
 fill_colors = c(rep("pink",5),rep("lightblue",5))
 line_colors = c("onset" = "blue", "offset" = "red")
 
-#Rainclouds for repeated measures, additional plotting options 
+# Rainclouds for repeated measures, additional plotting options 
 
 ggplot(rp_data, aes(x = SOA, y = mean_RT, fill = SOA_lock)) +
   # distribution plot
@@ -654,6 +654,7 @@ rcp2 = ggplot(all_event_table, aes(x = SOA*1000, y = RT_aud*1000, fill = SOA_loc
 rcp2
 
 ```
+
 # distribution analysis 
 
 ```{r distribution}
@@ -661,17 +662,42 @@ rcp2
 # Define custom labels for the columns
 custom_labels <- labeller(SOA_lock = c("onset" = "Onset", "offset" = "Offset"),
                           task_relevance = c("non-target" = "Relevant non-target",
-                                             "irrelevant" = "Irrelevant non-target"))
+                                             "irrelevant" = "Irrelevant non-target"),
+                          duration = c("0.5" = "500 ms",
+                                       "1" = "1000 ms",
+                                       "1.5" = "1500 ms"))
 
 # define order of task relevance
 all_event_table$task_relevance <- factor(all_event_table$task_relevance, levels = c("non-target", "irrelevant"))
 
-RT_dis = ggplot(all_event_table, aes(x = z_RT_aud, color = as.factor(SOA))) +
+# plot for onset - split by task-relevance 
+cdf_on = ggplot(all_event_table %>% filter(SOA_lock == 'onset'& z_RT_aud < 3), aes(x = z_RT_aud, color = as.factor(SOA))) +
   stat_ecdf(geom = "step") +
-  xlab("z-scored auditory reaction time [ms]") +
   ylab("Cumulative Probability") +
   labs(title = "Auditory reaction time distribution", tag = "B") +
-  xlim(c(-2,3))+
+  #xlim(c(-2,3))+
+  scale_color_manual(values = c('red', 'blue', 'green', "orange"), name = 'SOA [ms]', labels=c('0', '116', '232', '466'))+
+  theme_bw() +
+  theme(axis.line = element_line(colour = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(linetype = "solid"),
+        panel.background = element_blank(),
+        axis.text = element_text(color = "black", size = 10),
+        legend.text = element_text(size = 15),
+        legend.title = element_text(size = 15, face="bold"),
+        axis.title.y = element_text(size = 15, face="bold"),
+        axis.title.x = element_blank(),
+        plot.title = element_text(size = 15, face="bold"),
+        strip.text = element_text(size = 15))+   
+  facet_grid(SOA_lock ~ task_relevance, labeller = custom_labels)
+cdf_on
+
+cdf_off = ggplot(all_event_table %>% filter(SOA_lock == 'offset' & z_RT_aud < 3), aes(x = z_RT_aud, color = as.factor(SOA))) +
+  stat_ecdf(geom = "step") +
+  ylab("Cumulative Probability") +
+  xlab("z-scored auditory reaction time") +
+#  xlim(c(-2,3))+
   scale_color_manual(values = c('red', 'blue', 'green', "orange"), name = 'SOA [ms]', labels=c('0', '116', '232', '466'))+
   theme_bw() +
   theme(axis.line = element_line(colour = "black"),
@@ -686,15 +712,7 @@ RT_dis = ggplot(all_event_table, aes(x = z_RT_aud, color = as.factor(SOA))) +
         plot.title = element_text(size = 15, face="bold"),
         strip.text = element_text(size = 15))+   
   facet_grid(SOA_lock ~ duration, labeller = custom_labels)
-RT_dis
-
-# open grid.arrange library
-library(gridExtra)
-
-# combine p24 and RT_dis to one plot
-exp1 = grid.arrange(p24, RT_dis, nrow = 2)
-
-
+cdf_off
 
 ```
 # box plot 

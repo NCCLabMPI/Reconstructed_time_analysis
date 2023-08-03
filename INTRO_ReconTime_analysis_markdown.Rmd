@@ -92,37 +92,37 @@ for (subNum in subNums ){
 # without exclusion
 raw_event_table = all_event_table
 
-# remove false alarm 
-all_event_table = all_event_table[all_event_table$trial_response_vis != 'fa', ]
+# # remove false alarm
+# all_event_table = all_event_table[all_event_table$trial_response_vis != 'fa', ]
 
 # make iRT of 0 a 1
 all_event_table$iRT_vis[all_event_table$iRT_vis == 0] = 1
 all_event_table$iRT_aud[all_event_table$iRT_aud == 0] = 1
 
-# remove RT < 100 ms
-all_event_table = all_event_table[all_event_table$RT_aud > 0.1, ]
+# # remove RT < 100 ms
+# all_event_table = all_event_table[all_event_table$RT_aud > 0.1, ]
 
-# add response window column 
+# add response window column
 all_event_table = all_event_table %>% mutate(resp_window = (2-onset_SOA)+stim_jit )
-
-# remove RT > mean response window for offset, long duration adn long SOA 
+# 
+# # remove RT > mean response window for offset, long duration adn long SOA
 max_RT = mean(all_event_table$resp_window[all_event_table$SOA == 0.466 & all_event_table$SOA_lock == 'offset' & all_event_table$duration == 1.5], na.rm = TRUE)
 all_event_table = all_event_table[all_event_table$RT_aud < max_RT, ]
 
 
 # remove incorrect auditory responses
-# all_event_table = all_event_table[all_event_table$trial_accuracy_aud == 1, ]
+all_event_table = all_event_table[all_event_table$trial_accuracy_aud == 1, ]
 
 # remove NaNs from auditory responses
-all_event_table = all_event_table[!is.na(all_event_table$trial_accuracy_aud), ]
+all_event_table = all_event_table[!is.na(all_event_table$RT_aud), ]
 
 # with targets
-target_event_table = all_event_table
+ target_event_table = all_event_table
 
-# remove target trials 
+# remove target trials
 all_event_table = all_event_table[all_event_table$task_relevance != 'target', ]
 
-# check if any combination of condition (cell) has less than 30 trials 
+# check if any combination of condition (cell) has less than 30 trials
 
 task_relevance_lvl = c('non-target', 'irrelevant')
 SOA_lock_lvl = c('onset', 'offset')
@@ -136,10 +136,10 @@ for (o in sub_id_lvl){
     for (ii in SOA_lock_lvl) {
       for (iii in task_relevance_lvl) {
         for (iv in duration_lvl) {
-          
+
           cell_trials = sum(all_event_table$sub_id == o & all_event_table$SOA == i & all_event_table$SOA_lock == ii & all_event_table$task_relevance == iii & all_event_table$duration == iv, na.rm = TRUE)
-          
-          
+
+
           if(cell_trials < 15){
             cell_name = paste(i,ii,iii,iv,sep= '-')
             warning(paste0('Subject ',o,' has only ', cell_trials,' trials for cell: ', cell_name, '\n'))
@@ -253,8 +253,8 @@ for (sub_num in subNums) {
                           hit_rate = hits/(hits+misses)*100,
                           fa_rate = fas/(fas+crs)*100,
                           aud_acc = mean(raw_event_table$trial_accuracy_aud[raw_event_table$sub_num == sub_num], na.rm = TRUE)*100,
-                          RT_aud = mean(raw_event_table$RT_aud[raw_event_table$sub_num == sub_num], na.rm = TRUE)*1000,
-                          RT_vis = mean(raw_event_table$RT_vis[raw_event_table$sub_num == sub_num], na.rm = TRUE)*1000)
+                          RT_aud = mean(target_event_table$RT_aud[raw_event_table$sub_num == sub_num], na.rm = TRUE)*1000,
+                          RT_vis = mean(target_event_table$RT_vis[raw_event_table$sub_num == sub_num], na.rm = TRUE)*1000)
 }
 
 perf = perf %>% add_row(sub_num = 'mean',
@@ -457,7 +457,7 @@ vis_data4$task_relevance <- factor(vis_data4$task_relevance,
                                    labels = c('Target'))
 
 
-p13 <- ggplot(data = SOA_SOA_lock_data4, aes(x = onset_SOA * 1000, y = mean_RT, group = interaction(as.character(duration), SOA_lock), linetype = SOA_lock, color = 'RT aud')) +
+p13 = ggplot(data = SOA_SOA_lock_data4, aes(x = onset_SOA * 1000, y = mean_RT, group = interaction(as.character(duration), SOA_lock), linetype = SOA_lock, color = 'RT aud')) +
   geom_errorbar(aes(ymin = (mean_iT_vis - sem_iT_vis), ymax = (mean_iT_vis + sem_iT_vis), color = 'IT vis'), width = 20) +
   geom_line(data = vis_data4, aes(x = onset_SOA * 1000, y = mean_RT_vis * 1000, color = 'RT vis', linetype = SOA_lock)) +
   geom_errorbar(data = vis_data4, aes(x = onset_SOA * 1000, y = mean_RT_vis * 1000, ymin = (mean_RT_vis - sem_RT_vis) * 1000, ymax = (mean_RT_vis + sem_RT_vis) * 1000, color = 'RT vis'), width = 20) +
@@ -477,6 +477,7 @@ p13 <- ggplot(data = SOA_SOA_lock_data4, aes(x = onset_SOA * 1000, y = mean_RT, 
   scale_linetype_manual(values = c("solid", "dashed"), name = 'SOA time-locked to', breaks = c('onset', 'offset')) +
   scale_color_manual(values = c('RT aud' = 'black', 'RT vis' = 'darkgrey', 'IT aud' = 'darkgreen', 'IT vis' = '#e600ac'),
                      name = 'Measure',
+                     breaks = c('RT aud', 'RT vis', 'IT aud', 'IT vis'),
                      labels = c(expression("RT"[aud]), expression("RT"[vis]~" "), expression("IT"[aud]~" "), expression("IT"[vis]~"  "))) +
   theme_bw() +
   theme(axis.line = element_line(colour = "black"),
@@ -658,9 +659,9 @@ p5
 
 cor_aud = ggscatter(target_event_table , x = "z_RT_aud", y = "iRT_aud",
           add = "reg.line", conf.int = TRUE, 
-          cor.coef = TRUE, cor.coef.coord = c(-2, 1000), cor.method = "pearson")+
+          cor.coef = TRUE, cor.coef.coord = c(-2, 1100), cor.method = "pearson")+
   labs(title = "Estimation performance auditory task ", tag = "B")+
-  xlab("z-scored objective reaction time [ms]")+
+  xlab("z-scored objective reaction time")+
   ylab('Subjective  reaction time [ms]')+
   xlim(c(-2,5))+
   theme_bw() +
@@ -687,7 +688,7 @@ cor_sub = ggscatter(RT_iRT_data, x = "mean_RT", y = "mean_iRT",
           add = "reg.line", conf.int = TRUE, 
           cor.coef = TRUE, cor.coef.coord = c(500, 500), cor.method = "pearson")+
   labs(title = "Estimation performance by subject ", tag = "B")+
-  xlab("Mean objective auditory reaction time [ms]")+
+  xlab("Mean objective auditory reaction time")+
   ylab('Mean subjective auditory reaction time [ms]')+theme_bw() +
   theme(axis.line = element_line(colour = "black"),
         panel.grid.major = element_blank(),
@@ -709,9 +710,9 @@ ggscatter(raw_event_table, x = "iRT_aud", y = "iRT_vis", color='sub_id',
 
 cor_vis = ggscatter(target_event_table , x = "z_RT_vis", y = "iRT_vis",
           add = "reg.line", conf.int = TRUE, 
-          cor.coef = TRUE, cor.coef.coord = c(-2, 1000), cor.method = "pearson")+
+          cor.coef = TRUE, cor.coef.coord = c(-2, 1100), cor.method = "pearson")+
   labs(title = "Estimation performance visual task (T1) ", tag = "A")+
-  xlab("z-scored objective areaction time [ms]")+
+  xlab("z-scored objective areaction time")+
   ylab('Subjective reaction time [ms]')+
   xlim(c(-2,5))+
   theme_bw() +
@@ -727,11 +728,6 @@ cor_vis = ggscatter(target_event_table , x = "z_RT_vis", y = "iRT_vis",
         plot.title = element_text(size = 15, face="bold"))
 p13
 print(cor_vis)
-
-
-
-(cor_vis + cor_aud + plot_layout(ncol = 2, heights = c(1,3)))  /  (p13 + plot_layout(ncol = 1, heights = 10))
-
 ```
 
 
@@ -837,6 +833,27 @@ Anova(vis_model1)
 plot(fitted(vis_model1),residuals(vis_model1))
 qqnorm(residuals(vis_model1))
 rsq.glmm(vis_model1)
+```
+
+# main analysis from experiment 1 
+
+```{r model_exp1}
+
+## general linear mixed effect model from experiment 1
+
+# fixed effects: SOA (ordinal), SOA-Lock (as c_is_onset,  numeric, centered), Task-relevance (as is relevant, numeric, centered)
+# random effects: Subject ID, Duration (ordinal)
+
+model_exp1 = glmer(RT_aud ~ f_SOA*c_is_onset*c_task_relevant +
+                     (1*f_SOA*c_is_onset*c_task_relevant | sub_id)+
+                     (1*f_SOA*c_is_onset*c_task_relevant | f_duration),
+               family=Gamma(link="identity"), data=all_event_table)
+
+summary(model_exp1)
+Anova(model_exp1)
+plot(fitted(model_exp1),residuals(model_exp1))
+qqnorm(residuals(model_exp1))
+rsq.glmm(model_exp1)
 ```
 
 # control model - model2
