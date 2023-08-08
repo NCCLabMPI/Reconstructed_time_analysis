@@ -16,5 +16,27 @@
     "jitter": 4,
     "response": 5
   },
-  "trials_duration": 2.75
+  "trials_duration": 2.75,
+  "experimental_conditions": {
+    "event_type": ["visual_onset", "auditory_onset", "fixation", "jitter"],
+    "task": ["visual_first", "auditory_first"],
+    "task_relevance": ["target", "non-target", "irrelevant"],
+    "duration": ["1.0", "1.5"],
+    "category": ["face", "object", "letter", "false_font"],
+    "identity": [
+      "face_01", "face_02", "face_03", "face_04", "face_05",
+      "face_06", "face_07", "face_08", "face_09", "face_10",
+      "object_01", "object_02", "object_03", "object_04", "object_05",
+      "object_06", "object_07", "object_08", "object_09", "object_10",
+      "letter_01", "letter_02", "letter_03", "letter_04", "letter_05",
+      "letter_06", "letter_07", "letter_08", "letter_09", "letter_10",
+      "false_font_01", "false_font_02", "false_font_03", "false_font_04", "false_font_05",
+      "false_font_06", "false_font_07", "false_font_08", "false_font_09", "false_font_10"
+    ],
+    "orientation": ["center"],
+    "soa": ["0.0", "0.4"],
+    "lock": ["onset", "offset"],
+    "onset_soa": ["0.0", "0.4", "1.0", "1.4"],
+    "pitch": ["1000", "1100"]
+  }
 }
