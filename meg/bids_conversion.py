@@ -1,12 +1,32 @@
 import json
+import datetime
+import itertools
+from pathlib import Path
+import numpy as np
+import pandas as pd
+
 import mne
 import mne_bids
-import numpy as np
-from pathlib import Path
-import pandas as pd
+
 from bids_conversion_helper import split_logs, get_meg_file, validate_triggers, quality_checks_plots, \
     integrate_log_events
-import datetime
+
+
+def generate_event_id(event_dict):
+    """
+    This function takes in the events dict, which contains for each experimental condition the key word of each level
+    and generates a dict of unique conditions combinations and their unique ID
+    :param event_dict:
+    :return:
+    """
+    # Extract the content of the dictionary as a list of lists:
+    event_dict_list = list(event_dict.values())
+    # Generate all combinations of list of list:
+    combinations = list(itertools.product(*event_dict_list))
+    # Loop through each unique combination and generate a key for it:
+    event_id = {"/".join(combi): i for i, combi in enumerate(combinations)}
+
+    return event_id
 
 
 def bids_converter_task(subject, session, task, run, config="bids_conversion_params.json",
@@ -70,12 +90,14 @@ def bids_converter_task(subject, session, task, run, config="bids_conversion_par
         # Integrate the log file events with the triggers to create more sensical events:
         annotations = integrate_log_events(events, log_file, param["event_dict"],
                                            sfreq=raw_trig.info['sfreq'], trials_duration=param["trials_duration"])
-        # Add the annotations to the raw:
         raw.set_annotations(annotations)
+        # Generate the events keys, to make sure that the same is used across runs and subjects:
+        event_id = generate_event_id(param["experimental_conditions"])
+        # Generate the events ID from the annotations:
+        events, event_id = mne.events_from_annotations(raw, event_id=event_id)
         # Save to BIDS:
         mne_bids.write_raw_bids(raw, bids_path,
-                                overwrite=True, format='FIF')
-
+                                overwrite=True, format='FIF', events=events, event_id=event_id)
         # Save the param file to the bids directory:
         param_path = Path(bids_path.directory, "sub-" + subject + "_ses-" + session + "_task-" + task + "_param.json")
         with open(param_path, "w") as f:
@@ -111,5 +133,5 @@ def bids_converter_handler(subjects, sessions, tasks, run, config="bids_conversi
 
 
 if __name__ == "__main__":
-    bids_converter_handler(["SX104"], ["1"], ["emptyroom"], "all", config="bids_conversion_param.json",
+    bids_converter_handler(["SX104"], ["1"], ["visual_first"], "all", config="bids_conversion_param.json",
                            show_events=False)
