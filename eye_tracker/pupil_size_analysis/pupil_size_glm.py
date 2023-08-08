@@ -10,7 +10,7 @@ import statsmodels.api as sm
 
 
 # First, load the parameters:
-bids_root = r"C:\\Users\\alexander.lepauvre\\Documents\\PhD\\Reconstructed_Time\\bids"
+bids_root = r"D:\backup\Documents\PhD\Reconstructed_Time\bids"
 visit = "1"
 task = "prp"
 session = "1"

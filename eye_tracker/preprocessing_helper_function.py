@@ -3,6 +3,46 @@ import numpy as np
 import pandas as pd
 
 
+def interp_nan(data):
+    """
+
+    :param data:
+    :return:
+    """
+    ok = ~np.isnan(data)
+    xp = ok.ravel().nonzero()[0]
+    fp = data[~np.isnan(data)]
+    x = np.isnan(data).ravel().nonzero()[0]
+    data[np.isnan(data)] = np.interp(x, xp, fp)
+    return data
+
+
+def interpolate_pupil(raw, eyes=None):
+    """
+
+    :param raw:
+    :param eyes:
+    :return:
+    """
+    if eyes is None:
+        eyes = ["L", "R"]
+    for eye in eyes:
+        # Extract the data from this eye:
+        data = raw.copy().get_data(picks="{}Pupil".format(eye))
+        # Interpolate the nan:
+        data_interp = interp_nan(data)
+        # Add back to the mne raw object:
+        raw_data = raw.get_data()
+        # Extract the index of the channel:
+        ch_ind = np.where(np.array(raw.ch_names) == "{}Pupil".format(eye))[0]
+        raw_data[ch_ind, :] = data
+        # Recreate the raw object:
+        raw_new = mne.io.RawArray(raw_data, raw.info)
+        raw_new.set_annotations(raw.annotations)
+        raw = raw_new
+    return raw
+
+
 def dilation_filter(pupil_size, times, axis=-1):
     """
     This function computes a dilation filter according to the description found here:

@@ -6,6 +6,7 @@
   "data_type": "eyetrack",
   "preprocessing_steps": [
     "dilation_speed_rejection",
+    "interpolate_pupil",
     "extract_blinks",
     "extract_saccades",
     "extract_fixation",
@@ -14,6 +15,9 @@
   ],
   "dilation_speed_rejection": {
     "threshold_factor": 4,
+    "eyes": ["L", "R"]
+  },
+  "interpolate_pupil": {
     "eyes": ["L", "R"]
   },
   "extract_blinks": {

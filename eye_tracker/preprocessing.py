@@ -1,9 +1,11 @@
 import os
+
 print(os.getcwd())
 import mne
 import json
 from pathlib import Path
-from eye_tracker.preprocessing_helper_function import extract_eyelink_events, epoch_data, dilation_speed_rejection
+from eye_tracker.preprocessing_helper_function import (extract_eyelink_events, epoch_data, dilation_speed_rejection,
+                                                       interpolate_pupil)
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -41,8 +43,11 @@ def preprocessing(subject, parameters):
         step_param = param[step]
         # Performing the cleaning:
         if step == "dilation_speed_rejection":
-            raw = dilation_speed_rejection(raw, threshold_factor=step_param["threshold_factor"], 
+            raw = dilation_speed_rejection(raw, threshold_factor=step_param["threshold_factor"],
                                            eyes=step_param["eyes"])
+        # Interpolate the data:
+        if step == "interpolate_pupil":
+            raw = interpolate_pupil(raw, eyes=step_param["eyes"])
 
         # Performing blinks, saccades and fixaction extraction:
         if step in ["extract_blinks", "extract_saccades", "extract_fixation"]:
