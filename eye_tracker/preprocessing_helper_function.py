@@ -3,6 +3,76 @@ import numpy as np
 import pandas as pd
 
 
+def dilation_filter(pupil_size, times, axis=-1):
+    """
+    This function computes a dilation filter according to the description found here:
+    https://link.springer.com/article/10.3758/s13428-018-1075-y
+    :param pupil_size: (np array)
+    :return: (np array)
+    """
+    if len(pupil_size.shape) > 1:
+        raise Exception("The pupil array has more than 1 dimension. This function currently supports one eye at a time")
+    # Compute the forward diff:
+    forward_diff = np.diff(pupil_size, axis=axis)
+    # Pad with nan in the end:
+    forward_diff = np.pad(forward_diff, (0, 1), 'constant', constant_values=np.nan)
+    # Compute the backward diff:
+    backward_diff = np.flip(np.diff(np.flip(pupil_size, axis=axis), axis=axis), axis=axis)
+    # Pad with nan in the beginning:
+    backward_diff = np.pad(backward_diff, (1, 0), 'constant', constant_values=np.nan)
+    # Compute time interval:
+    dt = times[1] - times[0]
+    # Compute dilation speed:
+    dilation_speed = np.nanmax([forward_diff / dt, backward_diff / dt], axis=0)
+    return dilation_speed
+
+
+def mad_outliers_ind(data, threshold_factor=4, axis=0):
+    if len(data.shape) > 1:
+        raise Exception("This function only supports 1D arrays")
+    # Compute the MAD:
+    mad = np.median(np.abs(data - np.median(data, axis=axis)), axis=axis)
+    # Compute the threshold:
+    thresh = np.median(data, axis=axis) + threshold_factor * mad
+    # Find the outliers:
+    outliers_ind = np.where(data > thresh)
+    return outliers_ind
+
+
+def dilation_speed_rejection(raw, threshold_factor=4, eyes=None):
+    print("=" * 40)
+    print("Welcome to dilation_speed_rejection")
+    if eyes is None:
+        eyes = ["L", "R"]
+
+    # Loop through each eye:
+    for eye in eyes:
+        # Extract the pupil size from this eye:
+        data = raw.copy().get_data(picks="{}Pupil".format(eye))
+        # Compute the dilation speed:
+        dilation_speed = dilation_filter(np.squeeze(data), raw.times, axis=-1)
+        # Extract the index of the outliers:
+        outliers_ind = mad_outliers_ind(dilation_speed, threshold_factor=threshold_factor, axis=0)
+        # Display some information about the proportion of outliers that were found:
+        print("=" * 20)
+        print("For {} eye: ".format(eye))
+        print("{:2f}% of rejected samples ({} out of {})".format((outliers_ind[0].shape[0] / data.shape[-1]) *
+                                                                 100,
+                                                                 outliers_ind[0].shape[0], data.shape[-1]))
+        # Replace the outliers by nan.
+        data[0, outliers_ind[0]] = np.nan
+        # Add back to the mne raw object:
+        raw_data = raw.get_data()
+        # Extract the index of the channel:
+        ch_ind = np.where(np.array(raw.ch_names) == "{}Pupil".format(eye))[0]
+        raw_data[ch_ind, :] = data
+        # Recreate the raw object:
+        raw_new = mne.io.RawArray(raw_data, raw.info)
+        raw_new.set_annotations(raw.annotations)
+        raw = raw_new
+    return raw
+
+
 def create_metadata_from_events(epochs, metadata_column):
     """
     This function parses the events found in the epochs descriptions to create the meta data. The column of the meta

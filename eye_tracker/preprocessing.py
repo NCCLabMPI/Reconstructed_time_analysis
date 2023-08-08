@@ -1,8 +1,9 @@
 import os
+print(os.getcwd())
 import mne
 import json
 from pathlib import Path
-from eye_tracker.preprocessing_helper_function import extract_eyelink_events, epoch_data
+from eye_tracker.preprocessing_helper_function import extract_eyelink_events, epoch_data, dilation_speed_rejection
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -38,6 +39,10 @@ def preprocessing(subject, parameters):
     for step in preprocessing_steps:
         # Extract the parameters of the current step:
         step_param = param[step]
+        # Performing the cleaning:
+        if step == "dilation_speed_rejection":
+            raw = dilation_speed_rejection(raw, threshold_factor=step_param["threshold_factor"], 
+                                           eyes=step_param["eyes"])
 
         # Performing blinks, saccades and fixaction extraction:
         if step in ["extract_blinks", "extract_saccades", "extract_fixation"]:
@@ -109,7 +114,7 @@ def preprocessing(subject, parameters):
 
 if __name__ == "__main__":
     subjects_list = ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX110", "SX111"]
-    parameters_file = r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker" \
-                      r"\parameters\preprocessing_parameters.json "
+    parameters_file = (r"C:\Users\Guest1\Documents\GitHub\Reconstructed_time_analysis\eye_tracker\parameters"
+                       r"\preprocessing_parameters.json ")
     for sub in subjects_list:
         preprocessing(sub, parameters_file)

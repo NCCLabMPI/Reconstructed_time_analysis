@@ -1,16 +1,21 @@
 {
-  "bids_root": "C:\\Users\\alexander.lepauvre\\Documents\\PhD\\Reconstructed_Time\\bids",
+  "bids_root": "D:\\backup\\Documents\\PhD\\Reconstructed_Time\\bids",
   "visit": "1",
   "task": "prp",
   "session": "1",
   "data_type": "eyetrack",
   "preprocessing_steps": [
+    "dilation_speed_rejection",
     "extract_blinks",
     "extract_saccades",
     "extract_fixation",
     "epochs"
 
   ],
+  "dilation_speed_rejection": {
+    "threshold_factor": 4,
+    "eyes": ["L", "R"]
+  },
   "extract_blinks": {
     "eyes": ["L", "R"],
     "description": "blink"
