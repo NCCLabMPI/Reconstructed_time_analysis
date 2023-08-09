@@ -49,7 +49,7 @@ def trend_line_departure(raw, threshold_factor=3, eyes=None, window_length_s=0.0
             dev = np.abs(data - data_filt)
             # Compute the median absolute deviation:
             inds = mad_outliers_ind(dev, threshold_factor=threshold_factor, axis=0)
-            print("Removing {:2f}% samples in iter {}".format((len(inds) / data.shape[0]) * 100, i))
+            print("Removing {:2f}% samples in iter {}".format((len(inds[0]) / data.shape[0]) * 100, i))
             # Set the data to nan:
             data[inds] = np.nan
         # Add back into raw:
