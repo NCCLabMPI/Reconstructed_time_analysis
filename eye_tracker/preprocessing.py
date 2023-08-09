@@ -1,11 +1,10 @@
 import os
-
-print(os.getcwd())
 import mne
 import json
 from pathlib import Path
 from eye_tracker.preprocessing_helper_function import (extract_eyelink_events, epoch_data, dilation_speed_rejection,
-                                                       interpolate_pupil)
+                                                       interpolate_pupil, set_pupil_nans, remove_around_gap,
+                                                       trend_line_departure, remove_bad_epochs)
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -31,10 +30,15 @@ def preprocessing(subject, parameters):
     # Load the data:
     raw_file = Path(bids_root, "sub-" + subject, "ses-" + session, data_type,
                     "sub-{}_ses-{}_task-{}_{}-raw.fif".format(subject, session, task, data_type))
-    raw = mne.io.read_raw_fif(raw_file)
+    raw = mne.io.read_raw_fif(raw_file, verbose="WARNING")
+    # Plot the data:
+    raw_ds = raw.copy().resample(100, npad="auto")
+    # Remove the annotations:
+    raw_ds.annotations.delete(np.arange(len(raw_ds.annotations.description)))
+    # raw_ds.plot(block=True)
     # Convert the annotations to event for epoching:
     print('Creating annotations')
-    events_from_annot, event_dict = mne.events_from_annotations(raw)
+    events_from_annot, event_dict = mne.events_from_annotations(raw, verbose="ERROR")
 
     # =============================================================================================
     # Loop through the preprocessing steps:
@@ -42,12 +46,22 @@ def preprocessing(subject, parameters):
         # Extract the parameters of the current step:
         step_param = param[step]
         # Performing the cleaning:
+        if step == "set_pupil_nans":
+            raw = set_pupil_nans(raw,
+                                 eyes=step_param["eyes"])
+        # Performing the cleaning:
         if step == "dilation_speed_rejection":
             raw = dilation_speed_rejection(raw, threshold_factor=step_param["threshold_factor"],
                                            eyes=step_param["eyes"])
-        # Interpolate the data:
+        if step == "remove_around_gap":
+            raw = remove_around_gap(raw, gap_duration_s=step_param["gap_duration_s"],
+                                    eyes=step_param["eyes"])
         if step == "interpolate_pupil":
             raw = interpolate_pupil(raw, eyes=step_param["eyes"])
+        if step == "trend_line_departure":
+            raw = trend_line_departure(raw, threshold_factor=step_param["threshold_factor"],
+                                       eyes=step_param["eyes"], window_length_s=step_param["window_length_s"],
+                                       polyorder=step_param["polyorder"], n_iter=step_param["n_iter"])
 
         # Performing blinks, saccades and fixaction extraction:
         if step in ["extract_blinks", "extract_saccades", "extract_fixation"]:
@@ -57,7 +71,16 @@ def preprocessing(subject, parameters):
         if step == "epochs":
             # Looping through each of the different epochs file to create:
             for epoch_name in step_param.keys():
+                print(epoch_name)
                 epochs = epoch_data(raw, events_from_annot, event_dict, **step_param[epoch_name])
+                # Remove the bad epochs with more than X bad data:
+                # epochs = remove_bad_epochs(epochs, nan_proportion_thresh=0.2)
+                # Finally, interpolate the NaNs:
+                # epochs = interpolate_pupil(epochs, eyes=step_param[epoch_name]["eyes"])
+                # Plot the epochs:
+                # epochs.load_data().copy().pick(["LPupil", "RPupil"]).plot(block=True,
+                #                                                           scalings=dict(eeg=1),
+                #                                                           n_epochs=4)
                 # Save this epoch to file:
                 save_root = Path(bids_root, "derivatives", "preprocessing", "sub-" + subject,
                                  "ses-" + session, data_type)
@@ -67,7 +90,7 @@ def preprocessing(subject, parameters):
                 file_name = "sub-{}_ses-{}_task-{}_{}_desc-{}-epo.fif".format(subject, session, task, data_type,
                                                                               epoch_name)
                 # Save:
-                epochs.save(Path(save_root, file_name), overwrite=True)
+                epochs.save(Path(save_root, file_name), overwrite=True, verbose="ERROR")
 
                 # Depending on whehter or no the events were extracted:
                 if "extract_blinks" in preprocessing_steps:
@@ -118,8 +141,14 @@ def preprocessing(subject, parameters):
 
 
 if __name__ == "__main__":
-    subjects_list = ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX110", "SX111"]
-    parameters_file = (r"C:\Users\Guest1\Documents\GitHub\Reconstructed_time_analysis\eye_tracker\parameters"
-                       r"\preprocessing_parameters.json ")
+    subjects_list = ["SX102", "SX105", "SX106", "SX107", "SX108", "SX110", "SX111", "SX112", "SX113", "SX115", "SX116",
+                     "SX118", "SX119", "SX120", "SX121"]
+    parameters_file = (
+        r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker\parameters"
+        r"\preprocessing_parameters.json ")
     for sub in subjects_list:
-        preprocessing(sub, parameters_file)
+        try:
+            print("Preprocessing subject {}".format(sub))
+            preprocessing(sub, parameters_file)
+        except FileNotFoundError:
+            print("Subject {} not found".format(sub))

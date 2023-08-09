@@ -1,6 +1,149 @@
 import mne
 import numpy as np
 import pandas as pd
+from scipy.signal import savgol_filter
+
+
+def remove_bad_epochs(epochs, nan_proportion_thresh=0.2):
+    """
+    This function identifies any epochs in which there is more than X% in any channel
+    :param epochs:
+    :param threshold:
+    :return:
+    """
+    # Extract the data:
+    data = epochs.get_data(["LPupil", "RPupil"])
+    # Compute the proportion of nan:
+    nan_proportion = np.sum(np.isnan(data), axis=2) / data.shape[2]
+    # Extract the epochs that have more than X% nan:
+    bad_epochs = np.where(np.max(nan_proportion, axis=1) > nan_proportion_thresh)[0]
+    # Remove the bad epochs:
+    epochs.drop(bad_epochs, reason='TOO_MANY_NANS')
+    print(epochs.drop_log)
+    return epochs
+
+
+def trend_line_departure(raw, threshold_factor=3, eyes=None, window_length_s=0.05, polyorder=3, n_iter=4):
+    """
+    This function identifies samples that deviate more than X MAD from the trend line
+    :param raw:
+    :param threshold_factor:
+    :param eyes:
+    :return:
+    """
+    if eyes is None:
+        eyes = ["L", "R"]
+    # Convert the window length to samples:
+    window_length_n = int(window_length_s * raw.info["sfreq"])
+    # Loop through each eye:
+    for eye in eyes:
+        # Extract the data:
+        for i in range(n_iter):
+            if i == 0:
+                data = np.squeeze(raw.copy().get_data(picks="{}Pupil".format(eye)))
+            # Interpolate the data:
+            data = interp_nan(data)
+            # Smooth the data:
+            data_filt = savgol_filter(data, window_length_n, polyorder)
+            # Compute the difference between the data and the smoothed data:
+            dev = np.abs(data - data_filt)
+            # Compute the median absolute deviation:
+            inds = mad_outliers_ind(dev, threshold_factor=threshold_factor, axis=0)
+            print("Removing {:2f}% samples in iter {}".format((len(inds) / data.shape[0]) * 100, i))
+            # Set the data to nan:
+            data[inds] = np.nan
+        # Add back into raw:
+        raw_data = raw.get_data()
+        # Extract the index of the channel:
+        ch_ind = np.where(np.array(raw.ch_names) == "{}Pupil".format(eye))[0]
+        raw_data[ch_ind, :] = data
+        # Recreate the raw object:
+        raw_new = mne.io.RawArray(raw_data, raw.info, verbose="WARNING")
+        raw_new.set_annotations(raw.annotations)
+        raw = raw_new
+    return raw
+
+
+def remove_around_gap(raw, gap_reject_s=0.05, gap_duration_s=0.075, eyes=None):
+    """
+    This function removes data points around gaps (i.e. nan data points). When a nan is encountered, the n ms of data
+    before and after are removed
+    :param raw:
+    :param gap_duration_s:
+    :param eyes:
+    :return:
+    """
+    print("="*40)
+    print("Removing data around gaps")
+    # Convert the gap duration to samples:
+    gap_reject_n = int(gap_reject_s * raw.info["sfreq"])
+    gap_duration_n = int(gap_duration_s * raw.info["sfreq"])
+    if eyes is None:
+        eyes = ["L", "R"]
+    # Loop through each eye:
+    for eye in eyes:
+        # Extract the data from this eye:
+        data = np.squeeze(raw.copy().get_data(picks="{}Pupil".format(eye)))
+        # Find the onset and offsets of each gap:
+        nan_onset_inds = np.where(np.diff(np.isnan(data).astype(float)) == 1)[0]
+        nan_offset_inds = np.where(np.diff(np.isnan(data).astype(float)) == -1)[0]
+        if len(nan_onset_inds) != len(nan_offset_inds):
+            print(len(nan_onset_inds))
+            print(len(nan_offset_inds))
+            raise ValueError("The number of nan onsets and offsets is not equal!")
+
+        # Loop through each nan value:
+        for i, onset_ind in enumerate(nan_onset_inds):
+            if nan_offset_inds[i] < onset_ind:
+                raise ValueError("The offset is before the onset!")
+            if nan_offset_inds[i] - onset_ind >= gap_duration_n:
+                # Remove the data around the onset and the offset:
+                data[onset_ind - gap_reject_n:onset_ind] = np.nan
+                data[nan_offset_inds[i]:nan_offset_inds[i] + gap_reject_n] = np.nan
+        # Add back to the mne raw object:
+        raw_data = raw.get_data()
+        # Extract the index of the channel:
+        ch_ind = np.where(np.array(raw.ch_names) == "{}Pupil".format(eye))[0]
+        raw_data[ch_ind, :] = data
+        # Recreate the raw object:
+        raw_new = mne.io.RawArray(raw_data, raw.info, verbose="WARNING")
+        raw_new.set_annotations(raw.annotations)
+        raw = raw_new
+    return raw
+
+
+def set_pupil_nans(raw, eyes=None):
+    """
+    This function sets impossible values to Nans. Impossible values are negative values or zeros:
+    :param raw:
+    :param eyes:
+    :return:
+    """
+    print("="*40)
+    print("Setting impossible values to Nan")
+    if eyes is None:
+        eyes = ["L", "R"]
+    # Loop through each eye:
+    for eye in eyes:
+        # Extract the data from this eye:
+        data = raw.copy().get_data(picks="{}Pupil".format(eye))
+        # Count the proportion of zeros and negative values:
+        prop_rej = np.sum(data <= 0) / data.size
+        print("Proportion of impossible values for eye {}: {:2f}%".format(eye, prop_rej * 100))
+        # Find the samples that are equal to 0:
+        data[data == 0] = np.nan
+        # Set the negative samples to Nan:
+        data[data < 0] = np.nan
+        # Add back to the mne raw object:
+        raw_data = raw.get_data()
+        # Extract the index of the channel:
+        ch_ind = np.where(np.array(raw.ch_names) == "{}Pupil".format(eye))[0]
+        raw_data[ch_ind, :] = data
+        # Recreate the raw object:
+        raw_new = mne.io.RawArray(raw_data, raw.info, verbose="WARNING")
+        raw_new.set_annotations(raw.annotations)
+        raw = raw_new
+    return raw
 
 
 def interp_nan(data):
@@ -24,6 +167,8 @@ def interpolate_pupil(raw, eyes=None):
     :param eyes:
     :return:
     """
+    print("="*40)
+    print("Interpolating pupil values")
     if eyes is None:
         eyes = ["L", "R"]
     for eye in eyes:
@@ -35,9 +180,9 @@ def interpolate_pupil(raw, eyes=None):
         raw_data = raw.get_data()
         # Extract the index of the channel:
         ch_ind = np.where(np.array(raw.ch_names) == "{}Pupil".format(eye))[0]
-        raw_data[ch_ind, :] = data
+        raw_data[ch_ind, :] = data_interp
         # Recreate the raw object:
-        raw_new = mne.io.RawArray(raw_data, raw.info)
+        raw_new = mne.io.RawArray(raw_data, raw.info, verbose="WARNING")
         raw_new.set_annotations(raw.annotations)
         raw = raw_new
     return raw
@@ -71,17 +216,17 @@ def mad_outliers_ind(data, threshold_factor=4, axis=0):
     if len(data.shape) > 1:
         raise Exception("This function only supports 1D arrays")
     # Compute the MAD:
-    mad = np.median(np.abs(data - np.median(data, axis=axis)), axis=axis)
+    mad = np.nanmedian(np.abs(data - np.nanmedian(data, axis=axis)), axis=axis)
     # Compute the threshold:
-    thresh = np.median(data, axis=axis) + threshold_factor * mad
+    thresh = np.nanmedian(data, axis=axis) + threshold_factor * mad
     # Find the outliers:
     outliers_ind = np.where(data > thresh)
     return outliers_ind
 
 
 def dilation_speed_rejection(raw, threshold_factor=4, eyes=None):
-    print("=" * 40)
-    print("Welcome to dilation_speed_rejection")
+    print("="*40)
+    print("Rejecting samples based on dilation speed")
     if eyes is None:
         eyes = ["L", "R"]
 
@@ -94,7 +239,6 @@ def dilation_speed_rejection(raw, threshold_factor=4, eyes=None):
         # Extract the index of the outliers:
         outliers_ind = mad_outliers_ind(dilation_speed, threshold_factor=threshold_factor, axis=0)
         # Display some information about the proportion of outliers that were found:
-        print("=" * 20)
         print("For {} eye: ".format(eye))
         print("{:2f}% of rejected samples ({} out of {})".format((outliers_ind[0].shape[0] / data.shape[-1]) *
                                                                  100,
@@ -107,7 +251,7 @@ def dilation_speed_rejection(raw, threshold_factor=4, eyes=None):
         ch_ind = np.where(np.array(raw.ch_names) == "{}Pupil".format(eye))[0]
         raw_data[ch_ind, :] = data
         # Recreate the raw object:
-        raw_new = mne.io.RawArray(raw_data, raw.info)
+        raw_new = mne.io.RawArray(raw_data, raw.info, verbose="WARNING")
         raw_new.set_annotations(raw.annotations)
         raw = raw_new
     return raw
@@ -184,6 +328,12 @@ def epoch_data(raw, events, event_dict, events_of_interest=None, metadata_column
     epochs = mne.Epochs(raw, events=events, event_id=select_event_dict, tmin=tmin,
                         tmax=tmax, baseline=baseline, verbose='ERROR', picks=picks,
                         reject_by_annotation=reject_by_annotation)
+    # Reject trials whose end falls outside the recording:
+    tend = raw.times[-1]
+    # Find trials whose end is outside the recording:
+    bad_trials = np.where((epochs.events[:, 0] / raw.info["sfreq"]) + tmax > tend)[0]
+    # Drop those trials:
+    epochs.drop(bad_trials)
     # Dropping the bad epochs if there were any:
     epochs.drop_bad()
     # Adding the meta data to the table. The meta data are created by parsing the events strings, as each substring
@@ -223,13 +373,8 @@ def extract_eyelink_events(raw, description="blink", eyes=None):
 
         # Set the regressor to 1 where the event is happening:
         desc_vector = np.zeros(raw.n_times)
-        # Measure time this for loop takes:
-        import time
-        start = time.time()
         for i in range(len(onset)):
             desc_vector[onset[i]:offset[i]] = 1
-        end = time.time()
-        print("Time to create the regressor: ", end - start)
         desc_vectors.append(desc_vector)
 
     # Add these two channels to the raw data:
@@ -238,6 +383,6 @@ def extract_eyelink_events(raw, description="blink", eyes=None):
     channels = raw.ch_names
     channels.extend(["".join([eye, description]) for eye in eyes])
     info = mne.create_info(channels, ch_types=["eeg"] * len(channels), sfreq=raw.info["sfreq"])
-    raw_new = mne.io.RawArray(data, info)
+    raw_new = mne.io.RawArray(data, info, verbose="WARNING")
     raw_new.set_annotations(raw.annotations)
     return raw_new

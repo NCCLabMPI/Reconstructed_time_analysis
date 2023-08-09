@@ -1,20 +1,38 @@
 {
-  "bids_root": "D:\\backup\\Documents\\PhD\\Reconstructed_Time\\bids",
+  "bids_root": "C:\\Users\\alexander.lepauvre\\Documents\\PhD\\Reconstructed_Time\\bids",
   "visit": "1",
   "task": "prp",
   "session": "1",
   "data_type": "eyetrack",
   "preprocessing_steps": [
+    "set_pupil_nans",
     "dilation_speed_rejection",
-    "interpolate_pupil",
+    "remove_around_gap",
+    "trend_line_departure",
     "extract_blinks",
     "extract_saccades",
     "extract_fixation",
+    "interpolate_pupil",
     "epochs"
 
   ],
+  "trend_line_departure": {
+    "eyes": ["L", "R"],
+    "threshold_factor": 4,
+    "window_length_s": 0.5,
+    "polyorder": 3,
+    "n_iter": 4
+  },
+  "remove_around_gap": {
+    "eyes": ["L", "R"],
+    "gap_reject_s": 0.05,
+    "gap_duration_s": 0.075
+  },
   "dilation_speed_rejection": {
     "threshold_factor": 4,
+    "eyes": ["L", "R"]
+  },
+  "set_pupil_nans": {
     "eyes": ["L", "R"]
   },
   "interpolate_pupil": {
