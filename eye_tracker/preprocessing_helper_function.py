@@ -33,6 +33,8 @@ def trend_line_departure(raw, threshold_factor=3, eyes=None, window_length_s=0.0
     """
     if eyes is None:
         eyes = ["L", "R"]
+    print("="*40)
+    print("Trend line departure")
     # Convert the window length to samples:
     window_length_n = int(window_length_s * raw.info["sfreq"])
     # Loop through each eye:
@@ -42,11 +44,11 @@ def trend_line_departure(raw, threshold_factor=3, eyes=None, window_length_s=0.0
             if i == 0:
                 data = np.squeeze(raw.copy().get_data(picks="{}Pupil".format(eye)))
             # Interpolate the data:
-            data = interp_nan(data)
+            data_interp = interp_nan(data.copy())
             # Smooth the data:
-            data_filt = savgol_filter(data, window_length_n, polyorder)
+            data_filt = savgol_filter(data_interp, window_length_n, polyorder)
             # Compute the difference between the data and the smoothed data:
-            dev = np.abs(data - data_filt)
+            dev = np.abs(data_interp - data_filt)
             # Compute the median absolute deviation:
             inds = mad_outliers_ind(dev, threshold_factor=threshold_factor, axis=0)
             print("Removing {:2f}% samples in iter {}".format((len(inds[0]) / data.shape[0]) * 100, i))
@@ -91,7 +93,8 @@ def remove_around_gap(raw, gap_reject_s=0.05, gap_duration_s=0.075, eyes=None):
             print(len(nan_onset_inds))
             print(len(nan_offset_inds))
             raise ValueError("The number of nan onsets and offsets is not equal!")
-
+        # Store the number of removed samples:
+        n_removed = 0
         # Loop through each nan value:
         for i, onset_ind in enumerate(nan_onset_inds):
             if nan_offset_inds[i] < onset_ind:
@@ -100,6 +103,9 @@ def remove_around_gap(raw, gap_reject_s=0.05, gap_duration_s=0.075, eyes=None):
                 # Remove the data around the onset and the offset:
                 data[onset_ind - gap_reject_n:onset_ind] = np.nan
                 data[nan_offset_inds[i]:nan_offset_inds[i] + gap_reject_n] = np.nan
+                n_removed += gap_reject_n * 2
+        # Display the proportion of removed samples:
+        print("Removed {:2f}% samples".format((n_removed / data.shape[0]) * 100))
         # Add back to the mne raw object:
         raw_data = raw.get_data()
         # Extract the index of the channel:
@@ -173,7 +179,10 @@ def interpolate_pupil(raw, eyes=None):
         eyes = ["L", "R"]
     for eye in eyes:
         # Extract the data from this eye:
-        data = raw.copy().get_data(picks="{}Pupil".format(eye))
+        data = np.squeeze(raw.copy().get_data(picks="{}Pupil".format(eye)))
+        # Compute the total proportion of data requiring interpolation:
+        prop_interp = np.sum(np.isnan(data)) / data.size
+        print("Proportion of data requiring interpolation for eye {}: {:2f}%".format(eye, prop_interp * 100))
         # Interpolate the nan:
         data_interp = interp_nan(data)
         # Add back to the mne raw object:
