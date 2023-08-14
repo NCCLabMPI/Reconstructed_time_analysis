@@ -202,7 +202,8 @@ def interpolate_pupil_epochs(epochs, eyes=None):
         epochs_data[:, ch_ind, :] = np.expand_dims(data_interp, axis=1)
         # Recreate the raw object:
         epochs_new = mne.EpochsArray(epochs_data, epochs.info, events=epochs.events, event_id=epochs.event_id,
-                                     metadata=epochs.metadata, verbose="WARNING", on_missing="ignore")
+                                     metadata=epochs.metadata, verbose="WARNING", on_missing="ignore",
+                                     tmin=epochs.times[0])
         epochs = epochs_new
     return epochs, prop_interp
 
