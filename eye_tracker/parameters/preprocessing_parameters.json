@@ -12,10 +12,15 @@
     "extract_blinks",
     "extract_saccades",
     "extract_fixation",
-    "interpolate_pupil",
-    "epochs"
-
+    "epochs",
+    "remove_bad_epochs",
+    "interpolate_pupil_epochs",
+    "discard_bad_subjects"
   ],
+  "discard_bad_subjects": {
+    "bad_trials_threshold": 0.5,
+    "nan_threshold": 0.5
+  },
   "trend_line_departure": {
     "eyes": ["L", "R"],
     "threshold_factor": 4,
@@ -50,6 +55,13 @@
     "eyes": ["L", "R"],
     "description": "fixation"
   },
+  "remove_bad_epochs": {
+    "eyes": ["L", "R"],
+    "nan_proportion_thresh": 0.5
+  },
+  "interpolate_pupil_epochs": {
+    "eyes": ["L", "R"]
+  },
   "epochs": {
     "visual_onset": {
       "picks": "all",
@@ -58,30 +70,6 @@
       "baseline": null,
       "events_of_interest": [
           "vis_onset"
-      ],
-      "reject_by_annotation": false,
-      "metadata_column": ["event type", "task relevance", "duration", "category", "orientation", "identity",
-          "SOA", "lock", "pitch"]
-    },
-    "visual_offset": {
-      "picks": "all",
-      "tmin": -1,
-      "tmax": 3.5,
-      "baseline": null,
-      "events_of_interest": [
-          "fixation_onset"
-      ],
-      "reject_by_annotation": false,
-      "metadata_column": ["event type", "task relevance", "duration", "category", "orientation", "identity",
-          "SOA", "lock", "pitch"]
-    },
-    "audio_onset": {
-      "picks": "all",
-      "tmin": -1,
-      "tmax": 3.5,
-      "baseline": null,
-      "events_of_interest": [
-          "audio_onset"
       ],
       "reject_by_annotation": false,
       "metadata_column": ["event type", "task relevance", "duration", "category", "orientation", "identity",
