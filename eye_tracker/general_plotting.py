@@ -170,7 +170,8 @@ def plot_eyetracker_data(subject):
 
 
 if __name__ == "__main__":
-    subjects_list = ["SX102"]
+    subjects_list = ["SX101", "SX102", "SX103", "SX104", "SX105", "SX106", "SX107", "SX109", "SX110", "SX111",
+                     "SX113", "SX114", "SX115", "SX116", "SX117", "SX118", "SX119", "SX120", "SX121"]
     for sub in subjects_list:
         try:
             print("Plotting subject {}".format(sub))
