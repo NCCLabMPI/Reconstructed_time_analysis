@@ -82,9 +82,9 @@ def preprocessing(subject, parameters):
                 epochs = epoch_data(raw, events_from_annot, event_dict, **step_param[epoch_name])
 
                 # Plot the epochs:
-                epochs.load_data().copy()[0:200].pick(["LPupil", "RPupil"]).plot(block=True,
-                                                                                 scalings=dict(eeg=1000),
-                                                                                 n_epochs=4)
+                # epochs.load_data().copy()[0:200].pick(["LPupil", "RPupil"]).plot(block=True,
+                #                                                                  scalings=dict(eeg=1000),
+                #                                                                  n_epochs=4)
 
                 if "remove_bad_epochs" in preprocessing_steps:
                     epochs, proportion_reject = remove_bad_epochs(epochs,
@@ -101,9 +101,9 @@ def preprocessing(subject, parameters):
                         print("Subject {} rejected due to bad epochs".format(subject))
                         continue
 
-                epochs.load_data().copy()[0:100].pick(["LPupil", "RPupil"]).plot(block=True,
-                                                                                 scalings=dict(eeg=10),
-                                                                                 n_epochs=4)
+                # epochs.load_data().copy()[0:100].pick(["LPupil", "RPupil"]).plot(block=True,
+                #                                                                  scalings=dict(eeg=10),
+                #                                                                  n_epochs=4)
                 # Save this epoch to file:
                 save_root = Path(bids_root, "derivatives", "preprocessing", "sub-" + subject,
                                  "ses-" + session, data_type)
@@ -164,7 +164,8 @@ def preprocessing(subject, parameters):
 
 
 if __name__ == "__main__":
-    subjects_list = ["SX102"]
+    subjects_list = ["SX101", "SX102", "SX103", "SX104", "SX105", "SX106", "SX107", "SX109", "SX110", "SX111",
+                     "SX113", "SX114", "SX115", "SX116", "SX117", "SX118", "SX119", "SX120", "SX121"]
     parameters_file = (
         r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker\parameters"
         r"\preprocessing_parameters.json ")
