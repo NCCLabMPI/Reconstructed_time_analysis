@@ -11,6 +11,8 @@ def remove_bad_epochs(epochs, nan_proportion_thresh=0.2):
     :param threshold:
     :return:
     """
+    print("="*40)
+    print("Removing bad epochs (more than {}% nan)".format(nan_proportion_thresh*100))
     # Extract the data:
     data = epochs.get_data(["LPupil", "RPupil"])
     # Compute the proportion of nan:
@@ -19,8 +21,12 @@ def remove_bad_epochs(epochs, nan_proportion_thresh=0.2):
     bad_epochs = np.where(np.max(nan_proportion, axis=1) > nan_proportion_thresh)[0]
     # Remove the bad epochs:
     epochs.drop(bad_epochs, reason='TOO_MANY_NANS')
-    print(epochs.drop_log)
-    return epochs
+    proportion_rejected = len(bad_epochs) / len(epochs)
+    # Print the number of removed epochs:
+    print("Removed {:2f}% epochs".format(100 * proportion_rejected))
+    # Dropping the bad epochs if there were any:
+    epochs.drop_bad()
+    return epochs, proportion_rejected
 
 
 def trend_line_departure(raw, threshold_factor=3, eyes=None, window_length_s=0.05, polyorder=3, n_iter=4):
@@ -164,6 +170,41 @@ def interp_nan(data):
     x = np.isnan(data).ravel().nonzero()[0]
     data[np.isnan(data)] = np.interp(x, xp, fp)
     return data
+
+
+def interpolate_pupil_epochs(epochs, eyes=None):
+    """
+
+    :param epochs:
+    :param eyes:
+    :return:
+    """
+    print("="*40)
+    print("Interpolating pupil values")
+    if eyes is None:
+        eyes = ["L", "R"]
+    prop_interp = []
+    for eye in eyes:
+        # Extract the data from this eye:
+        data = np.squeeze(epochs.copy().get_data(picks="{}Pupil".format(eye)))
+        # Compute the total proportion of data requiring interpolation:
+        prop_interp.append(np.sum(np.isnan(data)) / data.size)
+        print("Proportion of data requiring interpolation for eye {}: {:2f}%".format(eye, prop_interp[-1] * 100))
+        # Interpolate the nan:
+        data_interp = []
+        for trials in range(data.shape[0]):
+            data_interp.append(interp_nan(data[trials, :]))
+        data_interp = np.array(data)
+        # Add back to the mne raw object:
+        epochs_data = epochs.get_data()
+        # Extract the index of the channel:
+        ch_ind = np.where(np.array(epochs.ch_names) == "{}Pupil".format(eye))[0]
+        epochs_data[:, ch_ind, :] = np.expand_dims(data_interp, axis=1)
+        # Recreate the raw object:
+        epochs_new = mne.EpochsArray(epochs_data, epochs.info, events=epochs.events, event_id=epochs.event_id,
+                                     metadata=epochs.metadata, verbose="WARNING", on_missing="ignore")
+        epochs = epochs_new
+    return epochs, prop_interp
 
 
 def interpolate_pupil(raw, eyes=None):
