@@ -96,9 +96,13 @@ def remove_around_gap(raw, gap_reject_s=0.05, gap_duration_s=0.075, eyes=None):
         nan_onset_inds = np.where(np.diff(np.isnan(data).astype(float)) == 1)[0]
         nan_offset_inds = np.where(np.diff(np.isnan(data).astype(float)) == -1)[0]
         if len(nan_onset_inds) != len(nan_offset_inds):
-            print(len(nan_onset_inds))
-            print(len(nan_offset_inds))
-            raise ValueError("The number of nan onsets and offsets is not equal!")
+            if len(nan_onset_inds) + 1 == len(nan_offset_inds) and nan_onset_inds[0] > nan_offset_inds[0]:
+                print("WARNING: the data started with Nans!")
+                nan_onset_inds = np.concatenate([[0], nan_onset_inds])
+            else:
+                print(len(nan_onset_inds))
+                print(len(nan_offset_inds))
+                raise ValueError("The number of nan onsets and offsets is not equal!")
         # Store the number of removed samples:
         n_removed = 0
         # Loop through each nan value:
