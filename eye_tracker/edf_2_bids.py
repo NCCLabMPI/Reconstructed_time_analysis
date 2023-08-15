@@ -132,16 +132,33 @@ def ascii_parser(ascii_file):
     sfreq = int(events_df[events_df["event"].str.contains("RECCFG")].iloc[0, 1].split()[2])
     # Fixations:
     i_not_efix = np.nonzero(line_type != EFIX)[0]
-    df_fix = pd.read_csv(ascii_file, skiprows=i_not_efix, header=None, delim_whitespace=True, usecols=range(1, 8))
-    df_fix.columns = ['eye', T_START, T_END, 'duration', 'xAvg', 'yAvg', 'pupilAvg']
+    try:
+        df_fix = pd.read_csv(ascii_file, skiprows=i_not_efix, header=None, delim_whitespace=True, usecols=range(1, 8))
+        df_fix.columns = ['eye', T_START, T_END, 'duration', 'xAvg', 'yAvg', 'pupilAvg']
+    except pd.errors.EmptyDataError:
+        print('No fixations found!')
+        df_fix = pd.DataFrame(columns=['eye', T_START, T_END, 'duration', 'xAvg', 'yAvg', 'pupilAvg'])
+
     # Saccades:
     i_not_esacc = np.nonzero(line_type != ESACC)[0]
-    df_sacc = pd.read_csv(ascii_file, skiprows=i_not_esacc, header=None, delim_whitespace=True, usecols=range(1, 11))
-    df_sacc.columns = ['eye', T_START, T_END, 'duration', 'xStart', 'yStart', 'xEnd', 'yEnd', AMP_DEG, VPEAK]
+    try:
+        df_sacc = pd.read_csv(ascii_file, skiprows=i_not_esacc, header=None, delim_whitespace=True,
+                              usecols=range(1, 11))
+        df_sacc.columns = ['eye', T_START, T_END, 'duration', 'xStart', 'yStart', 'xEnd', 'yEnd', AMP_DEG, VPEAK]
+    except pd.errors.EmptyDataError:
+        print('No saccades found!')
+        df_sacc = pd.DataFrame(columns=['eye', T_START, T_END, 'duration', 'xStart', 'yStart', 'xEnd', 'yEnd',
+                                        AMP_DEG, VPEAK])
+
     # Blinks:
     i_not_eblink = np.nonzero(line_type != EBLINK)[0]
-    df_blink = pd.read_csv(ascii_file, skiprows=i_not_eblink, header=None, delim_whitespace=True, usecols=range(1, 5))
-    df_blink.columns = ['eye', T_START, T_END, 'duration']
+    try:
+        df_blink = pd.read_csv(ascii_file, skiprows=i_not_eblink, header=None, delim_whitespace=True,
+                               usecols=range(1, 5))
+        df_blink.columns = ['eye', T_START, T_END, 'duration']
+    except pd.errors.EmptyDataError:
+        print('No blinks found!')
+        df_blink = pd.DataFrame(columns=['eye', T_START, T_END, 'duration'])
 
     # Combine all these "events" into an annotation table:
     events_df = pd.DataFrame(pd.DataFrame({
@@ -210,8 +227,8 @@ def df2mne(eyelink_df, annotations_df, sfreq):
     raw = mne.io.RawArray(data.T, info)
     # Add the annotations:
     # Creating annotation from onset, duration and description:
-    my_annotations = mne.Annotations(onset=(annotations_df["onset"] - eyelink_df["tSample"].to_list()[0]) * 10**-3,
-                                     duration=annotations_df["duration"] * 10**-3,
+    my_annotations = mne.Annotations(onset=(annotations_df["onset"] - eyelink_df["tSample"].to_list()[0]) * 10 ** -3,
+                                     duration=annotations_df["duration"] * 10 ** -3,
                                      description=annotations_df["description"])
 
     # Setting the annotation in the raw signal
@@ -219,7 +236,7 @@ def df2mne(eyelink_df, annotations_df, sfreq):
     return raw
 
 
-def save_to_bids(raw, subject="", session="",  task="", datatype="eyetrack", root=""):
+def save_to_bids(raw, subject="", session="", task="", datatype="eyetrack", root=""):
     """
 
     :param raw:
@@ -289,8 +306,10 @@ def ascii2mne_batch(root, subjects, save_root, session="1", convert_exe=""):
 
 
 if __name__ == "__main__":
-    subjects_list = ["sub-SX102", "sub-SX103"]
-    tasks = ["auditory_and_visual", "visual", "auditory", "prp"]
+    subjects_list = [
+        "sub-SX109", "sub-SX114"
+    ]
+    tasks = ["prp"]
     data_root = r"C:\Users\alexander.lepauvre\Documents\PhD\Reconstructed_Time\raw_data"
     save_root = r"C:\Users\alexander.lepauvre\Documents\PhD\Reconstructed_Time\bids"
     ascii2mne_batch(data_root, subjects_list, save_root,
