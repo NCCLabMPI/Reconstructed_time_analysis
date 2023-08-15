@@ -46,6 +46,8 @@ task = 'prp'
 
 count = 0
 sub_ids = NaN
+table_size = 1:21
+
 for (subNum in subNums ){
 count = count + 1
 sub_ids[count] = paste0(Lab_ID, subNum)
@@ -58,8 +60,11 @@ setwd("..")
 parent_dir = getwd()
 setwd(wd)
 file = file.path(parent_dir, 'Reconstructed_time_experiment', 'data', sub_folder, ses_folder, file_name)
+
 event_table = read.csv(file)
 
+table_size[count] = dim(event_table)[1]
+    
 # make format consistent
 if ('X' %in% colnames(event_table))
 {event_table$X <- NULL}
@@ -91,18 +96,22 @@ if ( exists('all_event_table')){
 # without exclusion
 raw_event_table = all_event_table
 
-# remove false alarm
-all_event_table = all_event_table[all_event_table$trial_response_vis != 'fa', ]
-
-# remove RT < 100 ms
-all_event_table = all_event_table[all_event_table$RT_aud > 0.1, ]
+# remove NaNs from auditory responses
+all_event_table = all_event_table[!is.na(all_event_table$RT_aud), ]
 
 # add response window column 
 all_event_table = all_event_table %>% mutate(resp_window = (2-onset_SOA)+stim_jit )
 
 # # remove RT > mean response window for offset, long duration adn long SOA 
 max_RT = mean(all_event_table$resp_window[all_event_table$SOA == 0.466 & all_event_table$SOA_lock == 'offset' & all_event_table$duration == 1.5], na.rm = TRUE)
-all_event_table = all_event_table[all_event_table$RT_aud < max_RT, ]
+# all_event_table = all_event_table[all_event_table$RT_aud < 1.8, ]
+
+# remove RT < 100 ms
+all_event_table = all_event_table[all_event_table$RT_aud > 0.1, ]
+
+# remove false alarm
+all_event_table = all_event_table[all_event_table$trial_response_vis != 'fa', ]
+
 
 # remove incorrect auditory responses
 all_event_table = all_event_table[all_event_table$trial_accuracy_aud == 1, ]
@@ -169,45 +178,62 @@ all_event_table = all_event_table %>% mutate(c_pitch = (pitch-1050)/100) # makes
 
 ```{R test exclusion}
 
-summary(all_event_table$resp_window[all_event_table$SOA == 0.466 & all_event_table$SOA_lock == 'offset' & all_event_table$duration == 1.5], na.rm = TRUE)
-summary(all_event_table$resp_window[all_event_table$SOA == 0 & all_event_table$SOA_lock == 'onset' & all_event_table$duration == 0.5], na.rm = TRUE)
+# summary(all_event_table$resp_window[all_event_table$SOA == 0.466 & all_event_table$SOA_lock == 'offset' & all_event_table$duration == 1.5], na.rm = TRUE)
+# summary(all_event_table$resp_window[all_event_table$SOA == 0 & all_event_table$SOA_lock == 'onset' & all_event_table$duration == 0.5], na.rm = TRUE)
+# 
+# sum(target_event_table$SOA == 0.466 & target_event_table$SOA_lock == 'offset' & target_event_table$duration == 1.5 & target_event_table$task_relevance == 'target')
+# sum(target_event_table$SOA == 0 & target_event_table$SOA_lock == 'onset' & target_event_table$duration == 0.5 & target_event_table$task_relevance == 'irrelevant')
+# 
+# task_relevance_lvl2 = c('non-target', 'irrelevant', 'target')
+# 
+# 
+# for (iii in task_relevance_lvl2) {
+#   for (i in SOA_lvl) {
+#     for (ii in SOA_lock_lvl) {
+#       for (iv in duration_lvl) {
+#         
+#         cell_trials = sum(target_event_table$SOA == i & target_event_table$SOA_lock == ii & target_event_table$task_relevance == iii & target_event_table$duration == iv, na.rm = TRUE)
+#         
+#         
+#         cell_name = paste(i,ii,iii,iv,sep= '-')
+#         print(paste0(cell_trials,' trials', ' for cell: ', cell_name))
+#         
+#       }}}}
 
-sum(target_event_table$SOA == 0.466 & target_event_table$SOA_lock == 'offset' & target_event_table$duration == 1.5 & target_event_table$task_relevance == 'target')
-sum(target_event_table$SOA == 0 & target_event_table$SOA_lock == 'onset' & target_event_table$duration == 0.5 & target_event_table$task_relevance == 'irrelevant')
-
-task_relevance_lvl2 = c('non-target', 'irrelevant', 'target')
 
 
-for (iii in task_relevance_lvl2) {
-  for (i in SOA_lvl) {
-    for (ii in SOA_lock_lvl) {
-      for (iv in duration_lvl) {
-        
-        cell_trials = sum(target_event_table$SOA == i & target_event_table$SOA_lock == ii & target_event_table$task_relevance == iii & target_event_table$duration == iv, na.rm = TRUE)
-        
-        
-        cell_name = paste(i,ii,iii,iv,sep= '-')
-        print(paste0(cell_trials,' trials', ' for cell: ', cell_name))
-        
-      }}}}
-
-
-
-# after trials removal 
+# after trials removal
+print('number of onset trials after trial removal (incl: targets)')
 sum(target_event_table$SOA_lock == 'onset')
+print('number of offset trials after trial removal (incl: targets)')
 sum(target_event_table$SOA_lock == 'offset')
 
-# before 
+# before
+print('number of onset trials before trial removal (incl: targets)')
 sum(raw_event_table$SOA_lock == 'onset')
+print('number of offset trials after trial removal (incl: targets)')
 sum(raw_event_table$SOA_lock == 'offset')
 
 # difference
-sum(raw_event_table$SOA_lock == 'onset') - sum(target_event_table$SOA_lock == 'onset')
-sum(raw_event_table$SOA_lock == 'offset') - sum(target_event_table$SOA_lock == 'offset')
+print('number of onset trials removed (excl: targets)')
+sum(raw_event_table$SOA_lock == 'onset' & raw_event_table$task_relevance != 'target') - sum(all_event_table$SOA_lock == 'onset')
+print('number of offset trials removed (excl: targets)')
+sum(raw_event_table$SOA_lock == 'offset' & raw_event_table$task_relevance != 'target') - sum(all_event_table$SOA_lock == 'offset')
 
-# relative trial removal
-(sum(raw_event_table$SOA_lock == 'onset') - sum(target_event_table$SOA_lock == 'onset'))/sum(raw_event_table$SOA_lock == 'onset')
-(sum(raw_event_table$SOA_lock == 'offset') - sum(target_event_table$SOA_lock == 'offset'))/sum(raw_event_table$SOA_lock == 'offset')
+# relative trial removal w/o targets
+print('perceptage of onset trials removed (excl: targets)')
+(sum(raw_event_table$SOA_lock == 'onset' & raw_event_table$task_relevance != 'target') - sum(all_event_table$SOA_lock == 'onset'))/sum(raw_event_table$SOA_lock == 'onset' & raw_event_table$task_relevance != 'target')
+
+print('perceptage of offset trials removed (excl: targets)')
+(sum(raw_event_table$SOA_lock == 'offset' & raw_event_table$task_relevance != 'target') - sum(all_event_table$SOA_lock == 'offset'))/sum(raw_event_table$SOA_lock == 'offset' & raw_event_table$task_relevance != 'target')
+
+
+# relative trial removal targets
+print('perceptage of onset target trials removed')
+(sum(raw_event_table$SOA_lock == 'onset' & raw_event_table$task_relevance == 'target') - sum(target_event_table$SOA_lock == 'onset' & target_event_table$task_relevance == 'target'))/sum(raw_event_table$SOA_lock == 'onset' & raw_event_table$task_relevance == 'target')
+
+print('perceptage of offset target trials removed')
+(sum(raw_event_table$SOA_lock == 'offset' & raw_event_table$task_relevance == 'target') - sum(target_event_table$SOA_lock == 'offset' & target_event_table$task_relevance == 'target'))/sum(raw_event_table$SOA_lock == 'offset' & raw_event_table$task_relevance == 'target')
 
 
 # sum(target_event_table$SOA == 0)
@@ -448,12 +474,12 @@ vis_data4= vis_data4 %>% mutate(duration = ifelse(SOA_lock == 'onset',0,duration
 
 
 p24 = ggplot(data = SOA_SOA_lock_duration_data4, aes(x = onset_SOA * 1000, y = mean_RT * 1000, group = interaction(as.character(duration), SOA_lock), color = as.character(duration), linetype = SOA_lock)) +
-  geom_line(data = vis_data4, aes(x = onset_SOA * 1000, y = mean_RT_vis * 1000, color = 'darkgrey', group = interaction(as.character(duration), SOA_lock))) +
-  geom_errorbar(data = vis_data4, aes(x = onset_SOA * 1000, y = mean_RT_vis * 1000, ymin = (mean_RT_vis - sem_RT_vis) * 1000, ymax = (mean_RT_vis + sem_RT_vis) * 1000, group = interaction(as.character(duration), SOA_lock), color = 'darkgrey', width = 20)) +
-  geom_point(data = vis_data4, aes(x = onset_SOA * 1000, y = mean_RT_vis * 1000, color = 'darkgrey', group = interaction(as.character(duration), SOA_lock)), size = 1) +
-  geom_line() +
-  geom_errorbar(aes(ymin = (mean_RT - sem_RT) * 1000, ymax = (mean_RT + sem_RT) * 1000), width = 20) +
-  geom_point(size = 1) +
+  geom_line(data = vis_data4, aes(x = onset_SOA * 1000, y = mean_RT_vis * 1000, color = 'darkgrey', group = interaction(as.character(duration), SOA_lock)), linewidth = 1) +
+  geom_errorbar(data = vis_data4, aes(x = onset_SOA * 1000, y = mean_RT_vis * 1000, ymin = (mean_RT_vis - sem_RT_vis) * 1000, ymax = (mean_RT_vis + sem_RT_vis) * 1000, group = interaction(as.character(duration), SOA_lock), color = 'darkgrey', width = 30), linewidth = 1) +
+  geom_point(data = vis_data4, aes(x = onset_SOA * 1000, y = mean_RT_vis * 1000, color = 'darkgrey', group = interaction(as.character(duration), SOA_lock)), size = 1.5) +
+  geom_line(linewidth = 1) +
+  geom_errorbar(aes(ymin = (mean_RT - sem_RT) * 1000, ymax = (mean_RT + sem_RT) * 1000), width = 30, linewidth = 1) +
+  geom_point(size = 1.5) +
   facet_grid(. ~ task_relevance) +
   labs(title = "Objective reaction time by task-relevance", tag = "A") +
   ylab("Reaction time [ms]") +
@@ -464,7 +490,7 @@ p24 = ggplot(data = SOA_SOA_lock_duration_data4, aes(x = onset_SOA * 1000, y = m
                                 expression("RT"[aud]~" [1000 ms duration]"),
                                 expression("RT"[aud]~" [1500 ms duration]"),
                                 expression("RT"[vis]~" [all durations]          "))) +
-  scale_linetype_manual(values = c("solid", "dashed"),
+  scale_linetype_manual(values = c("solid", "longdash"),
                         name = 'SOA time-locked to',
                         breaks = c('onset', 'offset')) +
   theme_bw() +
@@ -473,13 +499,14 @@ p24 = ggplot(data = SOA_SOA_lock_duration_data4, aes(x = onset_SOA * 1000, y = m
         panel.grid.minor = element_blank(),
         panel.border = element_rect(linetype = "solid"),
         panel.background = element_blank(),
-        axis.text = element_text(color = "black", size = 10),
-        legend.text = element_text(size = 15),
-        legend.title = element_text(size = 15, face="bold"),
-        axis.title = element_text(size = 15, face="bold"),
-        plot.title = element_text(size = 15, face="bold"),
-        strip.text = element_text(size = 15))
-p24
+        axis.text = element_text(color = "black", size = 15),
+        legend.text = element_text(size = 20),
+        legend.title = element_text(size = 20, face="bold"),
+        axis.title = element_text(size = 20, face="bold"),
+        plot.title = element_text(size = 25, face="bold"),
+        plot.tag = element_text(size = 25, face="bold"),
+        strip.text = element_text(size = 20))
+p24 
 
 # by task-relevance
 
@@ -683,13 +710,13 @@ cdf_on = ggplot(all_event_table %>% filter(SOA_lock == 'onset'& z_RT_aud < 3), a
         panel.grid.minor = element_blank(),
         panel.border = element_rect(linetype = "solid"),
         panel.background = element_blank(),
-        axis.text = element_text(color = "black", size = 10),
-        legend.text = element_text(size = 15),
-        legend.title = element_text(size = 15, face="bold"),
-        axis.title.y = element_text(size = 15, face="bold"),
-        axis.title.x = element_blank(),
-        plot.title = element_text(size = 15, face="bold"),
-        strip.text = element_text(size = 15))+   
+        axis.text = element_text(color = "black", size = 15),
+        legend.text = element_text(size = 20),
+        legend.title = element_text(size = 20, face="bold"),
+        axis.title = element_text(size = 20, face="bold"),
+        plot.title = element_text(size = 25, face="bold"),
+        plot.tag = element_text(size = 25, face="bold"),
+        strip.text = element_text(size = 20))+   
   facet_grid(SOA_lock ~ task_relevance, labeller = custom_labels)
 cdf_on
 
@@ -705,12 +732,13 @@ cdf_off = ggplot(all_event_table %>% filter(SOA_lock == 'offset' & z_RT_aud < 3)
         panel.grid.minor = element_blank(),
         panel.border = element_rect(linetype = "solid"),
         panel.background = element_blank(),
-        axis.text = element_text(color = "black", size = 10),
-        legend.text = element_text(size = 15),
-        legend.title = element_text(size = 15, face="bold"),
-        axis.title = element_text(size = 15, face="bold"),
-        plot.title = element_text(size = 15, face="bold"),
-        strip.text = element_text(size = 15))+   
+        axis.text = element_text(color = "black", size = 15),
+        legend.text = element_text(size = 20),
+        legend.title = element_text(size = 20, face="bold"),
+        axis.title = element_text(size = 20, face="bold"),
+        plot.title = element_text(size = 25, face="bold"),
+        plot.tag = element_text(size = 25, face="bold"),
+        strip.text = element_text(size = 20))+
   facet_grid(SOA_lock ~ duration, labeller = custom_labels)
 cdf_off
 
