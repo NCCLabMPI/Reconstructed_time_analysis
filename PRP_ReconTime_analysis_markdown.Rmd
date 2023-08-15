@@ -260,6 +260,8 @@ perf$fa_rate = NaN
 perf$aud_acc = NaN
 perf$RT_aud = NaN
 perf$RT_vis = NaN
+perf$RT_aud_raw = NaN
+perf$RT_vis_raw = NaN
 perf = perf[-c(1), ]
 
 for (sub_num in subNums) {
@@ -271,10 +273,16 @@ for (sub_num in subNums) {
                           hit_rate = hits/(hits+misses)*100,
                           fa_rate = fas/(fas+crs)*100,
                           aud_acc = mean(raw_event_table$trial_accuracy_aud[raw_event_table$sub_num == sub_num], na.rm = TRUE)*100,
-                          RT_aud = mean(target_event_table$RT_aud[raw_event_table$sub_num == sub_num], na.rm = TRUE)*1000,
-                          RT_vis = mean(target_event_table$RT_vis[raw_event_table$sub_num == sub_num], na.rm = TRUE)*1000)
+                          RT_aud = mean(target_event_table$RT_aud[target_event_table$sub_num == sub_num], na.rm = TRUE)*1000,
+                          RT_vis = mean(target_event_table$RT_vis[target_event_table$sub_num == sub_num], na.rm = TRUE)*1000,
+                          RT_aud_raw = mean(raw_event_table$RT_aud[raw_event_table$sub_num == sub_num], na.rm = TRUE)*1000,
+                          RT_vis_raw = mean(raw_event_table$RT_vis[raw_event_table$sub_num == sub_num], na.rm = TRUE)*1000)
 }
 
+# transfer hit rate and false alarm rate into accuracy 
+perf = perf %>% mutate(vis_acc = (hits + crs)/(hits + misses + crs + fas)*100)
+
+# add mean and SD
 perf = perf %>% add_row(sub_num = 'mean',
                         hits = mean(perf$hits),
                         misses = mean(perf$misses),
@@ -283,19 +291,25 @@ perf = perf %>% add_row(sub_num = 'mean',
                         hit_rate = mean(perf$hit_rate),
                         fa_rate = mean(perf$fa_rate),
                         aud_acc = mean(perf$aud_acc),
+                        vis_acc = mean(perf$vis_acc),
                         RT_aud = mean(perf$RT_aud),
-                        RT_vis = mean(perf$RT_vis))
+                        RT_vis = mean(perf$RT_vis),
+                        RT_aud_raw = mean(perf$RT_aud_raw),
+                        RT_vis_raw = mean(perf$RT_vis_raw))
 
 perf = perf %>% add_row(sub_num = 'sd',
-                        hits = sd(perf$hits[1:10]),
-                        misses = sd(perf$misses[1:10]),
-                        crs = sd(perf$crs[1:10]),
-                        fas = sd(perf$fas[1:10]),
-                        hit_rate = sd(perf$hit_rate[1:10]),
-                        fa_rate = sd(perf$fa_rate[1:10]),
-                        aud_acc = sd(perf$aud_acc[1:10]),
-                        RT_aud = sd(perf$RT_aud[1:10]),
-                        RT_vis = sd(perf$RT_vis[1:10]))
+                        hits = sd(perf$hits[1:21]),
+                        misses = sd(perf$misses[1:21]),
+                        crs = sd(perf$crs[1:21]),
+                        fas = sd(perf$fas[1:21]),
+                        hit_rate = sd(perf$hit_rate[1:21]),
+                        fa_rate = sd(perf$fa_rate[1:21]),
+                        aud_acc = sd(perf$aud_acc[1:12]),
+                        vis_acc = sd(perf$vis_acc[1:12]),
+                        RT_aud = sd(perf$RT_aud[1:21]),
+                        RT_vis = sd(perf$RT_vis[1:21]),
+                        RT_aud_raw = sd(perf$RT_aud_raw[1:21]),
+                        RT_vis_raw = sd(perf$RT_vis_raw[1:21]))
 
 ```
 
@@ -699,11 +713,11 @@ all_event_table$task_relevance <- factor(all_event_table$task_relevance, levels 
 
 # plot for onset - split by task-relevance 
 cdf_on = ggplot(all_event_table %>% filter(SOA_lock == 'onset'& z_RT_aud < 3), aes(x = z_RT_aud, color = as.factor(SOA))) +
-  stat_ecdf(geom = "step") +
+  stat_ecdf(geom = "step", size = 1) +
   ylab("Cumulative Probability") +
   labs(title = "Auditory reaction time distribution", tag = "B") +
   #xlim(c(-2,3))+
-  scale_color_manual(values = c('red', 'blue', 'green', "orange"), name = 'SOA [ms]', labels=c('0', '116', '232', '466'))+
+  scale_color_manual(values = c('red', 'blue', '#00b300', "orange"), name = 'SOA [ms]', labels=c('0', '116', '232', '466'))+
   theme_bw() +
   theme(axis.line = element_line(colour = "black"),
         panel.grid.major = element_blank(),
@@ -721,11 +735,11 @@ cdf_on = ggplot(all_event_table %>% filter(SOA_lock == 'onset'& z_RT_aud < 3), a
 cdf_on
 
 cdf_off = ggplot(all_event_table %>% filter(SOA_lock == 'offset' & z_RT_aud < 3), aes(x = z_RT_aud, color = as.factor(SOA))) +
-  stat_ecdf(geom = "step") +
+  stat_ecdf(geom = "step", size = 1) +
   ylab("Cumulative Probability") +
   xlab("z-scored auditory reaction time") +
 #  xlim(c(-2,3))+
-  scale_color_manual(values = c('red', 'blue', 'green', "orange"), name = 'SOA [ms]', labels=c('0', '116', '232', '466'))+
+  scale_color_manual(values = c('red', 'blue', '#00b300', "orange"), name = 'SOA [ms]', labels=c('0', '116', '232', '466'))+
   theme_bw() +
   theme(axis.line = element_line(colour = "black"),
         panel.grid.major = element_blank(),
