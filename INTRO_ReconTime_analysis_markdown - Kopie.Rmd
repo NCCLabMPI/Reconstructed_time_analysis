@@ -30,7 +30,7 @@ pacman::p_load('dplyr', 'ggdist', 'ggeffects', 'ggpubr', 'lme4', 'emmeans', 'rst
 
 ```{r loading}
 # details of subjects  
-subNums = c(105, 106, 109, 110, 113, 114, 115, 118, 122) # 101
+subNums = c(105, 106, 108, 109, 110, 113, 114, 115, 118, 122) # 101 excluded
 sessions = c(2,3)
 Lab_ID = 'SX'
 task = 'introspection'
@@ -107,10 +107,10 @@ all_event_table = all_event_table[all_event_table$RT_aud > 0.1, ]
 
 # add response window column
 all_event_table = all_event_table %>% mutate(resp_window = (2-onset_SOA)+stim_jit )
-# 
-# # remove RT > mean response window for offset, long duration adn long SOA
+
+# remove RT > mean response window for offset, long duration adn long SOA
 max_RT = mean(all_event_table$resp_window[all_event_table$SOA == 0.466 & all_event_table$SOA_lock == 'offset' & all_event_table$duration == 1.5], na.rm = TRUE)
- all_event_table = all_event_table[all_event_table$RT_aud < max_RT, ]
+all_event_table = all_event_table[all_event_table$RT_aud < max_RT, ]
 
 # remove incorrect auditory responses
 all_event_table = all_event_table[all_event_table$trial_accuracy_aud == 1, ]
@@ -889,6 +889,47 @@ Anova(model_exp1)
 plot(fitted(model_exp1),residuals(model_exp1))
 qqnorm(residuals(model_exp1))
 rsq.glmm(model_exp1)
+
+
+# onset PRP analysis
+
+
+onset_event_table = all_event_table %>% filter(SOA_lock == "onset")
+
+# new model (needs to be adjusted probably)
+
+onset_model = glmer(RT_aud ~ f_SOA*c_task_relevant +
+                       (1*f_SOA*c_task_relevant | sub_id) + 
+                      (1*f_SOA*c_task_relevant | f_duration), 
+                     family = Gamma(link="identity"), data = onset_event_table)
+
+summary(onset_model)
+Anova(onset_model)
+rsq.glmm(onset_model)
+
+
+# offset PRP analysis
+
+
+# do pairwise comparions using tukey correted t-testing 
+# post-hoc pairwise comparison
+
+offset_event_table = all_event_table %>% filter(SOA_lock == "offset")
+
+# new model (needs to be adjusted probably)
+
+offset_model = glmer(RT_aud ~ f_SOA*f_duration*c_task_relevant +
+                       (1*f_SOA*f_duration*c_task_relevant | sub_id), 
+                     family = Gamma(link="identity"), data = offset_event_table)
+
+summary(offset_model)
+Anova(offset_model)
+rsq.glmm(offset_model)
+
+em1 <- emmeans(offset_model, "f_SOA", by = "f_duration")
+contrast(em1, "pairwise", adjust = "bonferroni")
+
+
 ```
 
 # control model - model2
@@ -1163,10 +1204,12 @@ plot(fitted(model_T1speed),residuals(model_T1speed))
 qqnorm(residuals(model_T1speed))
 rsq.glmm(model_T1speed)
 
+# bring IT vis and RT aud into the same unit (secs)
+all_event_table = all_event_table %>% mutate(iRT_vis_0.001 = iRT_vis*0.001)
 
-model_T1 = glmer(RT_aud ~ f_SOA*c_is_onset*c_task_relevant*z_iRT_vis +
-                   (1*f_SOA*c_is_onset*c_task_relevant*z_iRT_vis| sub_id)+
-                   (1*f_SOA*c_is_onset*c_task_relevant*z_iRT_vis | f_duration),
+model_T1 = glmer(RT_aud ~ f_SOA*c_is_onset*c_task_relevant*iRT_vis_0.001 +
+                   (1*f_SOA*c_is_onset*c_task_relevant*iRT_vis_0.001| sub_id)+
+                   (1*f_SOA*c_is_onset*c_task_relevant*iRT_vis_0.001 | f_duration),
                  family=Gamma(link="identity"), data=all_event_table)
 
 summary(model_T1)
@@ -1504,21 +1547,27 @@ ggscatter(all_cali_table, x = "cali_ms", y = "estimation_error",
 
 
 # calibration performance split by subject
-cali_sub = ggplot(all_cali_table, aes(x = cali_ms, y = iT))+
+cali_sub = ggplot(all_cali_table %>% filter(sub_id != 'SX108'), aes(x = cali_ms, y = iT))+
   geom_point() +
   geom_smooth(method = "lm", se = TRUE)+
   facet_wrap(~sub_id, nrow = 3, ncol = 3, scales = "free")+
   xlab("Objective tones length [ms]")+
   ylab("Estimated time [ms]")+
-  ylim(c(0,1300))+
+  ylim(c(0,1050))+
   theme_bw() +
   theme(axis.line = element_line(colour = "black"),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
         panel.border = element_rect(linetype = "solid"),
-        panel.background = element_blank())+
-  stat_cor(color = 'black', label.y = 1200, method = "pearson", show.legend = FALSE)
+        panel.background = element_blank(),
+        axis.text = element_text(color = "black", size = 15),
+        legend.text = element_text(size = 20),axis.title = element_text(size = 20, face="bold"),
+        plot.title = element_text(size = 25, face="bold"),
+        strip.text = element_text(size = 20))+
+  stat_cor(color = 'black', label.y = 1000, method = "pearson", show.legend = FALSE, size = 5)
 cali_sub
+
+```
 
 
 ```

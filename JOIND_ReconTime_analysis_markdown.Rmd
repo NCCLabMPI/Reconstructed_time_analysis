@@ -30,7 +30,8 @@ pacman::p_load('dplyr', 'ggdist', 'ggeffects', 'ggpubr', 'lme4', 'emmeans', 'rst
 
 ```{r loading}
 # details of subjects  
-subNums = c(105, 106, 109, 110, 113, 114, 115, 116, 118, 122) # 116 and 122 are the same person
+subNums = c(105, 106, 108, 109, 110, 113, 114, 115, 116, 118, 122) # 116 and 122 are the same person
+# subNums = 101:123 # all subjects
 sessions = c(1,2,3)
 Lab_ID = 'SX'
 count = 0
@@ -290,11 +291,11 @@ p25 = ggplot(data = plot_data2 %>% filter(task == 'prp'), aes(x = onset_SOA * 10
   geom_line(data = plot_data2 %>% filter(task == 'introspection'), aes(x = onset_SOA * 1000, y = mean_RT * 1000, color = 'intro' , group = interaction(as.character(duration), SOA_lock), linetype = SOA_lock)) +
   geom_errorbar(data = plot_data2 %>% filter(task == 'introspection'), aes(x = onset_SOA * 1000, y = mean_RT * 1000, color = 'intro' , group = interaction(as.character(duration), SOA_lock), linetype = SOA_lock, ymin = (mean_RT - sem_RT) * 1000, ymax = (mean_RT + sem_RT) * 1000), width = 20) +
   geom_point(data = plot_data2 %>% filter(task == 'introspection'), aes(x = onset_SOA * 1000, y = mean_RT * 1000, color = 'intro' , group = interaction(as.character(duration), SOA_lock), linetype = SOA_lock),size = 1) +
-  facet_wrap(~ sub_id, nrow = 3, ncol = 3, scales = "free")+
+  facet_wrap(~ sub_id, nrow = 7, ncol = 3, scales = "free")+
   labs(title = "Objective reaction time by task-relevance", tag = "A") +
   ylab("Reaction time [ms]") +
   xlab('SOA to visual onset [ms]') +
-  xlim(c(350, 900))
+  ylim(c(300, 900))+
   scale_color_manual(values = c('blue','red'),
                      name = 'Experiment',
                      breaks = c('prp','intro'),
@@ -528,9 +529,9 @@ sub_effect_size_table = sub_effect_size_table %>% add_row(sub_num = sub,
 
 ```
 
-# correlation 
+# correlation of effect size
 
-```{r correlation}
+```{r correlation1}
 
 effect_sizes_non_target_onset_cd <- sub_effect_size_table %>% pivot_wider(id_cols = sub_num, names_from = task, values_from = non_target_onset_cd)
 
@@ -550,5 +551,63 @@ cor1 = ggplot(effect_sizes_non_target_onset_cd, aes(x = prp, y = introspection))
   stat_cor(color = 'black', method = "pearson", show.legend = FALSE)
 cor1
 
+```
+
+# correlation of time series
+
+```{r correlation2}
+p_values = 1:length(subNums[subNums != 122])
+estimates = 1:length(subNums[subNums != 122])
+significance = 1:length(subNums[subNums != 122])
+null_p_values = 1:length(subNums[subNums != 122])
+null_estimates = 1:length(subNums[subNums != 122])
+null_significance = 1:length(subNums[subNums != 122])
+count = 0
+
+# for each subject correlate time-series of experiment one and two
+for (sub in subNums[subNums != 122]){
+count = count + 1
+
+# subset the data
+time_series = all_event_table %>% filter(SOA != 0.116 & sub_num == sub) %>% group_by(SOA, SOA_lock, duration, task_relevance, task) %>%
+                                      summarise(mean_RT = mean(RT_aud, na.rm = TRUE))
+
+# split by experiment (task)
+RT_prp = time_series %>% filter(task == 'prp') %>% pull(mean_RT)
+RT_intro = time_series %>% filter(task == 'introspection') %>% pull(mean_RT)
+
+# ran correlation and store variables
+correlation = cor.test(RT_prp,RT_intro, method = "pearson")
+estimates[count] = correlation$estimate
+p_values[count] = correlation$p.value
+significance[count] = correlation$p.value < 0.05
+
+
+# shuffle order and ran correlation to generate null distribution
+null_correlation = cor.test(sample(RT_prp),sample(RT_intro), method = "pearson")
+null_estimates[count] = null_correlation$estimate
+null_p_values[count] = null_correlation$p.value
+null_significance[count] = null_correlation$p.value < 0.05
+}
+
+# Combine data into a data frame
+estimates_data <- data.frame(
+  Group = rep(c("estimates", "null_estimates"), each = length(estimates)),
+  Value = c(estimates, null_estimates)
+)
+
+# Create a boxplot
+boxplot <- ggplot(estimates_data, aes(x = Group, y = Value, fill = Group)) +
+  geom_boxplot() +
+  geom_point() +
+  labs(title = "Correlation estimates", y = "Value") +
+  theme_minimal()
+boxplot
+
+# compare them with a t-test
+ttest_result <- t.test(estimates, null_estimates, paired = TRUE)
+
+# Print the results
+print(ttest_result)
 ```
 

@@ -104,7 +104,7 @@ all_event_table = all_event_table %>% mutate(resp_window = (2-onset_SOA)+stim_ji
 
 # # remove RT > mean response window for offset, long duration adn long SOA 
 max_RT = mean(all_event_table$resp_window[all_event_table$SOA == 0.466 & all_event_table$SOA_lock == 'offset' & all_event_table$duration == 1.5], na.rm = TRUE)
-# all_event_table = all_event_table[all_event_table$RT_aud < 1.8, ]
+all_event_table = all_event_table[all_event_table$RT_aud < 1.8, ]
 
 # remove RT < 100 ms
 all_event_table = all_event_table[all_event_table$RT_aud > 0.1, ]
@@ -776,7 +776,7 @@ ggplot(box_plot_data, aes(SOA_lock, mean_RT, fill=interaction(duration, task_rel
 
 ```{r model1}
 
-## general linear mixed effect model 1 
+## general linear mixed effect model 1 (single trial level)
 
 # fixed effects: SOA (ordinal), SOA-Lock (as c_is_onset,  numeric, centered), Task-relevance (as is relevant, numeric, centered)
 # random effects: Subject ID, Duration (ordinal)
@@ -791,6 +791,20 @@ Anova(model1)
 plot(fitted(model1),residuals(model1))
 qqnorm(residuals(model1))
 rsq.glmm(model1)
+
+
+# subject level model (mean of each cell for each subjects - no signle trials)
+subj_data = all_event_table %>% group_by(f_SOA, c_is_onset, c_task_relevant, sub_id, f_duration) %>%
+                                      summarise(RT_mean = mean(RT_aud, na.rm = TRUE))
+
+sub_model1 = glmer(RT_mean ~ f_SOA*c_is_onset*c_task_relevant +
+                     (1*f_SOA*c_is_onset*c_task_relevant | sub_id)+
+                     (1*f_SOA*c_is_onset*c_task_relevant | f_duration),
+               family=Gamma(link="identity"), data = subj_data)
+
+summary(sub_model1)
+Anova(sub_model1)
+rsq.glmm(sub_model1)
 ```
 
 # onset PRP analysis
@@ -965,6 +979,52 @@ acc_plot = ggplot(data=acc_data, aes(x=SOA*1000, y=mean_acc2*100, colour = task_
         axis.text.x = element_text(color = "black"),
         axis.text.y = element_text(color = "black"))
 acc_plot
+
+# accuracy plot as RT plot
+acc_data2 = raw_event_table %>% group_by(onset_SOA,SOA_lock, duration, sub_id, task_relevance) %>%
+                                      summarise(acc_mean = mean(trial_accuracy_aud, na.rm = TRUE))
+
+acc_data2 = acc_data2 %>%  group_by(onset_SOA, SOA_lock,duration, task_relevance) %>%
+                                      summarise(mean_acc = mean(acc_mean, na.rm = TRUE),
+                                                         sd_acc = sd(acc_mean, na.rm = TRUE),
+                                                         sem_acc = sd_acc / sqrt(n))
+
+# remove NaNs from auditory responses
+acc_data2 = acc_data2[!is.na(acc_data2$mean_acc), ]
+
+# define order
+acc_data2$task_relevance = factor(acc_data2$task_relevance,
+                                   levels = c('target', 'non-target', 'irrelevant'),
+                                   labels = c('Target', 'Relevant non-target', 'Irrelevant non-target'))
+
+
+acc_plot2 = ggplot(data = acc_data2, aes(x = onset_SOA * 1000, y = mean_acc, group = interaction(as.character(duration), SOA_lock), color = as.character(duration), linetype = SOA_lock)) +
+  geom_line(linewidth = 1) +
+  geom_errorbar(aes(ymin = (mean_acc - sem_acc), ymax = (mean_acc + sem_acc)), width = 30, linewidth = 1) +
+  geom_point(size = 1.5) +
+  facet_grid(. ~ task_relevance) +
+  labs(title = "Auditory accuracy by task-relevance") +
+  ylab("Auditory accuracy [%]") +
+  xlab('SOA to visual onset [ms]') +
+  scale_color_manual(values = c('darkviolet', 'darkorange', 'darkred'),
+                     name = 'Duration [ms]',
+                     labels = c('500', '1000', '1500')) +
+  scale_linetype_manual(values = c("solid", "longdash"),
+                        name = 'SOA time-locked to',
+                        breaks = c('onset', 'offset')) +
+  theme_bw() +
+  theme(axis.line = element_line(colour = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(linetype = "solid"),
+        panel.background = element_blank(),
+        axis.text = element_text(color = "black", size = 15),
+        legend.text = element_text(size = 20),
+        legend.title = element_text(size = 20, face="bold"),
+        axis.title = element_text(size = 20, face="bold"),
+        plot.title = element_text(size = 25, face="bold"),
+        strip.text = element_text(size = 20))
+acc_plot2
 
 ## general linear mixed effect for accuracy 
 
