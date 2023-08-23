@@ -8,6 +8,9 @@ import seaborn as sns
 import pandas as pd
 import os
 
+# Set the font size:
+plt.rcParams.update({'font.size': 22})
+
 
 def pupil_peak_latency(parameters_file, subjects):
 
