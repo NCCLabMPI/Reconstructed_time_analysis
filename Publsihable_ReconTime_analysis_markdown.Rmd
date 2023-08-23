@@ -390,6 +390,7 @@ png(png_filename, width = width, height = height)
 ```
 
 # plotting Figure 5b for experiment 1
+- distribution analysis not preregistered
 
 ```{R plotting_fig5b_exp1}
 
@@ -475,7 +476,7 @@ random effects: Subject ID, Duration (ordinal)
 
 ```{r glmm1_epx1}
 
-# single trial level
+# single trial level (as preregistered)
 
 # fit model
 model1 = glmer(RT_aud ~ f_SOA*c_is_onset*c_task_relevant +
@@ -496,7 +497,7 @@ qqnorm(residuals(model1))
 rsq.glmm(model1)
 
 
-# subject level model (mean of each cell for each subjects - no single trials)
+# subject level model (mean of each cell for each subjects - no single trials) (not preregistered)
 
 subj_data = all_event_table %>% group_by(f_SOA, c_is_onset, c_task_relevant, sub_id, f_duration) %>%
                                       summarise(RT_mean = mean(RT_aud, na.rm = TRUE))
@@ -516,6 +517,7 @@ rsq.glmm(sub_model1)
 ```
 
 # onset PRP analysis
+- as preregistered
 
 ```{r onset_PRP1}
 
@@ -540,6 +542,7 @@ rsq.glmm(onset_model)
 ```
 
 # offset PRP analysis
+- as preregistered
 
 ```{r offset_PRP1}
 
@@ -569,6 +572,7 @@ contrast(em1, "pairwise", adjust = "bonferroni")
 ```
 
 # control model - model2
+- as preregistered
 
 ```{r ctr_model2}
 
@@ -598,6 +602,7 @@ anova(model1, ctr_model)
 
 # accuracy analysis - acc_model
 GLMM with auditory accuracy as a dependent variable and SAO, onset/offset and task-relevance as fixed effects
+- not preregistered
 
 ```{r acc_model1}
 
@@ -624,6 +629,62 @@ acc_model = glmer(trial_accuracy_aud ~ f_SOA*c_is_onset*c_task_relevant +
 
 summary(acc_model)
 Anova(acc_model)
+
+
+```
+
+# accuracy analysis - accuracy plot (Figure S1) 
+- not preregistered
+
+```{r acc_plot}
+
+# accuracy plot as RT plot
+acc_data = raw_event_table %>% group_by(onset_SOA,SOA_lock, duration, sub_id, task_relevance) %>%
+                                      summarise(acc_mean = mean(trial_accuracy_aud, na.rm = TRUE))
+
+acc_data  = acc_data  %>%  group_by(onset_SOA, SOA_lock,duration, task_relevance) %>%
+                                      summarise(mean_acc = mean(acc_mean, na.rm = TRUE),
+                                                         sd_acc = sd(acc_mean, na.rm = TRUE),
+                                                         sem_acc = sd_acc / sqrt(n))
+
+# remove NaNs from auditory responses
+acc_data  = acc_data [!is.na(acc_data $mean_acc), ]
+
+# define order
+acc_data $task_relevance = factor(acc_data $task_relevance,
+                                   levels = c('target', 'non-target', 'irrelevant'),
+                                   labels = c('Target', 'Relevant non-target', 'Irrelevant non-target'))
+
+
+fig_S1 = ggplot(data = acc_data , aes(x = onset_SOA * 1000, y = mean_acc, group = interaction(as.character(duration), SOA_lock), color = as.character(duration), linetype = SOA_lock)) +
+  geom_line(linewidth = 1) +
+  geom_errorbar(aes(ymin = (mean_acc - sem_acc), ymax = (mean_acc + sem_acc)), width = 30, linewidth = 1) +
+  geom_point(size = 1.5) +
+  facet_grid(. ~ task_relevance) +
+  labs(title = "Auditory accuracy by task-relevance") +
+  ylab("Auditory accuracy [%]") +
+  xlab('SOA to visual onset [ms]') +
+  scale_color_manual(values = c('darkviolet', 'darkorange', 'darkred'),
+                     name = 'Duration [ms]',
+                     labels = c('500', '1000', '1500')) +
+  scale_linetype_manual(values = c("solid", "longdash"),
+                        name = 'SOA time-locked to',
+                        breaks = c('onset', 'offset')) +
+  theme_bw() +
+  theme(axis.line = element_line(colour = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(linetype = "solid"),
+        panel.background = element_blank(),
+        axis.text = element_text(color = "black", size = 15),
+        legend.text = element_text(size = 20),
+        legend.title = element_text(size = 20, face="bold"),
+        axis.title = element_text(size = 20, face="bold"),
+        plot.title = element_text(size = 25, face="bold"),
+        strip.text = element_text(size = 20))
+fig_S1
+
+
 ```
 
 # effect size of PRP
@@ -678,7 +739,6 @@ if (!('pwr' %in% installed.packages()))
 {install.packages("pwr")}
 library(pwr)
 
-
 # from marti paper
 f =  47.08
 n = 10
@@ -698,7 +758,6 @@ u = 1
 
 # Estimate sample size for GLMM with logistic regression
 v = pwr.f2.test(u = u, v = , f2 = effect_size/4, sig.level = .05, power = power)$v
-
   
 # (v = n - u - 1\). This implies \(n = v + u + 1\).
 req_sample_size = ceiling(v + u + 1)
