@@ -8,6 +8,7 @@ from eye_tracker.preprocessing_helper_function import (extract_eyelink_events, e
                                                        interpolate_pupil_epochs)
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 
 
 def preprocessing(subject, parameters):
@@ -70,10 +71,9 @@ def preprocessing(subject, parameters):
             raw = extract_eyelink_events(raw, step_param["description"])
 
         # Print the proportion of NaN in the data:
-        print("Total proportion of NaN in the left pupil: {:.2f}%".format(
-            100 * np.sum(np.isnan(raw.get_data(picks=["LPupil"]))) / raw.get_data().shape[-1]))
-        print("Total proportion of NaN in the right pupil: {:.2f}%".format(
-            100 * np.sum(np.isnan(raw.get_data(picks=["RPupil"]))) / raw.get_data().shape[-1]))
+        total_nan_proportion = np.mean(
+            [100 * np.sum(np.isnan(raw.get_data(picks=["LPupil"]))) / raw.get_data().shape[-1],
+             100 * np.sum(np.isnan(raw.get_data(picks=["RPupil"]))) / raw.get_data().shape[-1]])
 
         if step == "epochs":
             # Looping through each of the different epochs file to create:
@@ -81,29 +81,22 @@ def preprocessing(subject, parameters):
                 print(epoch_name)
                 epochs = epoch_data(raw, events_from_annot, event_dict, **step_param[epoch_name])
 
-                # Plot the epochs:
-                # epochs.load_data().copy()[0:200].pick(["LPupil", "RPupil"]).plot(block=True,
-                #                                                                  scalings=dict(eeg=1000),
-                #                                                                  n_epochs=4)
-
                 if "remove_bad_epochs" in preprocessing_steps:
-                    epochs, proportion_reject = remove_bad_epochs(epochs,
-                                                                  nan_proportion_thresh=param["remove_bad_epochs"][
-                                                                      "nan_proportion_thresh"])
+                    epochs, proportion_rejected_trials = remove_bad_epochs(epochs,
+                                                                           nan_proportion_thresh=
+                                                                           param["remove_bad_epochs"][
+                                                                               "nan_proportion_thresh"])
                 if "interpolate_pupil_epochs" in preprocessing_steps:
                     epochs, proportion_nan = interpolate_pupil_epochs(epochs,
                                                                       eyes=param["interpolate_pupil_epochs"]["eyes"])
 
                 # Plot the epochs:
                 if "discard_bad_subjects" in preprocessing_steps:
-                    if (proportion_reject > param["discard_bad_subjects"]["bad_trials_threshold"] or
+                    if (proportion_rejected_trials > param["discard_bad_subjects"]["bad_trials_threshold"] or
                             np.min(proportion_nan) > param["discard_bad_subjects"]["nan_threshold"]):
                         print("Subject {} rejected due to bad epochs".format(subject))
                         continue
 
-                # epochs.load_data().copy()[0:100].pick(["LPupil", "RPupil"]).plot(block=True,
-                #                                                                  scalings=dict(eeg=10),
-                #                                                                  n_epochs=4)
                 # Save this epoch to file:
                 save_root = Path(bids_root, "derivatives", "preprocessing", "sub-" + subject,
                                  "ses-" + session, data_type)
@@ -162,17 +155,35 @@ def preprocessing(subject, parameters):
                     plt.savefig(Path(save_root, file_name))
                     plt.close()
 
+            return total_nan_proportion, proportion_rejected_trials, np.mean(proportion_nan)
+
 
 if __name__ == "__main__":
     # The following subjects have the specified issues:
     # SX101: differences in sampling rate due to experiment program issues
     # SX104: missing files
     # SX117: no eyetracking data
+    bids_root = r"C:\Users\alexander.lepauvre\Documents\PhD\Reconstructed_Time\bids"
     subjects_list = ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112", "SX113",
                      "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121"]
     parameters_file = (
-        r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker\parameters"
-        r"\preprocessing_parameters.json ")
+        r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker"
+        r"\01-preprocessing_parameters.json ")
+    # Create a data frame to save the summary of all subjects:
+    preprocessing_summary = []
     for sub in subjects_list:
         print("Preprocessing subject {}".format(sub))
-        preprocessing(sub, parameters_file)
+        total_nan, rejected_trials, epochs_nan = preprocessing(sub, parameters_file)
+        # Append to the summary:
+        preprocessing_summary.append(pd.DataFrame({
+            "subject": sub,
+            "total_nan": total_nan,
+            "rejected_trials": rejected_trials,
+            "epochs_nan": epochs_nan,
+            "valid_flag": True if rejected_trials < 0.5 and np.min(epochs_nan) < 0.5 else False
+        }, index=[0]))
+    # Concatenate the data frame:
+    preprocessing_summary = pd.concat(preprocessing_summary)
+    # Save the data frame:
+    save_dir = Path(bids_root, "derivatives", "preprocessing")
+    preprocessing_summary.to_csv(Path(save_dir, "participants.csv"))

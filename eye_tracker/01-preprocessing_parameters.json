@@ -34,7 +34,7 @@
     "gap_duration_s": 0.075
   },
   "dilation_speed_rejection": {
-    "threshold_factor": 4,
+    "threshold_factor": 5,
     "eyes": ["L", "R"]
   },
   "set_pupil_nans": {

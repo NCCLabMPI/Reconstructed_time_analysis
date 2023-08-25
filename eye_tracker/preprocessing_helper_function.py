@@ -2,6 +2,10 @@ import mne
 import numpy as np
 import pandas as pd
 from scipy.signal import savgol_filter
+from scipy.interpolate import CubicSpline
+import matplotlib.pyplot as plt
+
+show_checks = False
 
 
 def remove_bad_epochs(epochs, nan_proportion_thresh=0.2):
@@ -46,9 +50,9 @@ def trend_line_departure(raw, threshold_factor=3, eyes=None, window_length_s=0.0
     # Loop through each eye:
     for eye in eyes:
         # Extract the data:
+        data = np.squeeze(raw.copy().get_data(picks="{}Pupil".format(eye)))
+        check_plot_data = data.copy()[0:100000]
         for i in range(n_iter):
-            if i == 0:
-                data = np.squeeze(raw.copy().get_data(picks="{}Pupil".format(eye)))
             # Interpolate the data:
             data_interp = interp_nan(data.copy())
             # Smooth the data:
@@ -60,6 +64,19 @@ def trend_line_departure(raw, threshold_factor=3, eyes=None, window_length_s=0.0
             print("Removing {:2f}% samples in iter {}".format((len(inds[0]) / data.shape[0]) * 100, i))
             # Set the data to nan:
             data[inds] = np.nan
+        if show_checks:
+            fig, ax = plt.subplots(nrows=1, ncols=1)
+            ax.plot(raw.times[0:check_plot_data.shape[0]], data_filt[0:check_plot_data.shape[0]], color="black",
+                    label="Trend line")
+            ax.scatter(raw.times[0:check_plot_data.shape[0]], check_plot_data, color="blue", label="Before")
+            ax.scatter(raw.times[0:check_plot_data.shape[0]], data[0:check_plot_data.shape[0]], color="red",
+                       label="After")
+            ax.set_xlabel("Time (s)")
+            ax.set_ylabel("Pupil size")
+            ax.set_title("Trend line departure")
+            plt.legend()
+            plt.show()
+
         # Add back into raw:
         raw_data = raw.get_data()
         # Extract the index of the channel:
@@ -92,6 +109,7 @@ def remove_around_gap(raw, gap_reject_s=0.05, gap_duration_s=0.075, eyes=None):
     for eye in eyes:
         # Extract the data from this eye:
         data = np.squeeze(raw.copy().get_data(picks="{}Pupil".format(eye)))
+        check_plot_data = data.copy()[0:100000]
         # Find the onset and offsets of each gap:
         nan_onset_inds = np.where(np.diff(np.isnan(data).astype(float)) == 1)[0]
         nan_offset_inds = np.where(np.diff(np.isnan(data).astype(float)) == -1)[0]
@@ -111,9 +129,10 @@ def remove_around_gap(raw, gap_reject_s=0.05, gap_duration_s=0.075, eyes=None):
                 raise ValueError("The offset is before the onset!")
             if nan_offset_inds[i] - onset_ind >= gap_duration_n:
                 # Remove the data around the onset and the offset:
-                data[onset_ind - gap_reject_n:onset_ind] = np.nan
+                data[onset_ind - gap_reject_n:onset_ind + 1] = np.nan
                 data[nan_offset_inds[i]:nan_offset_inds[i] + gap_reject_n] = np.nan
                 n_removed += gap_reject_n * 2
+
         # Display the proportion of removed samples:
         print("Removed {:2f}% samples".format((n_removed / data.shape[0]) * 100))
         # Add back to the mne raw object:
@@ -125,6 +144,18 @@ def remove_around_gap(raw, gap_reject_s=0.05, gap_duration_s=0.075, eyes=None):
         raw_new = mne.io.RawArray(raw_data, raw.info, verbose="WARNING")
         raw_new.set_annotations(raw.annotations)
         raw = raw_new
+
+        if show_checks:
+            fig, ax = plt.subplots(nrows=1, ncols=1)
+            ax.scatter(raw.times[0:check_plot_data.shape[0]], check_plot_data, color="blue", label="Before")
+            ax.scatter(raw.times[0:check_plot_data.shape[0]], data[0:check_plot_data.shape[0]], color="red",
+                       label="After")
+            ax.set_xlabel("Time (s)")
+            ax.set_ylabel("Pupil size")
+            ax.set_title("Removing data around gaps")
+            plt.legend()
+            plt.show()
+
     return raw
 
 
@@ -176,6 +207,20 @@ def interp_nan(data):
     return data
 
 
+def cubic_interpolation(data):
+    """
+    This function interpolates the nan values using a cubic interpolation
+    :param data: (1d numpy array) contains the data with nans to be interpolated!
+    :return: (1d numpy array) interpolated data
+    """
+    # Extract the valid indices:
+    valid_indices = np.where(~np.isnan(data))[0]
+    if len(valid_indices) > 1:
+        cs = CubicSpline(valid_indices, data[valid_indices], extrapolate='zeros')
+        data = cs(np.arange(len(data)))
+    return data
+
+
 def interpolate_pupil_epochs(epochs, eyes=None):
     """
 
@@ -197,7 +242,7 @@ def interpolate_pupil_epochs(epochs, eyes=None):
         # Interpolate the nan:
         data_interp = []
         for trials in range(data.shape[0]):
-            data_interp.append(interp_nan(data[trials, :]))
+            data_interp.append(cubic_interpolation(data[trials, :]))
         data_interp = np.array(data)
         # Add back to the mne raw object:
         epochs_data = epochs.get_data()
@@ -289,6 +334,7 @@ def dilation_speed_rejection(raw, threshold_factor=4, eyes=None):
     for eye in eyes:
         # Extract the pupil size from this eye:
         data = raw.copy().get_data(picks="{}Pupil".format(eye))
+        check_plot_data = data.copy()[0, 0:100000]
         # Compute the dilation speed:
         dilation_speed = dilation_filter(np.squeeze(data), raw.times, axis=-1)
         # Extract the index of the outliers:
@@ -309,6 +355,18 @@ def dilation_speed_rejection(raw, threshold_factor=4, eyes=None):
         raw_new = mne.io.RawArray(raw_data, raw.info, verbose="WARNING")
         raw_new.set_annotations(raw.annotations)
         raw = raw_new
+
+        if show_checks:
+            fig, ax = plt.subplots(nrows=1, ncols=1)
+            ax.scatter(raw.times[0:check_plot_data.shape[0]], check_plot_data, color="blue", label="Before")
+            ax.scatter(raw.times[0:check_plot_data.shape[0]], data[0, 0:check_plot_data.shape[0]], color="red",
+                       label="After")
+            ax.set_xlabel("Time (s)")
+            ax.set_ylabel("Pupil size")
+            ax.set_title("Dilation speed rejection")
+            plt.legend()
+            plt.show()
+
     return raw
 
 
