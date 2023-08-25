@@ -1,0 +1,16 @@
+{
+  "bids_root": "C:\\Users\\alexander.lepauvre\\Documents\\PhD\\Reconstructed_Time\\bids",
+  "visit": "1",
+  "task": "prp",
+  "session": "1",
+  "data_type": "eyetrack",
+  "epoch_name": "visual_onset",
+  "crop": [0, 3.5],
+  "baseline": null,
+  "baseline_window": null,
+  "picks": ["Lblink", "Rblink"],
+  "task_relevance": ["non-target", "irrelevant"],
+  "durations": ["0.5", "1", "1.5"],
+  "soas": ["0", "0.116", "0.232", "0.466"],
+  "locks": ["onset", "offset"]
+}
