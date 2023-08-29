@@ -792,6 +792,16 @@ plot(fitted(model1),residuals(model1))
 qqnorm(residuals(model1))
 rsq.glmm(model1)
 
+# with duration
+
+model1_dur = glmer(RT_aud ~ f_SOA*c_is_onset*c_task_relevant*f_duration +
+                     (1*f_SOA*c_is_onset*c_task_relevant*f_duration | sub_id),
+               family=Gamma(link="identity"), data=all_event_table)
+
+summary(model1_dur)
+Anova(model1_dur)
+rsq.glmm(model1_dur)
+
 
 # subject level model (mean of each cell for each subjects - no signle trials)
 subj_data = all_event_table %>% group_by(f_SOA, c_is_onset, c_task_relevant, sub_id, f_duration) %>%
@@ -823,6 +833,15 @@ onset_model = glmer(RT_aud ~ f_SOA*c_task_relevant +
 summary(onset_model)
 Anova(onset_model)
 rsq.glmm(onset_model)
+
+# with duration
+onset_model_dur = glmer(RT_aud ~ f_SOA*c_task_relevant*f_duration +
+                       (1*f_SOA*c_task_relevant*f_duration | sub_id), 
+                     family = Gamma(link="identity"), data = onset_event_table)
+
+summary(onset_model_dur)
+Anova(onset_model_dur)
+rsq.glmm(onset_model_dur)
 
 ```
 
@@ -859,6 +878,20 @@ em4 <- emmeans(offset_model, c("f_SOA", "f_duration"))
 contrast(em4, "pairwise", adjust = "bonferroni")
 
 # MAYBE FIND ONE THAT DISPLAYS P VALUES WITH MORE VALUES AFTER THE PERIOD
+
+
+# without duration
+offset_model_no_dur = glmer(RT_aud ~ f_SOA*c_task_relevant +
+                       (1*f_SOA*c_task_relevant | sub_id) + 
+                      (1*f_SOA*c_task_relevant | f_duration), 
+                     family = Gamma(link="identity"), data = offset_event_table)
+
+summary(offset_model_no_dur)
+Anova(offset_model_no_dur)
+rsq.glmm(offset_model_no_dur)
+
+emx <- emmeans(offset_model_no_dur, "f_SOA", by = "f_duration")
+contrast(emx, "pairwise", adjust = "bonferroni")
 
 
 ```
