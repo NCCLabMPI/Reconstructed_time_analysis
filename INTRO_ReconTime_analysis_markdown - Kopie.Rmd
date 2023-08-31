@@ -846,7 +846,7 @@ ggplot(box_plot_data, aes(SOA_lock, mean_RT, fill=interaction(duration, task_rel
 aud_model1 = glmer(iRT_aud ~ f_SOA*c_is_onset*c_task_relevant +
                      (1*f_SOA*c_is_onset*c_task_relevant | sub_id)+
                      (1*f_SOA*c_is_onset*c_task_relevant | f_duration),
-                   family=Gamma(link="identity"), data=all_event_table)
+                   family=Gamma(link="log"), data=all_event_table)
 
 summary(aud_model1)
 Anova(aud_model1)
@@ -861,7 +861,7 @@ rsq.glmm(aud_model1)
 vis_model1 = glmer(iRT_vis ~ f_SOA*c_is_onset*c_task_relevant +
                      (1*f_SOA*c_is_onset*c_task_relevant | sub_id)+
                      (1*f_SOA*c_is_onset*c_task_relevant | f_duration),
-                   family=Gamma(link="identity"), data=all_event_table)
+                   family=Gamma(link="log"), data=all_event_table)
 
 summary(vis_model1)
 Anova(vis_model1)

@@ -319,10 +319,6 @@ p25
 
 ```
 
-
-
-
-
 # box plot - introspective RT aud
 
 ```{r boxplot}
@@ -556,7 +552,8 @@ cor1
 # correlation of time series
 
 ```{r correlation2}
-p_values = 1:length(subNums[subNums != 122])
+p_values_cor = 1:length(subNums[subNums != 122])
+p_values_permutation = 1:length(subNums[subNums != 122])
 estimates = 1:length(subNums[subNums != 122])
 significance = 1:length(subNums[subNums != 122])
 null_p_values = 1:length(subNums[subNums != 122])
@@ -579,35 +576,61 @@ RT_intro = time_series %>% filter(task == 'introspection') %>% pull(mean_RT)
 # ran correlation and store variables
 correlation = cor.test(RT_prp,RT_intro, method = "pearson")
 estimates[count] = correlation$estimate
-p_values[count] = correlation$p.value
+p_values_cor[count] = correlation$p.value
 significance[count] = correlation$p.value < 0.05
 
+# Number of permutations
+num_permutations = 100000
 
-# shuffle order and ran correlation to generate null distribution
-null_correlation = cor.test(sample(RT_prp),sample(RT_intro), method = "pearson")
-null_estimates[count] = null_correlation$estimate
-null_p_values[count] = null_correlation$p.value
-null_significance[count] = null_correlation$p.value < 0.05
+# Initialize an empty vector to store shuffled correlations
+shuffled_correlations = numeric(num_permutations)
+
+# Permutation testing loop
+for (i in 1:num_permutations) {
+  # Combine the two arrays
+  combined_data = c(RT_prp, RT_intro)
+  
+  # Shuffle the combined data
+  shuffled_data = sample(combined_data)
+  
+  # Split the shuffled data back into two arrays
+  shuffled_exp_1 = shuffled_data[1:length(RT_prp)]
+  shuffled_exp_2 = shuffled_data[(length(RT_prp) + 1):(length(RT_prp) + length(RT_prp))]
+  
+  # Calculate the correlation for shuffled arrays
+  shuffled_correlation = cor.test(shuffled_exp_1, shuffled_exp_2, method = "pearson")
+  
+  # Store the shuffled correlation value
+  shuffled_correlations[i] = shuffled_correlation$estimate
 }
 
-# Combine data into a data frame
-estimates_data <- data.frame(
-  Group = rep(c("estimates", "null_estimates"), each = length(estimates)),
-  Value = c(estimates, null_estimates)
-)
-
-# Create a boxplot
-boxplot <- ggplot(estimates_data, aes(x = Group, y = Value, fill = Group)) +
-  geom_boxplot() +
-  geom_point() +
-  labs(title = "Correlation estimates", y = "Value") +
-  theme_minimal()
-boxplot
-
-# compare them with a t-test
-ttest_result <- t.test(estimates, null_estimates, paired = TRUE)
+# Calculate the p-value
+p_values_permutation[count] = sum(shuffled_correlations >= estimates[count]) / num_permutations
 
 # Print the results
-print(ttest_result)
+cat("For subject: ", sub, "\n")
+cat("Observed Correlation: ", estimates[count], "\n")
+cat("p-value: ", p_values_permutation[count], "\n")
+
+}
+
+# create a data frame with the observed correlation and the p values 
+corrleation_df <- data.frame(Column1 = estimates, Column2 = p_values_cor, Column3 = p_values_permutation)
+colnames(corrleation_df) = c("Observed_cor", "p_cor", "p_perm")
+
+
+# Create a boxplot with individual data points
+p = ggplot(corrleation_df, aes(x = factor(1), y = Observed_cor)) +
+  geom_boxplot(fill = "blue", width = 0.2, outlier.shape = NA) + 
+  geom_jitter(data = corrleation_df, aes(x = factor(1), y = Observed_cor), color = "black", width = 0.1) +
+  geom_boxplot(aes(x = factor(2), y = p_perm), fill = "green", width = 0.2, outlier.shape = NA) +
+  geom_jitter(data = corrleation_df, aes(x = factor(2), y = p_perm), color = "black", width = 0.1) +
+  labs(title = "Boxplot with Individual Data Points",
+       x = "Columns",
+       y = "Values") +
+  scale_x_discrete(labels = c("Observed correlation", "p-value from permutation"))
+
+# Display the plot
+print(p)
 ```
 
