@@ -47,7 +47,7 @@ The full model is applied to all the data
 # Extract the onset data points only:
 onset_data = data %>% filter(lock == "onset")
 
-onset_model <- lmer(formula = peak_latency ~ 1 + task_relevance * soa + ( 1 + task_relevance * soa | subject),
+onset_model <- lmer(formula = peak_latency ~ 1 + task_relevance * soa * duration + ( 1 + task_relevance * soa | subject),
                   data = onset_data)
 summary(onset_model)
 anova(onset_model)
