@@ -2,4 +2,4 @@
 *__pycache__*
 *.png
 eye_tracker\__pycache__\
-bids\
+*bids/
