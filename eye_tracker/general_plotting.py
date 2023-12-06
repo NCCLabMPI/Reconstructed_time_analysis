@@ -3,17 +3,18 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
 from scipy.stats import sem
+from eye_tracker.plotter_functions import plot_events_latencies
 from eye_tracker.general_helper_function import baseline_scaling
 import os
-from scipy.ndimage import uniform_filter1d
+
 
 # Get matplotlib colors:
 prop_cycle = plt.rcParams['axes.prop_cycle']
 cwheel = prop_cycle.by_key()['color']
 # First, load the parameters:
-bids_root = r"C:\\Users\\alexander.lepauvre\\Documents\\PhD\\Reconstructed_Time\\bids"
+bids_root = r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\bids"
 visit = "1"
-task = "prp"
+experiment = "prp"
 session = "1"
 data_type = "eyetrack"
 epoch_names = ["visual_onset"]
@@ -22,22 +23,13 @@ picks = ["LPupil", "RPupil"]
 task_relevance = ["non-target", "irrelevant"]
 durations = ["0.5", "1", "1.5"]
 soas = ["0", "0.116", "0.232", "0.466"]
+soas_colors = [
+    [179, 156, 77],
+    [238, 99, 82],
+    [11, 93, 30],
+    [29, 132, 181]
+]
 locks = ["onset", "offset"]
-
-
-def get_blink_onset(data, times):
-    """
-    This function returns the onset of the blinks for each trial
-    :param data: data containing the blinking information. The data should in the format of trials x time with 1 where
-    a subject was blinking and 0 otherwise
-    :param times: (array) the time vector
-    :return: a list of arrays containing the onset of the blinks for each trial
-    """
-    blinking_onsets = []
-    data_onset = np.diff(data, axis=-1)
-    for trial in range(data.shape[0]):
-        blinking_onsets.append(times[np.where(data_onset[trial, :] == 1)[0]])
-    return blinking_onsets
 
 
 def plot_eyetracker_data(subject):
@@ -50,7 +42,7 @@ def plot_eyetracker_data(subject):
         # Load the epochs:
         root = Path(bids_root, "derivatives", "preprocessing", "sub-" + sub, "ses-" + session,
                     data_type)
-        file_name = "sub-{}_ses-{}_task-{}_{}_desc-{}-epo.fif".format(sub, session, task, data_type,
+        file_name = "sub-{}_ses-{}_task-{}_{}_desc-{}-epo.fif".format(sub, session, experiment, data_type,
                                                                       epoch_name)
         epochs = mne.read_epochs(Path(root, file_name))
         # Crop if needed:
@@ -60,40 +52,59 @@ def plot_eyetracker_data(subject):
 
         # ================================================================
         # Plot the blinking rate:
-        # Extract the left and right eye:
+        # Plot separately for onset and offset locked
         for lock in locks:
-            # Open a figure:
-            fig, ax = plt.subplots(nrows=2, ncols=1, sharex=True)
-            blink_data = []
-            blink_avg = []
-            colors = []
-            for ind, soa in enumerate(soas):
-                data_l = np.squeeze(epochs.copy()["/".join([lock, soa])].get_data(picks=["Lblink"]))
-                data_r = np.squeeze(epochs.copy()["/".join([lock, soa])].get_data(picks=["Rblink"]))
-                # Combine both eyes such that if we have a 1 in both arrays, then we have a 1, otherwise a 0:
-                blink_data.append(np.logical_and(data_l, data_r).astype(int))
-                # Colors:
-                colors.append([cwheel[ind]] * data_l.shape[0])
-                # Blinking average:
-                blink_avg.append(np.average(np.logical_and(data_l, data_r).astype(int), axis=0))
-            blinks_onsets = get_blink_onset(np.concatenate(blink_data), epochs.times)
-            # Plot the data:
-            ax[0].eventplot(blinks_onsets, orientation="horizontal", colors=np.concatenate(colors), linelengths=1,
-                            linewidths=8)
-            # Smooth the blinking rate a little:
-            blink_avg = np.array(blink_avg)
-            blink_avg = uniform_filter1d(blink_avg, 10, axis=-1)
-            ax[1].plot(epochs.times, blink_avg.T, label=soas)
-            ax[0].set_title("Lock: {}".format(lock))
-            plt.legend()
-            plt.ylabel("Blinking rate")
-            plt.xlabel("Time (s)")
-            plt.tight_layout()
-            # plt.show()
+            fig = plot_events_latencies(epochs, lock, durations, soas, channels=["Lblink", "Rblink"], audio_lock=False)
+            save_root_ = Path(save_root, 'blinks', lock)
+            if not os.path.exists(save_root_):
+                os.makedirs(save_root_)
             # Save the figure:
-            file_name = "sub-{}_ses-{}_task-{}_{}_desc-{}_ana-{}.png".format(sub, session, task, data_type,
-                                                                             epoch_name, "blinking_rate_" + lock)
-            fig.savefig(Path(save_root, file_name))
+            file_name = ("sub-{}_ses-{}_task-{}_{}_desc-{}.png"
+                         "").format(sub, session, experiment, 'blinks',
+                                    lock)
+            fig.savefig(Path(save_root_, file_name))
+            plt.close(fig)
+
+            # Plot locked to the audio stimulus:
+            fig = plot_events_latencies(epochs, lock, durations, soas, channels=["Lblink", "Rblink"], audio_lock=True)
+            save_root_ = Path(save_root, 'blinks', lock)
+            if not os.path.exists(save_root_):
+                os.makedirs(save_root_)
+            # Save the figure:
+            file_name = ("sub-{}_ses-{}_task-{}_{}_desc-{}-{}.png"
+                         "").format(sub, session, experiment, 'blinks',
+                                    lock, 'audlock')
+            fig.savefig(Path(save_root_, file_name))
+            plt.close(fig)
+
+        # ================================================================
+        # Plot the saccades rate:
+        # Plot separately for onset and offset locked
+        for lock in locks:
+            fig = plot_events_latencies(epochs, lock, durations, soas, channels=["Lsaccade", "Rsaccade"],
+                                        audio_lock=False)
+            save_root_ = Path(save_root, 'saccades', lock)
+            if not os.path.exists(save_root_):
+                os.makedirs(save_root_)
+            # Save the figure:
+            file_name = ("sub-{}_ses-{}_task-{}_{}_desc-{}.png"
+                         "").format(sub, session, experiment, 'saccades',
+                                    lock)
+            fig.savefig(Path(save_root_, file_name))
+            plt.close(fig)
+
+            # Create the same plots but locked to the audio signal, since it is what's important:
+            # Open a figure:
+            fig = plot_events_latencies(epochs, lock, durations, soas, channels=["Lsaccade", "Rsaccade"],
+                                        audio_lock=True)
+            save_root_ = Path(save_root, 'saccades', lock)
+            if not os.path.exists(save_root_):
+                os.makedirs(save_root_)
+            # Save the figure:
+            file_name = ("sub-{}_ses-{}_task-{}_{}_desc-{}-{}.png"
+                         "").format(sub, session, experiment, 'saccades',
+                                    lock, 'audlock')
+            fig.savefig(Path(save_root_, file_name))
             plt.close(fig)
 
         # ================================================================
@@ -103,7 +114,7 @@ def plot_eyetracker_data(subject):
         pupil_epo = epochs.copy().pick(["LPupil", "RPupil"])
         for ind, lock in enumerate(locks):
             for soa in soas:
-                pupil_data = np.mean(pupil_epo.copy()["/".join([lock, soa])].get_data(), axis=1)
+                pupil_data = np.nanmean(pupil_epo.copy()["/".join([lock, soa])].get_data(), axis=1)
                 avg = np.mean(np.squeeze(pupil_data), axis=0)
                 err = sem(np.squeeze(pupil_data), axis=0)
                 # Plot the average pupil size in that condition:
@@ -117,8 +128,8 @@ def plot_eyetracker_data(subject):
         plt.xlabel("Time (s)")
         plt.tight_layout()
         # Save the figure:
-        file_name = "sub-{}_ses-{}_task-{}_{}_desc-{}_ana-{}.png".format(sub, session, task, data_type,
-                                                                         epoch_name, "pupil_size")
+        file_name = ("sub-{}_ses-{}_task-{}_{}.png"
+                     "").format(sub, session, experiment, 'pup')
         fig.savefig(Path(save_root, file_name))
         plt.close(fig)
 
@@ -147,9 +158,9 @@ def plot_eyetracker_data(subject):
             plt.xlabel("Time (s)")
             plt.tight_layout()
             # Save the figure:
-            file_name = "sub-{}_ses-{}_task-{}_{}_desc-{}_ana-{}.png".format(sub, session, task, data_type,
-                                                                             epoch_name,
-                                                                             "pupil_size_{}".format(lock))
+            file_name = ("sub-{}_ses-{}_task-{}_{}_desc-{}.png"
+                         "").format(sub, session, experiment, 'pup',
+                                    lock)
             fig.savefig(Path(save_root, file_name))
             plt.close(fig)
 
