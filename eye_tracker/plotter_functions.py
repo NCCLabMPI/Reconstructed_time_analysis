@@ -4,6 +4,7 @@ from matplotlib.gridspec import GridSpec
 import matplotlib.patches as patches
 import numpy as np
 from general_helper_function import get_event_ts
+from general_helper_function import cousineau_morey_correction
 
 font = {'size': 18}
 matplotlib.rc('font', **font)
@@ -12,7 +13,7 @@ prop_cycle = plt.rcParams['axes.prop_cycle']
 cwheel = prop_cycle.by_key()['color']
 
 
-def plot_events_latencies(epochs, lock, durations, soas, channels=None, audio_lock=True):
+def latency_raster_plot(epochs, lock, durations, soas, channels=None, audio_lock=True):
     """
     This function generate events plots from mne epochs object containing eyetracking events data. It loops through
     each durations and SOAs conditions (from our PRP experiment) and generates one subplot per duration. Each subplot is
@@ -121,7 +122,8 @@ def plot_events_latencies(epochs, lock, durations, soas, channels=None, audio_lo
 
 
 def plot_within_subject_boxplot(data_df, within_column, between_column, dependent_variable, positions=None,
-                                ax=None, cousineau_correction=True, title="", xlabel="", ylabel=""):
+                                ax=None, cousineau_correction=True, title="", xlabel="", ylabel="", xlim=None,
+                                width=0.1, face_colors=None):
     """
     This function generates within subject design boxplot with line plots connecting each subjects dots across
     conditions. Further offers the option to apply Cousineau Morey correction. Importantly, data must be passed before
@@ -140,30 +142,57 @@ def plot_within_subject_boxplot(data_df, within_column, between_column, dependen
     :param title: (string) title of the plot
     :param xlabel: (string) xlabel
     :param ylabel: (string) ylabel
+    :param xlim: (list) limits for the x axis
     :return:
     """
     if cousineau_correction:
-        data_df = cousineau_correction(data_df, within_column, between_column, dependent_variable)
+        data_df = cousineau_morey_correction(data_df, within_column, between_column, dependent_variable)
 
     # Average the data within subject and condition for the boxplot:
     avg_data = data_df.groupby([within_column, between_column])[dependent_variable].mean().reset_index()
     # Convert to 2D arrays for the line plot:
-    avg_data_2d = np.array([avg_data[avg_data[cond] == cond][dependent_variable].to_numpy()
-                            for cond in avg_data[between_column].unique()]).T
+    try:
+        avg_data_2d = np.array([avg_data[avg_data[between_column] == cond][dependent_variable].to_numpy()
+                                for cond in avg_data[between_column].unique()]).T
+    except ValueError:
+        avg_data_2d = np.zeros((len(avg_data[within_column].unique()), len(avg_data[between_column].unique())))
+        for sub_i, sub in enumerate(avg_data[within_column].unique()):
+            for cond_i, cond in enumerate(avg_data[between_column].unique()):
+                try:
+                    avg_data_2d[sub_i, cond_i] = avg_data.loc[(avg_data[within_column] == sub) &
+                                                              (avg_data[between_column] == cond),
+                    dependent_variable].values
+                except ValueError:
+                    print("WARNING: missing value for sub-{} in condition {}".format(sub, cond))
+                    avg_data_2d[sub_i, cond_i] = np.nan
 
     if ax is None:
         fig, ax = plt.subplots(nrows=1, ncols=1, sharex=True, sharey=True, figsize=[14, 14])
     if isinstance(positions, str):
         positions = avg_data[between_column].unique()
+        if isinstance(positions[0], str):
+            positions = [float(pos) for pos in positions]
     elif positions is None:
         positions = range(0, len(avg_data[between_column].unique()))
+    # Check if there are NaNs in the data:
+    if np.isnan(np.min(avg_data_2d)):
+        nan_inds = np.where(np.isnan(avg_data_2d))
+        for row_ind in nan_inds[0]:
+            for col_ind in nan_inds[1]:
+                avg_data_2d[row_ind, col_ind] = np.mean(avg_data_2d[col_ind])
     bplot = ax.boxplot(avg_data_2d, patch_artist=True, notch=True,
-                       positions=positions, widths=0.1)
+                       positions=positions, widths=width)
     lineplot = ax.plot(positions, avg_data_2d.T, linewidth=0.6,
                        color=[0.5, 0.5, 0.5], alpha=0.5)
     ax.tick_params(axis='x', labelrotation=45)
     ax.set_title(title)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
+    if xlim is not None:
+        ax.set_xlim(xlim)
+
+    if face_colors is not None:
+        for i, patch in enumerate(bplot['boxes']):
+            patch.set_facecolor(face_colors[i])
 
     return ax, bplot, lineplot
