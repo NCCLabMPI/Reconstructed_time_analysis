@@ -7,6 +7,7 @@ from eye_tracker.general_helper_function import baseline_scaling
 import seaborn as sns
 import pandas as pd
 import os
+import environment_variables as ev
 
 # Set the font size:
 plt.rcParams.update({'font.size': 22})
@@ -25,7 +26,7 @@ def pupil_peak_latency(parameters_file, subjects):
         # ===========================================
         # Data loading:
         # Load the epochs:
-        root = Path(param["bids_root"], "derivatives", "preprocessing", "sub-" + sub, "ses-" + param["session"],
+        root = Path(ev.bids_root, "derivatives", "preprocessing", "sub-" + sub, "ses-" + param["session"],
                     param["data_type"])
         file_name = "sub-{}_ses-{}_task-{}_{}_desc-{}-epo.fif".format(sub, param["session"], param["task"],
                                                                       param["data_type"],
@@ -72,7 +73,7 @@ def pupil_peak_latency(parameters_file, subjects):
                                                                                  index=[0])])
     peak_latencies = peak_latencies.reset_index(drop=True)
     # Create the save directory:
-    save_dir = Path(param["bids_root"], "derivatives", "pupil_size", "group_level", "data")
+    save_dir = Path(ev.bids_root, "derivatives", "pupil_size", "group_level", "data")
     if not os.path.isdir(save_dir):
         os.makedirs(save_dir)
     # Save the peak latencies:
@@ -106,7 +107,7 @@ def pupil_peak_latency(parameters_file, subjects):
         plt.suptitle("{} locked peak latency".format(lock))
         plt.tight_layout()
         # Create the save directory:
-        save_dir = Path(param["bids_root"], "derivatives", "pupil_size", "group_level", "figures")
+        save_dir = Path(ev.bids_root, "derivatives", "pupil_size", "group_level", "figures")
         if not os.path.isdir(save_dir):
             os.makedirs(save_dir)
         # Save the figure:

@@ -5,6 +5,7 @@ import pandas as pd
 import os
 import subprocess
 import warnings
+import environment_variables as ev
 
 # Eyelink logs' line tags
 OTHER = "OTHER"
@@ -311,6 +312,5 @@ if __name__ == "__main__":
     ]
     tasks = ["prp"]
     data_root = r"C:\Users\alexander.lepauvre\Documents\PhD\Reconstructed_Time\raw_data"
-    save_root = r"C:\Users\alexander.lepauvre\Documents\PhD\Reconstructed_Time\bids"
-    ascii2mne_batch(data_root, subjects_list, save_root,
+    ascii2mne_batch(ev.raw_root, subjects_list, ev.bids_root,
                     convert_exe=r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker\edf2asc.exe")

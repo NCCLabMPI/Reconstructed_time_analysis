@@ -9,6 +9,7 @@ from eye_tracker.preprocessing_helper_function import (extract_eyelink_events, e
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import environment_variables as ev
 
 
 def preprocessing(subject, parameters):
@@ -22,7 +23,6 @@ def preprocessing(subject, parameters):
     with open(parameters) as json_file:
         param = json.load(json_file)
     # Extract the info about the session:
-    bids_root = param["bids_root"]
     session = param["session"]
     task = param["task"]
     data_type = param["data_type"]
@@ -30,7 +30,7 @@ def preprocessing(subject, parameters):
 
     # =============================================================================================
     # Load the data:
-    raw_file = Path(bids_root, "sub-" + subject, "ses-" + session, data_type,
+    raw_file = Path(ev.bids_root, "sub-" + subject, "ses-" + session, data_type,
                     "sub-{}_ses-{}_task-{}_{}-raw.fif".format(subject, session, task, data_type))
     raw = mne.io.read_raw_fif(raw_file, verbose="WARNING")
     # Plot the data:
@@ -98,7 +98,7 @@ def preprocessing(subject, parameters):
                         continue
 
                 # Save this epoch to file:
-                save_root = Path(bids_root, "derivatives", "preprocessing", "sub-" + subject,
+                save_root = Path(ev.bids_root, "derivatives", "preprocessing", "sub-" + subject,
                                  "ses-" + session, data_type)
                 if not os.path.isdir(save_root):
                     os.makedirs(save_root)
@@ -163,7 +163,6 @@ if __name__ == "__main__":
     # SX101: differences in sampling rate due to experiment program issues
     # SX104: missing files
     # SX117: no eyetracking data
-    bids_root = r"C:\Users\alexander.lepauvre\Documents\PhD\Reconstructed_Time\bids"
     subjects_list = ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112", "SX113",
                      "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121"]
     parameters_file = (
@@ -185,5 +184,5 @@ if __name__ == "__main__":
     # Concatenate the data frame:
     preprocessing_summary = pd.concat(preprocessing_summary)
     # Save the data frame:
-    save_dir = Path(bids_root, "derivatives", "preprocessing")
+    save_dir = Path(ev.bids_root, "derivatives", "preprocessing")
     preprocessing_summary.to_csv(Path(save_dir, "participants.csv"))
