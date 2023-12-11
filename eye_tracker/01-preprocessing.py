@@ -4,8 +4,7 @@ import json
 from pathlib import Path
 from eye_tracker.preprocessing_helper_function import (extract_eyelink_events, epoch_data, dilation_speed_rejection,
                                                        interpolate_pupil, set_pupil_nans, remove_around_gap,
-                                                       trend_line_departure, remove_bad_epochs,
-                                                       interpolate_pupil_epochs)
+                                                       trend_line_departure, remove_bad_epochs)
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -37,7 +36,7 @@ def preprocessing(subject, parameters):
     raw_ds = raw.copy().resample(100, npad="auto")
     # Remove the annotations:
     raw_ds.annotations.delete(np.arange(len(raw_ds.annotations.description)))
-    # raw_ds.plot(block=True)
+    raw_ds.plot(block=True)
     # Convert the annotations to event for epoching:
     print('Creating annotations')
     events_from_annot, event_dict = mne.events_from_annotations(raw, verbose="ERROR")
@@ -59,7 +58,7 @@ def preprocessing(subject, parameters):
             raw = remove_around_gap(raw, gap_duration_s=step_param["gap_duration_s"],
                                     eyes=step_param["eyes"])
         if step == "interpolate_pupil":
-            raw = interpolate_pupil(raw, eyes=step_param["eyes"])
+            raw = interpolate_pupil(raw, eyes=step_param["eyes"], kind=step_param["kind"])
         if step == "trend_line_departure":
             raw = trend_line_departure(raw, threshold_factor=step_param["threshold_factor"],
                                        eyes=step_param["eyes"], window_length_s=step_param["window_length_s"],
@@ -86,14 +85,11 @@ def preprocessing(subject, parameters):
                                                                            nan_proportion_thresh=
                                                                            param["remove_bad_epochs"][
                                                                                "nan_proportion_thresh"])
-                if "interpolate_pupil_epochs" in preprocessing_steps:
-                    epochs, proportion_nan = interpolate_pupil_epochs(epochs,
-                                                                      eyes=param["interpolate_pupil_epochs"]["eyes"])
 
                 # Plot the epochs:
                 if "discard_bad_subjects" in preprocessing_steps:
                     if (proportion_rejected_trials > param["discard_bad_subjects"]["bad_trials_threshold"] or
-                            np.min(proportion_nan) > param["discard_bad_subjects"]["nan_threshold"]):
+                            np.min(total_nan_proportion) > param["discard_bad_subjects"]["nan_threshold"]):
                         print("Subject {} rejected due to bad epochs".format(subject))
                         continue
 
@@ -155,7 +151,7 @@ def preprocessing(subject, parameters):
                     plt.savefig(Path(save_root, file_name))
                     plt.close()
 
-            return total_nan_proportion, proportion_rejected_trials, np.mean(proportion_nan)
+            return total_nan_proportion, proportion_rejected_trials
 
 
 if __name__ == "__main__":
@@ -172,14 +168,13 @@ if __name__ == "__main__":
     preprocessing_summary = []
     for sub in subjects_list:
         print("Preprocessing subject {}".format(sub))
-        total_nan, rejected_trials, epochs_nan = preprocessing(sub, parameters_file)
+        total_nan, rejected_trials = preprocessing(sub, parameters_file)
         # Append to the summary:
         preprocessing_summary.append(pd.DataFrame({
             "subject": sub,
             "total_nan": total_nan,
             "rejected_trials": rejected_trials,
-            "epochs_nan": epochs_nan,
-            "valid_flag": True if rejected_trials < 0.5 and np.min(epochs_nan) < 0.5 else False
+            "valid_flag": True if rejected_trials < 0.5 and np.min(total_nan) < 0.5 else False
         }, index=[0]))
     # Concatenate the data frame:
     preprocessing_summary = pd.concat(preprocessing_summary)

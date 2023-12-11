@@ -11,9 +11,9 @@
     "extract_blinks",
     "extract_saccades",
     "extract_fixation",
+    "interpolate_pupil",
     "epochs",
     "remove_bad_epochs",
-    "interpolate_pupil_epochs",
     "discard_bad_subjects"
   ],
   "discard_bad_subjects": {
@@ -40,7 +40,8 @@
     "eyes": ["L", "R"]
   },
   "interpolate_pupil": {
-    "eyes": ["L", "R"]
+    "eyes": ["L", "R"],
+    "kind": "linear"
   },
   "extract_blinks": {
     "eyes": ["L", "R"],
@@ -57,9 +58,6 @@
   "remove_bad_epochs": {
     "eyes": ["L", "R"],
     "nan_proportion_thresh": 0.5
-  },
-  "interpolate_pupil_epochs": {
-    "eyes": ["L", "R"]
   },
   "epochs": {
     "visual_onset": {

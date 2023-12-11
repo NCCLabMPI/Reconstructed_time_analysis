@@ -2,7 +2,7 @@ import mne
 import numpy as np
 import pandas as pd
 from scipy.signal import savgol_filter
-from scipy.interpolate import CubicSpline
+from scipy import interpolate
 import matplotlib.pyplot as plt
 
 show_checks = False
@@ -54,7 +54,7 @@ def trend_line_departure(raw, threshold_factor=3, eyes=None, window_length_s=0.0
         check_plot_data = data.copy()[0:100000]
         for i in range(n_iter):
             # Interpolate the data:
-            data_interp = interp_nan(data.copy())
+            data_interp = interpolate_nan(data.copy(), raw.times)
             # Smooth the data:
             data_filt = savgol_filter(data_interp, window_length_n, polyorder)
             # Compute the difference between the data and the smoothed data:
@@ -193,75 +193,30 @@ def set_pupil_nans(raw, eyes=None):
     return raw
 
 
-def interp_nan(data):
-    """
-
-    :param data:
-    :return:
-    """
-    ok = ~np.isnan(data)
-    xp = ok.ravel().nonzero()[0]
-    fp = data[~np.isnan(data)]
-    x = np.isnan(data).ravel().nonzero()[0]
-    data[np.isnan(data)] = np.interp(x, xp, fp)
-    return data
-
-
-def cubic_interpolation(data):
+def interpolate_nan(data, times, kind="linear"):
     """
     This function interpolates the nan values using a cubic interpolation
     :param data: (1d numpy array) contains the data with nans to be interpolated!
     :return: (1d numpy array) interpolated data
     """
-    # Extract the valid indices:
+    if np.isnan(data[0]):
+        data[0] = np.nanmean(data)
+    # Check whether there are any valid indices:
     valid_indices = np.where(~np.isnan(data))[0]
     if len(valid_indices) > 1:
-        cs = CubicSpline(valid_indices, data[valid_indices], extrapolate='zeros')
-        data = cs(np.arange(len(data)))
-    return data
+        f = interpolate.interp1d(times[valid_indices], data[valid_indices], kind=kind, fill_value='extrapolate')
+        interpolated_values = f(times)
+    else:
+        raise Exception("Pupil size are all Nan!")
+    return interpolated_values
 
 
-def interpolate_pupil_epochs(epochs, eyes=None):
-    """
-
-    :param epochs:
-    :param eyes:
-    :return:
-    """
-    print("="*40)
-    print("Interpolating pupil values")
-    if eyes is None:
-        eyes = ["L", "R"]
-    prop_interp = []
-    for eye in eyes:
-        # Extract the data from this eye:
-        data = np.squeeze(epochs.copy().get_data(picks="{}Pupil".format(eye)))
-        # Compute the total proportion of data requiring interpolation:
-        prop_interp.append(np.sum(np.isnan(data)) / data.size)
-        print("Proportion of data requiring interpolation for eye {}: {:2f}%".format(eye, prop_interp[-1] * 100))
-        # Interpolate the nan:
-        data_interp = []
-        for trials in range(data.shape[0]):
-            data_interp.append(cubic_interpolation(data[trials, :]))
-        data_interp = np.array(data)
-        # Add back to the mne raw object:
-        epochs_data = epochs.get_data()
-        # Extract the index of the channel:
-        ch_ind = np.where(np.array(epochs.ch_names) == "{}Pupil".format(eye))[0]
-        epochs_data[:, ch_ind, :] = np.expand_dims(data_interp, axis=1)
-        # Recreate the raw object:
-        epochs_new = mne.EpochsArray(epochs_data, epochs.info, events=epochs.events, event_id=epochs.event_id,
-                                     metadata=epochs.metadata, verbose="WARNING", on_missing="ignore",
-                                     tmin=epochs.times[0])
-        epochs = epochs_new
-    return epochs, prop_interp
-
-
-def interpolate_pupil(raw, eyes=None):
+def interpolate_pupil(raw, eyes=None, kind="linear"):
     """
 
     :param raw:
     :param eyes:
+    :param kind:
     :return:
     """
     print("="*40)
@@ -275,16 +230,14 @@ def interpolate_pupil(raw, eyes=None):
         prop_interp = np.sum(np.isnan(data)) / data.size
         print("Proportion of data requiring interpolation for eye {}: {:2f}%".format(eye, prop_interp * 100))
         # Interpolate the nan:
-        data_interp = interp_nan(data)
-        # Add back to the mne raw object:
-        raw_data = raw.get_data()
-        # Extract the index of the channel:
-        ch_ind = np.where(np.array(raw.ch_names) == "{}Pupil".format(eye))[0]
-        raw_data[ch_ind, :] = data_interp
-        # Recreate the raw object:
-        raw_new = mne.io.RawArray(raw_data, raw.info, verbose="WARNING")
-        raw_new.set_annotations(raw.annotations)
-        raw = raw_new
+        data_interp = interpolate_nan(data, raw.times, kind=kind)
+        # Add the interpolated data as an extra channel:
+        interpolated_info = mne.create_info(["{}Pupil_interpolated".format(eye)], raw.info["sfreq"],
+                                            ch_types="eeg")
+        interpolated_raw = mne.io.RawArray(np.expand_dims(data_interp, 0), interpolated_info)
+        # Append to raw:
+        raw.add_channels([interpolated_raw])
+
     return raw
 
 
