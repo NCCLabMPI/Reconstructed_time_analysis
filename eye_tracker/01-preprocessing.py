@@ -33,10 +33,10 @@ def preprocessing(subject, parameters):
                     "sub-{}_ses-{}_task-{}_{}-raw.fif".format(subject, session, task, data_type))
     raw = mne.io.read_raw_fif(raw_file, verbose="WARNING")
     # Plot the data:
-    raw_ds = raw.copy().resample(100, npad="auto")
+    # raw_ds = raw.copy().resample(100, npad="auto")
     # Remove the annotations:
-    raw_ds.annotations.delete(np.arange(len(raw_ds.annotations.description)))
-    raw_ds.plot(block=True)
+    # raw_ds.annotations.delete(np.arange(len(raw_ds.annotations.description)))
+    # raw_ds.plot(block=True)
     # Convert the annotations to event for epoching:
     print('Creating annotations')
     events_from_annot, event_dict = mne.events_from_annotations(raw, verbose="ERROR")
@@ -71,8 +71,8 @@ def preprocessing(subject, parameters):
 
         # Print the proportion of NaN in the data:
         total_nan_proportion = np.mean(
-            [100 * np.sum(np.isnan(raw.get_data(picks=["LPupil"]))) / raw.get_data().shape[-1],
-             100 * np.sum(np.isnan(raw.get_data(picks=["RPupil"]))) / raw.get_data().shape[-1]])
+            [np.sum(np.isnan(raw.get_data(picks=["LPupil"]))) / raw.get_data().shape[-1],
+             np.sum(np.isnan(raw.get_data(picks=["RPupil"]))) / raw.get_data().shape[-1]])
 
         if step == "epochs":
             # Looping through each of the different epochs file to create:
