@@ -51,8 +51,14 @@ def ascii2mne_batch(raw_root, subjects, bids_root, session="1", convert_exe=""):
                 print('Converting {} to asc'.format(fl))
                 asci_file = edf2ascii(convert_exe, Path(subject_dir, fl))
                 # Copy paste the file to the bids directory:
+                asci_stem = asci_file.stem
+                # Add leading 0 to files which are less than 10, to make sure that the files are loaded in the right
+                # order
+                if float(asci_stem.split('run-')[1].split('_task')[0]) <= 9:
+                    asci_stem = (asci_stem.split('run-')[0] + "run-0" + asci_stem.split('run-')[1].split('_task')[0] +
+                                 '_task' + asci_stem.split('run-')[1].split('_task')[1])
                 print('Copying {} to {}'.format(asci_file, save_dir))
-                shutil.copyfile(asci_file, Path(save_dir, asci_file.stem + asci_file.suffix))
+                shutil.copyfile(asci_file, Path(save_dir, asci_stem + asci_file.suffix))
 
 
 if __name__ == "__main__":
