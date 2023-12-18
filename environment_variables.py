@@ -1,6 +1,6 @@
 
-bids_root = r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\bids"
-raw_root = r"P:\2023-0357-ReconTime\03_data\raw_data"
+bids_root = r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\bids_new"
+raw_root = r"C:\Users\alexander.lepauvre\Documents\PhD\Reconstructed_Time\raw_data"
 colors = {
     "soa": {
         "0": [91/255, 192/255, 235/255],
