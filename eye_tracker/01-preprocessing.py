@@ -4,7 +4,7 @@ from mne.viz.eyetracking import plot_gaze
 import json
 from pathlib import Path
 from eye_tracker.preprocessing_helper_function import (extract_eyelink_events, epoch_data, dilation_speed_rejection,
-                                                       trend_line_departure, remove_bad_epochs)
+                                                       trend_line_departure, remove_bad_epochs, show_bad_segments)
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -76,6 +76,9 @@ def preprocessing(subject, parameters):
                                                              interpolate_gaze=step_param["interpolate_gaze"])
             # Add the annotations back in as we still want to keep track what was interpolated and what wasn't:
             raw.set_annotations(annotations)
+            # Show where the data were interpolated:
+            show_bad_segments(raw, "left", pad_sec=1)
+            show_bad_segments(raw, "right", pad_sec=1)
         # Extract the eyelink events as channels (to keep them after the epoching):
         if step == "extract_eyelink_events":
             print("Extracting the {} from the annotation".format(step_param["events"]))
