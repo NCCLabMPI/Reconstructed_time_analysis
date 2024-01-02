@@ -3,7 +3,6 @@ import mne
 import json
 from pathlib import Path
 from eye_tracker.preprocessing_helper_function import (extract_eyelink_events, epoch_data, dilation_speed_rejection,
-                                                       interpolate_pupil, set_pupil_nans, remove_around_gap,
                                                        trend_line_departure, remove_bad_epochs)
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,6 +10,7 @@ import pandas as pd
 import environment_variables as ev
 import glob, os
 
+DEBUG = True
 
 def preprocessing(subject, parameters):
     """
@@ -34,12 +34,16 @@ def preprocessing(subject, parameters):
     # Load all the files:
     raws = []
     raw_files = []
+    ctr = 0
     for fl in os.listdir(files_root):
+        if DEBUG and ctr > 4:  # Load only a subpart of the files for the debugging
+            continue
         if fl.endswith('.asc') and fl.split("_task-")[1].split("_eyetrack.asc")[0] == task:
             print("Loading: " + fl)
             raw_files.append(Path(files_root, fl))
             raw = mne.io.read_raw_eyelink(Path(files_root, fl))
             raws.append(raw)
+            ctr += 1
     raw = mne.concatenate_raws(raws)
 
     # Convert the annotations to event for epoching:
