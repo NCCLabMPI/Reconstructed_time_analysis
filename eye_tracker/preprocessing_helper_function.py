@@ -130,7 +130,6 @@ def trend_line_departure(raw, threshold_factor=3, eyes=None, window_length_s=0.0
         annot = create_bad_annotations(bad_indices, raw.times, "BAD_speed_outlier", eye)
         # Combine annotations:
         raw.set_annotations(raw.annotations + annot)
-
         if show_checks:
             raw.plot(scalings=dict(eyegaze=1e3))
 
