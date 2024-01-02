@@ -4,8 +4,92 @@ import pandas as pd
 from scipy.signal import savgol_filter
 from scipy import interpolate
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 
-show_checks = False
+show_checks = True
+
+
+def show_bad_segments(raw, eye, pad_sec=1):
+    """
+    This function shows the segments with bad annotations in a way that is easy to visualize, better than the MNE
+    visualizer for that purpose.
+    :param raw:
+    :param eye:
+    param pad_sec:
+    :return:
+    """
+    # Compute how many samples needed for padding:
+    pad_sample = int(pad_sec * raw.info["sfreq"])
+    # Extract the annotations for this eye:
+    bad_annot_ind = np.intersect1d([ind for ind, val in enumerate(raw.annotations.description) if "BAD_" in val],
+                                   np.array([ind for ind in range(len(raw.annotations.ch_names))
+                                             if len(raw.annotations.ch_names[ind]) > 0
+                                             if eye in raw.annotations.ch_names[ind][0]])
+                                   )
+    annots = mne.Annotations(
+        onset=raw.annotations.onset[bad_annot_ind],  # in seconds
+        duration=raw.annotations.duration[bad_annot_ind],  # in seconds, too
+        description=raw.annotations.description[bad_annot_ind],
+        ch_names=raw.annotations.ch_names[bad_annot_ind],
+        orig_time=raw.annotations.orig_time
+    )
+    # Extract the data:
+    raw_copy = raw.copy().pick([ch for ch in raw.ch_names if eye in ch])
+    data = raw_copy.get_data()
+    min_val, max_val = np.nanpercentile(data, 1, axis=1), np.nanpercentile(data, 99, axis=1)
+    # Set continuation_flag:
+    continue_flag = True
+    ctr = 0
+    while continue_flag:
+        # If we have exceeded the number of bad segments, abort:
+        if ctr > len(bad_annot_ind):
+            continue_flag = False
+        # Extract current event time stamp and duration:
+        annot_onset = annots.onset[ctr]
+        annot_offset = annot_onset + annots.duration[ctr]
+        # Convert to samples:
+        onset_samp = np.where(raw.times == annot_onset)[0][0]
+        offset_samp = np.where(raw.times == annot_offset)[0][0]
+        # Otherwise, plot the data:
+        fig, axs = plt.subplots(3, 1, sharex=True)
+        # Chop the data in the segment of interest:
+        if onset_samp - pad_sample > 0 and offset_samp + pad_sample < data.shape[1]:
+            segment_data = data[:, onset_samp - pad_sample:offset_samp + pad_sample]
+            times = raw.times[onset_samp - pad_sample:offset_samp + pad_sample]
+        elif onset_samp - pad_sample < 0:
+            segment_data = data[:, 0:offset_samp + pad_sample]
+            times = raw.times[0:offset_samp + pad_sample]
+        else:
+            segment_data = data[:, onset_samp - pad_sample:-1]
+            times = raw.times[onset_samp - pad_sample:-1]
+
+        # Plot the data:
+        plt.suptitle("Press n to show next and x to abort")
+        for i in range(segment_data.shape[0]):
+            # Scatter of the raw data:
+            axs[i].scatter(times, segment_data[i, :])
+            # Add a rectangle marking the bad segment:
+            width = annot_offset - annot_onset
+            ylim = axs[i].get_ylim()
+            rect = patches.Rectangle((annot_onset, ylim[0]), width, ylim[1], facecolor='r', alpha=0.5)
+            axs[i].add_patch(rect)
+            axs[i].set_title(raw_copy.ch_names[i] + " " + annots.description[ctr])
+            axs[i].set_ylim(min_val[i], max_val[i])
+        # Show the plot:
+        plt.show()
+
+        # Get the user input to continue:
+        accepted_input = False
+        while not accepted_input:
+            txt = input("Press n to show next and x to abort:")
+            if txt == "n":
+                ctr += 1
+                accepted_input = True
+            elif txt == "x":
+                continue_flag = False
+                accepted_input = True
+
+    return None
 
 
 def create_bad_annotations(bad_indices, times, description, eye, orig_time):
@@ -57,7 +141,7 @@ def convert_onset_offset(bad_indices):
         # If the previous index + 1 is not equal to the current index, then this is not a contiguous segment
         # and we are at an edge:
         if bad_indices[i] != bad_indices[i - 1] + 1:
-            offsets.append(bad_indices[i - 1])
+            offsets.append(bad_indices[i - 1] + 1)
             onsets.append(bad_indices[i])
     offsets.append(bad_indices[-1])
     return onsets, offsets
@@ -139,17 +223,8 @@ def trend_line_departure(raw, threshold_factor=3, eyes=None, window_length_s=0.0
         raw.set_annotations(raw.annotations + annot)
     if show_checks:
         # Create a copy of the raw data to only select the bad annotations:
-        raw_copy = raw.copy()
-        bad_annot_ind = [ind for ind, val in enumerate(raw_copy.annotations.description) if "BAD_" in val]
-        bad_annot = mne.Annotations(
-            onset=raw_copy.annotations.onset[bad_annot_ind],  # in seconds
-            duration=raw_copy.annotations.duration[bad_annot_ind],  # in seconds, too
-            description=raw_copy.annotations.description[bad_annot_ind],
-            ch_names=raw_copy.annotations.ch_names[bad_annot_ind],
-            orig_time=raw_copy.annotations.orig_time
-        )
-        raw_copy.set_annotations(bad_annot)
-        raw_copy.plot(scalings=dict(eyegaze=1e3), block=True)
+        show_bad_segments(raw, "left", pad_sec=1)
+        show_bad_segments(raw, "right", pad_sec=1)
 
     return raw
 
@@ -175,6 +250,15 @@ def dilation_filter(pupil_size, times, axis=-1):
     dt = times[1] - times[0]
     # Compute dilation speed:
     dilation_speed = np.nanmax([forward_diff / dt, backward_diff / dt], axis=0)
+    if show_checks:
+        fig, axs = plt.subplots()
+        axs.scatter(times, pupil_size)
+        axs.set_ylabel("Pupil size")
+        axs.spines[['right', 'top']].set_visible(False)
+        ax2 = axs.twinx()  # instantiate a second axes that shares the same x-axis
+        ax2.plot(times, dilation_speed, c="r")
+        ax2.set_ylabel("Dilation speed", color="r")
+        plt.show()
     return dilation_speed
 
 
@@ -187,6 +271,11 @@ def mad_outliers_ind(data, threshold_factor=4, axis=0):
     thresh = np.nanmedian(data, axis=axis) + threshold_factor * mad
     # Find the outliers:
     outliers_ind = np.where(data > thresh)[0]
+    if show_checks:
+        fig, ax = plt.subplots()
+        ax.plot(data)
+        ax.axhline(thresh, 0, len(data), c="r")
+        plt.show()
     return outliers_ind
 
 
@@ -228,17 +317,8 @@ def dilation_speed_rejection(raw, threshold_factor=4, eyes=None):
 
     if show_checks:
         # Create a copy of the raw data to only select the bad annotations:
-        raw_copy = raw.copy()
-        bad_annot_ind = [ind for ind, val in enumerate(raw_copy.annotations.description) if "BAD_" in val]
-        bad_annot = mne.Annotations(
-            onset=raw_copy.annotations.onset[bad_annot_ind],  # in seconds
-            duration=raw_copy.annotations.duration[bad_annot_ind],  # in seconds, too
-            description=raw_copy.annotations.description[bad_annot_ind],
-            ch_names=raw_copy.annotations.ch_names[bad_annot_ind],
-            orig_time=raw_copy.annotations.orig_time
-        )
-        raw_copy.set_annotations(bad_annot)
-        raw_copy.plot(scalings=dict(eyegaze=1e3), block=True)
+        show_bad_segments(raw, "left", pad_sec=1)
+        show_bad_segments(raw, "right", pad_sec=1)
 
     return raw
 

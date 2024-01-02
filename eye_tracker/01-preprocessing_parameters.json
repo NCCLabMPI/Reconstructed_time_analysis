@@ -25,7 +25,7 @@
     "n_iter": 4
   },
   "dilation_speed_rejection": {
-    "threshold_factor": 5,
+    "threshold_factor": 10,
     "eyes": ["left", "right"]
   },
   "interpolate_blinks": {
