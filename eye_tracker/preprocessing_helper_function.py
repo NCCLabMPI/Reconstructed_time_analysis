@@ -205,9 +205,20 @@ def trend_line_departure(raw, threshold_factor=3, eyes=None, window_length_s=0.0
         raw_data = np.squeeze(raw.copy().get_data(picks='pupil_' + eye))
         for i in range(n_iter):
             # Filter the data:
-            data_filt = savgol_filter(raw_data, window_length_n, polyorder)
+            data_filt = gaussian_filter1d(raw_data, window_length_n)
             # Compute the difference between the data and the smoothed data:
             dev = np.abs(raw_data - data_filt)
+            if show_checks:
+                fig, ax = plt.subplots()
+                ax.plot(raw.times, raw_data, label="Unfiltered", color="r")
+                ax.plot(raw.times, data_filt, label="Trend line", color="b")
+                plt.legend()
+                ax.set_xlabel("Times (sec)")
+                ax.set_ylabel("Pupil size")
+                ax2 = ax.twinx()
+                ax2.plot(raw.times, dev, c="g")
+                ax2.set_ylabel("Trend line deviation", color="g")
+                plt.show()
             # Compute the median absolute deviation:
             inds = mad_outliers_ind(dev, threshold_factor=threshold_factor, axis=0)
             print("Removing {:2f}% samples in iter {}".format((len(inds) / raw_data.shape[0]) * 100, i))

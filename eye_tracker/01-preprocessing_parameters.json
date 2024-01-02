@@ -20,7 +20,7 @@
   "trend_line_departure": {
     "eyes": ["left", "right"],
     "threshold_factor": 16,
-    "window_length_s": 0.5,
+    "window_length_s": 0.01,
     "polyorder": 3,
     "n_iter": 4
   },
