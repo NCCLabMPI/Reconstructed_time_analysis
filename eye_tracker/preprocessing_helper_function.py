@@ -8,6 +8,35 @@ import matplotlib.pyplot as plt
 show_checks = False
 
 
+def create_bad_annotations(bad_indices, times, description, eye):
+    """
+    This function takes in an array of indices marking each bad data according to whatever metric and converts it
+    to mne annotations to be append to the raw object.
+    :param bad_indices: (list) list of integers containing the index of samples marked as bad
+    :param times: (np array) time vector from the mne raw object
+    :param description: (string) description of the bad annotation
+    :param eye: (string) left or right, for the eye to annotate
+    :return: (mne annotations object) generated annotations
+    """
+    # Convert to annotations:
+    onsets, offsets = convert_onset_offset(bad_indices)
+    # Convert samples to times:
+    onsets = [times[ind] for ind in onsets]
+    offsets = [times[ind] for ind in offsets]
+    # Compute the duration:
+    duration = [offset - onsets[ind] for ind, offset in enumerate(offsets)]
+    desc = [description] * len(onsets)
+    ch_names = [('xpos_' + eye, 'ypos_' + eye, 'pupil_' + eye)] * len(onsets)
+    # Create the annotations:
+    annot = mne.Annotations(
+        onset=onsets,  # in seconds
+        duration=duration,  # in seconds, too
+        description=desc,
+        ch_names=ch_names
+    )
+    return annot
+
+
 def convert_onset_offset(bad_indices):
     """
     This function converts an array of indices into two array, marking the onset and offset of contiguous chunks of data
@@ -30,6 +59,7 @@ def convert_onset_offset(bad_indices):
     offsets.append(bad_indices[-1])
     return onsets, offsets
 
+
 def remove_bad_epochs(epochs, nan_proportion_thresh=0.2):
     """
     This function identifies any epochs in which there is more than X% in any channel
@@ -37,8 +67,8 @@ def remove_bad_epochs(epochs, nan_proportion_thresh=0.2):
     :param threshold:
     :return:
     """
-    print("="*40)
-    print("Removing bad epochs (more than {}% nan)".format(nan_proportion_thresh*100))
+    print("=" * 40)
+    print("Removing bad epochs (more than {}% nan)".format(nan_proportion_thresh * 100))
     # Extract the data:
     data = epochs.get_data(["LPupil", "RPupil"])
     # Compute the proportion of nan:
@@ -55,57 +85,55 @@ def remove_bad_epochs(epochs, nan_proportion_thresh=0.2):
     return epochs, proportion_rejected
 
 
-def trend_line_departure(raw, threshold_factor=3, eyes=None, window_length_s=0.05, polyorder=3, n_iter=4):
+def trend_line_departure(raw, threshold_factor=3, eyes=None, window_length_s=0.05, n_iter=4, polyorder=3):
     """
-    This function identifies samples that deviate more than X MAD from the trend line
-    :param raw:
-    :param threshold_factor:
-    :param eyes:
+    This function performs an iterative procedure in which the trendline is computed using a savegol filter. Then,
+    the unfiltered data are compared to the filtered one. Sample which deviates from more than X mad (3 is the default)
+    are marked as bad in the MNE annotations. This is an iterative such that the same process is repeated N times. This
+    is due to the fact that fitted trend line will change once outliers are removed and new outliers might emerge. This
+    ensures that massive outliers do not hide smaller but nonetheless artifactual samples
+    :param raw: (mne raw object) contains the pupil data for which to compute trend line departure
+    :param threshold_factor: (float) factors for the MAD outlier detection (if set to 4, samples for which dilation
+    speed deviates from 4 MAD or more are rejected).
+    :param eyes: (string) left or right
+    :param window_length_s: (float) length of the window for the savgol filter to compute the trend line
+    :param n_iter: (int) number of iteration to perform
+    :paranm polyorder: (int) polynomial order of the savegol filter.
     :return:
     """
     if eyes is None:
-        eyes = ["pupil_left", "pupil_right"]
-    print("="*40)
+        eyes = ["left", "right"]
+    print("=" * 40)
     print("Trend line departure")
-    # Convert the window length to samples:
+    # Calculate the window length:
     window_length_n = int(window_length_s * raw.info["sfreq"])
     # Loop through each eye:
     for eye in eyes:
-        # Extract the data:
-        data = np.squeeze(raw.copy().get_data(picks=eye))
-        check_plot_data = data.copy()[0:100000]
+        bad_indices = []
+        # Extract the raw data:
+        raw_data = raw.copy().get_data(picks='pupil_' + eye)
         for i in range(n_iter):
-            # Smooth the data:
-            data_filt = savgol_filter(data, window_length_n, polyorder)
+            # Filter the data:
+            data_filt = savgol_filter(raw_data, window_length_n, polyorder)
             # Compute the difference between the data and the smoothed data:
-            dev = np.abs(data - data_filt)
+            dev = np.abs(raw_data - data_filt)
             # Compute the median absolute deviation:
             inds = mad_outliers_ind(dev, threshold_factor=threshold_factor, axis=0)
-            print("Removing {:2f}% samples in iter {}".format((len(inds[0]) / data.shape[0]) * 100, i))
-            # Set the data to nan:
-            data[inds] = np.nan
-        if show_checks:
-            fig, ax = plt.subplots(nrows=1, ncols=1)
-            ax.plot(raw.times[0:check_plot_data.shape[0]], data_filt[0:check_plot_data.shape[0]], color="black",
-                    label="Trend line")
-            ax.scatter(raw.times[0:check_plot_data.shape[0]], check_plot_data, color="blue", label="Before")
-            ax.scatter(raw.times[0:check_plot_data.shape[0]], data[0:check_plot_data.shape[0]], color="red",
-                       label="After")
-            ax.set_xlabel("Time (s)")
-            ax.set_ylabel("Pupil size")
-            ax.set_title("Trend line departure")
-            plt.legend()
-            plt.show()
+            print("Removing {:2f}% samples in iter {}".format((len(inds[0]) / raw_data.shape[0]) * 100, i))
+            # Append the bad indices to the data:
+            bad_indices.append(inds)
+            # Set the bad samples to nan, so that they are excluded from the next computation:
+            raw_data[inds] = np.nan
+        # Set the bad indices in the annotations:
+        bad_indices = list(set(bad_indices))
+        # Convert to annotations:
+        annot = create_bad_annotations(bad_indices, raw.times, "BAD_speed_outlier", eye)
+        # Combine annotations:
+        raw.set_annotations(raw.annotations + annot)
 
-        # Add back into raw:
-        raw_data = raw.get_data()
-        # Extract the index of the channel:
-        ch_ind = np.where(np.array(raw.ch_names) == eye)[0]
-        raw_data[ch_ind, :] = data
-        # Recreate the raw object:
-        raw_new = mne.io.RawArray(raw_data, raw.info, verbose="WARNING")
-        raw_new.set_annotations(raw.annotations)
-        raw = raw_new
+        if show_checks:
+            raw.plot(scalings=dict(eyegaze=1e3))
+
     return raw
 
 
@@ -157,7 +185,7 @@ def dilation_speed_rejection(raw, threshold_factor=4, eyes=None):
     :param eyes: (list) eyes to apply the filter to
     :return: raw (mne raw object) contains the data with additional annotations based on dilation speed filtering
     """
-    print("="*40)
+    print("=" * 40)
     print("Rejecting samples based on dilation speed")
     if eyes is None:
         eyes = ["left", "right"]
@@ -176,21 +204,7 @@ def dilation_speed_rejection(raw, threshold_factor=4, eyes=None):
                                                                  100,
                                                                  outliers_ind[0].shape[0], data.shape[-1]))
         # Convert to annotations:
-        onsets, offsets = convert_onset_offset(outliers_ind)
-        # Convert samples to times:
-        onsets = [raw.times[ind] for ind in onsets]
-        offsets = [raw.times[ind] for ind in offsets]
-        # Compute the duration:
-        duration = [offset - onsets[ind] for ind, offset in enumerate(offsets)]
-        desc = ["BAD_speed_outlier"] * len(onsets)
-        ch_names = [('xpos_' + eye, 'ypos_' + eye, 'pupil_' + eye)] * len(onsets)
-        # Create the annotations:
-        annot = mne.Annotations(
-            onset=onsets,  # in seconds
-            duration=duration,  # in seconds, too
-            description=desc,
-            ch_names=ch_names
-        )
+        annot = create_bad_annotations(outliers_ind, raw.times, "BAD_speed_outlier", eye)
         # Combine annotations:
         raw.set_annotations(raw.annotations + annot)
 
