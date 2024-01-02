@@ -5,6 +5,7 @@ from scipy.signal import savgol_filter
 from scipy import interpolate
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+from scipy.ndimage import gaussian_filter1d
 
 show_checks = True
 
@@ -48,8 +49,8 @@ def show_bad_segments(raw, eye, pad_sec=1):
         annot_onset = annots.onset[ctr]
         annot_offset = annot_onset + annots.duration[ctr]
         # Convert to samples:
-        onset_samp = np.where(raw.times == annot_onset)[0][0]
-        offset_samp = np.where(raw.times == annot_offset)[0][0]
+        onset_samp = np.abs(raw.times - annot_onset).argmin()
+        offset_samp = np.abs(raw.times - annot_offset).argmin()
         # Otherwise, plot the data:
         fig, axs = plt.subplots(3, 1, sharex=True)
         # Chop the data in the segment of interest:
@@ -279,7 +280,7 @@ def mad_outliers_ind(data, threshold_factor=4, axis=0):
     return outliers_ind
 
 
-def dilation_speed_rejection(raw, threshold_factor=4, eyes=None):
+def dilation_speed_rejection(raw, threshold_factor=4, window_length_s=0.00, eyes=None):
     """
     This function handles the annotations of samples based on a speed filter. Samples in which pupil dilation speed
     deviates from a MAD threshold are marked as bad, following
@@ -288,6 +289,8 @@ def dilation_speed_rejection(raw, threshold_factor=4, eyes=None):
     :param raw: (mne raw object) contains the eyetracking data
     :param threshold_factor: (float) factors for the MAD outlier detection (if set to 4, samples for which dilation
     speed deviates from 4 MAD or more are rejected).
+    :param window_length_s: (float) length of the smoothing filter. This enables smoothing the data prior to computing
+    dilation speed, which might be helpful to remove noise. Note that this is not applied directly to the raw data!
     :param eyes: (list) eyes to apply the filter to
     :return: raw (mne raw object) contains the data with additional annotations based on dilation speed filtering
     """
@@ -299,9 +302,13 @@ def dilation_speed_rejection(raw, threshold_factor=4, eyes=None):
     # Loop through each eye:
     for eye in eyes:
         # Extract the pupil size from this eye:
-        data = raw.copy().get_data(picks='pupil_' + eye)
+        data = np.squeeze(raw.copy().get_data(picks='pupil_' + eye))
+        # Smooth the data according to the filter length:
+        window_length_n = int(window_length_s * raw.info["sfreq"])
+        if window_length_n > 0:
+            data = gaussian_filter1d(data, window_length_n)
         # Compute the dilation speed:
-        dilation_speed = dilation_filter(np.squeeze(data), raw.times, axis=-1)
+        dilation_speed = dilation_filter(data, raw.times, axis=-1)
         # Extract the index of the outliers:
         outliers_ind = mad_outliers_ind(dilation_speed, threshold_factor=threshold_factor, axis=0)
         # Display some information about the proportion of outliers that were found:

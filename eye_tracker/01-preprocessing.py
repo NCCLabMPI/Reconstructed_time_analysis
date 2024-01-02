@@ -57,7 +57,8 @@ def preprocessing(subject, parameters):
         # Apply dilation speed filter:
         if step == "dilation_speed_rejection":
             raw = dilation_speed_rejection(raw, threshold_factor=step_param["threshold_factor"],
-                                           eyes=step_param["eyes"])
+                                           eyes=step_param["eyes"],
+                                           window_length_s=step_param["window_length_s"])
         # Apply trend line departure filter:
         if step == "trend_line_departure":
             raw = trend_line_departure(raw, threshold_factor=step_param["threshold_factor"],
