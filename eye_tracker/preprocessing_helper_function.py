@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from scipy.ndimage import gaussian_filter1d
 
-show_checks = True
+show_checks = False
 
 
 def show_bad_segments(raw, eye, pad_sec=1):
@@ -467,9 +467,10 @@ def extract_eyelink_events(raw, description="blink", eyes=None):
     # Add these two channels to the raw data:
     data = raw.get_data()
     data = np.concatenate([data, np.array(desc_vectors)])
+    channel_types = raw.get_channel_types() + ['misc'] * len(eyes)
     channels = raw.ch_names
     channels.extend(["_".join([description, eye]) for eye in eyes])
-    channel_types = raw.get_channel_types() + ['misc'] * len(eyes)
+
     info = mne.create_info(channels,
                            ch_types=channel_types,
                            sfreq=raw.info["sfreq"])
