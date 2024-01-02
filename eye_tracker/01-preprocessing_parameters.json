@@ -7,6 +7,7 @@
     "dilation_speed_rejection",
     "trend_line_departure",
     "blinks_interpolation",
+    "extract_eyelink_events",
     "extract_blinks",
     "extract_saccades",
     "extract_fixation",
@@ -25,6 +26,10 @@
     "window_length_s": 0.5,
     "polyorder": 3,
     "n_iter": 4
+  },
+  "extract_eyelink_events": {
+    "eyes": ["left", "right"],
+    "events": ["BAD_blinks", "saccade", "fixation"]
   },
   "blinks_interpolation": {
     "buffer": [0.05, 0.2],

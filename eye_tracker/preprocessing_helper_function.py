@@ -135,7 +135,18 @@ def trend_line_departure(raw, threshold_factor=3, eyes=None, window_length_s=0.0
         # Combine annotations:
         raw.set_annotations(raw.annotations + annot)
     if show_checks:
-        raw.plot(scalings=dict(eyegaze=1e3), block=True)
+        # Create a copy of the raw data to only select the bad annotations:
+        raw_copy = raw.copy()
+        bad_annot_ind = [ind for ind, val in enumerate(raw_copy.annotations.description) if "BAD_" in val]
+        bad_annot = mne.Annotations(
+            onset=raw_copy.annotations.onset[bad_annot_ind],  # in seconds
+            duration=raw_copy.annotations.duration[bad_annot_ind],  # in seconds, too
+            description=raw_copy.annotations.description[bad_annot_ind],
+            ch_names=raw_copy.annotations.ch_names[bad_annot_ind],
+            orig_time=raw_copy.annotations.orig_time
+        )
+        raw_copy.set_annotations(bad_annot)
+        raw_copy.plot(scalings=dict(eyegaze=1e3), block=True)
 
     return raw
 
@@ -213,7 +224,18 @@ def dilation_speed_rejection(raw, threshold_factor=4, eyes=None):
         raw.set_annotations(raw.annotations + annot)
 
     if show_checks:
-        raw.plot(scalings=dict(eyegaze=1e3), block=True)
+        # Create a copy of the raw data to only select the bad annotations:
+        raw_copy = raw.copy()
+        bad_annot_ind = [ind for ind, val in enumerate(raw_copy.annotations.description) if "BAD_" in val]
+        bad_annot = mne.Annotations(
+            onset=raw_copy.annotations.onset[bad_annot_ind],  # in seconds
+            duration=raw_copy.annotations.duration[bad_annot_ind],  # in seconds, too
+            description=raw_copy.annotations.description[bad_annot_ind],
+            ch_names=raw_copy.annotations.ch_names[bad_annot_ind],
+            orig_time=raw_copy.annotations.orig_time
+        )
+        raw_copy.set_annotations(bad_annot)
+        raw_copy.plot(scalings=dict(eyegaze=1e3), block=True)
 
     return raw
 
@@ -319,7 +341,7 @@ def extract_eyelink_events(raw, description="blink", eyes=None):
     """
     # Create the new channels, one per eye:
     if eyes is None:
-        eyes = ["L", "R"]
+        eyes = ["left", "right"]
 
     desc_vectors = []
     for eye in eyes:
@@ -342,7 +364,7 @@ def extract_eyelink_events(raw, description="blink", eyes=None):
     data = raw.get_data()
     data = np.concatenate([data, np.array(desc_vectors)])
     channels = raw.ch_names
-    channels.extend(["".join([eye, description]) for eye in eyes])
+    channels.extend(["".join([description, eye]) for eye in eyes])
     info = mne.create_info(channels, ch_types=["eeg"] * len(channels), sfreq=raw.info["sfreq"])
     raw_new = mne.io.RawArray(data, info, verbose="WARNING")
     raw_new.set_annotations(raw.annotations)

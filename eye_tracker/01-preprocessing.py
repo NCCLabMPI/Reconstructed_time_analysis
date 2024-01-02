@@ -12,6 +12,7 @@ import glob, os
 
 DEBUG = True
 
+
 def preprocessing(subject, parameters):
     """
     This function preprocesses the eyetracking data, using several MNE key functionalities for handling the data
@@ -36,7 +37,7 @@ def preprocessing(subject, parameters):
     raw_files = []
     ctr = 0
     for fl in os.listdir(files_root):
-        if DEBUG and ctr > 4:  # Load only a subpart of the files for the debugging
+        if DEBUG and ctr > 2:  # Load only a subpart of the files for the debugging
             continue
         if fl.endswith('.asc') and fl.split("_task-")[1].split("_eyetrack.asc")[0] == task:
             print("Loading: " + fl)
@@ -45,11 +46,6 @@ def preprocessing(subject, parameters):
             raws.append(raw)
             ctr += 1
     raw = mne.concatenate_raws(raws)
-
-    # Convert the annotations to event for epoching:
-    print('Creating annotations')
-    events_from_annot, event_dict = mne.events_from_annotations(raw, verbose="ERROR",
-                                                                regexp=param["events_of_interest"][0])
 
     # =============================================================================================
     # Loop through the preprocessing steps:
@@ -67,9 +63,11 @@ def preprocessing(subject, parameters):
                                        polyorder=step_param["polyorder"], n_iter=step_param["n_iter"])
 
         # Performing blinks, saccades and fixaction extraction:
-        if step in ["extract_blinks", "extract_saccades", "extract_fixation"]:
+        if step == "extract_eyelink_events":
             print("Extracting the {} from the annotation".format(step_param["description"]))
-            raw = extract_eyelink_events(raw, step_param["description"])
+            # Loop through each event to extract:
+            for evt in step_param["events"]:
+                raw = extract_eyelink_events(raw, evt, eyes=step_param["eyes"])
 
         # Print the proportion of NaN in the data:
         total_nan_proportion = 0
@@ -81,6 +79,10 @@ def preprocessing(subject, parameters):
             # Looping through each of the different epochs file to create:
             for epoch_name in step_param.keys():
                 print(epoch_name)
+                # Convert the annotations to event for epoching:
+                print('Creating annotations')
+                events_from_annot, event_dict = mne.events_from_annotations(raw, verbose="ERROR",
+                                                                            regexp=param["events_of_interest"][0])
                 epochs = epoch_data(raw, events_from_annot, event_dict, **step_param[epoch_name])
 
                 if "remove_bad_epochs" in preprocessing_steps:
