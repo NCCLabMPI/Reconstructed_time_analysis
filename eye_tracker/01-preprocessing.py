@@ -1,5 +1,6 @@
 import os
 import mne
+from mne.viz.eyetracking import plot_gaze
 import json
 from pathlib import Path
 from eye_tracker.preprocessing_helper_function import (extract_eyelink_events, epoch_data, dilation_speed_rejection,
@@ -125,12 +126,12 @@ def preprocessing(subject, parameters):
                 epochs.save(Path(save_root, file_name), overwrite=True, verbose="ERROR")
                 epochs.load_data()
                 # Depending on whehter or no the events were extracted:
-                if "extract_blinks" in preprocessing_steps:
+                if "extract_eyelink_events" in preprocessing_steps:
                     # Plot the blinks rate:
                     fig, ax = plt.subplots(2)
-                    ax[0].imshow(np.squeeze(epochs.get_data(picks="Lblink")), aspect="auto", origin="lower",
+                    ax[0].imshow(np.squeeze(epochs.get_data(picks="BAD_blink_left")), aspect="auto", origin="lower",
                                  extent=[epochs.times[0], epochs.times[-1], 0, len(epochs)])
-                    ax[1].imshow(np.squeeze(epochs.get_data(picks="Rblink")), aspect="auto", origin="lower",
+                    ax[1].imshow(np.squeeze(epochs.get_data(picks="BAD_blink_right")), aspect="auto", origin="lower",
                                  extent=[epochs.times[0], epochs.times[-1], 0, len(epochs)])
                     ax[0].set_title("Left eye")
                     ax[1].set_title("Right eye")
@@ -140,12 +141,12 @@ def preprocessing(subject, parameters):
                                                                                      data_type, epoch_name)
                     plt.savefig(Path(save_root, file_name))
                     plt.close()
-                if "extract_saccades" in preprocessing_steps:
-                    # Plot the blinks rate:
+
+                    # Plot the saccades rate:
                     fig, ax = plt.subplots(2)
-                    ax[0].imshow(np.squeeze(epochs.get_data(picks="Lsaccade")), aspect="auto", origin="lower",
+                    ax[0].imshow(np.squeeze(epochs.get_data(picks="saccade_left")), aspect="auto", origin="lower",
                                  extent=[epochs.times[0], epochs.times[-1], 0, len(epochs)])
-                    ax[1].imshow(np.squeeze(epochs.get_data(picks="Rsaccade")), aspect="auto", origin="lower",
+                    ax[1].imshow(np.squeeze(epochs.get_data(picks="saccade_right")), aspect="auto", origin="lower",
                                  extent=[epochs.times[0], epochs.times[-1], 0, len(epochs)])
                     ax[0].set_title("Left eye")
                     ax[1].set_title("Right eye")
@@ -155,12 +156,12 @@ def preprocessing(subject, parameters):
                                                                                        data_type, epoch_name)
                     plt.savefig(Path(save_root, file_name))
                     plt.close()
-                if "extract_fixation" in preprocessing_steps:
-                    # Plot the blinks rate:
+
+                    # Plot the fixation rate:
                     fig, ax = plt.subplots(2)
-                    ax[0].imshow(np.squeeze(epochs.get_data(picks="Lfixation")), aspect="auto", origin="lower",
+                    ax[0].imshow(np.squeeze(epochs.get_data(picks="fixation_left")), aspect="auto", origin="lower",
                                  extent=[epochs.times[0], epochs.times[-1], 0, len(epochs)])
-                    ax[1].imshow(np.squeeze(epochs.get_data(picks="Rfixation")), aspect="auto", origin="lower",
+                    ax[1].imshow(np.squeeze(epochs.get_data(picks="fixation_right")), aspect="auto", origin="lower",
                                  extent=[epochs.times[0], epochs.times[-1], 0, len(epochs)])
                     ax[0].set_title("Left eye")
                     ax[1].set_title("Right eye")
@@ -170,6 +171,13 @@ def preprocessing(subject, parameters):
                                                                                        data_type, epoch_name)
                     plt.savefig(Path(save_root, file_name))
                     plt.close()
+
+                # Finally, plot the fixation maps:
+                plot_gaze(epochs, width=1920, height=1080, show=False)
+                file_name = "sub-{}_ses-{}_task-{}_{}_desc-{}_gaze.png".format(subject, session, task,
+                                                                               data_type, epoch_name)
+                plt.savefig(Path(save_root, file_name))
+                plt.close()
 
             return bad_annotation_proportion, proportion_rejected_trials
 

@@ -73,7 +73,7 @@ def remove_bad_epochs(epochs, channels=None, nan_proportion_thresh=0.2):
     print("=" * 40)
     print("Removing bad epochs (more than {}% nan)".format(nan_proportion_thresh * 100))
     if channels is None:
-        channels = ["BAD_blinks_left", "BAD_blinks_right"]
+        channels = ["BAD_blink_left", "BAD_blink_right"]
     # Extract the data:
     data = epochs.get_data(channels)
     data_combined = np.logical_and(data[:, 0, :], data[:, 0, :])
@@ -349,7 +349,10 @@ def extract_eyelink_events(raw, description="blink", eyes=None):
     desc_vectors = []
     for eye in eyes:
         # Extract the events
-        evts_ind = np.where(raw.annotations.description == "_".join([description, eye]))[0]
+        evts_ind = np.intersect1d(np.where(raw.annotations.description == description)[0],
+                                  np.array([ind for ind in range(len(raw.annotations.ch_names))
+                                            if len(raw.annotations.ch_names[ind]) > 0
+                                            if eye in raw.annotations.ch_names[ind][0]]))
         # Extract the onset and duration of the said event:
         evt_onset = raw.annotations.onset[evts_ind]
         evt_offset = evt_onset + raw.annotations.duration[evts_ind]
@@ -368,8 +371,9 @@ def extract_eyelink_events(raw, description="blink", eyes=None):
     data = np.concatenate([data, np.array(desc_vectors)])
     channels = raw.ch_names
     channels.extend(["_".join([description, eye]) for eye in eyes])
+    channel_types = raw.get_channel_types() + ['misc'] * len(eyes)
     info = mne.create_info(channels,
-                           ch_types=["eeg"] * len(channels),
+                           ch_types=channel_types,
                            sfreq=raw.info["sfreq"])
     info.set_meas_date(raw.info['meas_date'])
     raw_new = mne.io.RawArray(data, info, verbose="WARNING")

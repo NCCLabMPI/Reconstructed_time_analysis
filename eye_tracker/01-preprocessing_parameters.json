@@ -34,10 +34,10 @@
   },
   "extract_eyelink_events": {
     "eyes": ["left", "right"],
-    "events": ["BAD_blinks", "saccade", "fixation"]
+    "events": ["BAD_blink", "saccade", "fixation"]
   },
   "remove_bad_epochs": {
-    "channels": ["BAD_blinks_left", "BAD_blinks_right"],
+    "channels": ["BAD_blink_left", "BAD_blink_right"],
     "nan_proportion_thresh": 0.5
   },
   "epochs": {
