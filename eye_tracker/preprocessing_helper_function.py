@@ -8,6 +8,28 @@ import matplotlib.pyplot as plt
 show_checks = False
 
 
+def convert_onset_offset(bad_indices):
+    """
+    This function converts an array of indices into two array, marking the onset and offset of contiguous chunks of data
+    marked as bad. This is useful to create mne annotations.
+    :param bad_indices: (list) list of integers containing the index of samples marked as bad
+    :return: onsets, offsets: lists marking the onset and offset of each contiguous segment
+    """
+    if not bad_indices:
+        return [], []
+    # Prepare lists to store onset and offsets
+    onsets = [bad_indices[0]]
+    offsets = []
+    # Loop through each index:
+    for i in range(1, len(bad_indices)):
+        # If the previous index + 1 is not equal to the current index, then this is not a contiguous segment
+        # and we are at an edge:
+        if bad_indices[i] != bad_indices[i - 1] + 1:
+            offsets.append(bad_indices[i - 1])
+            onsets.append(bad_indices[i])
+    offsets.append(bad_indices[-1])
+    return onsets, offsets
+
 def remove_bad_epochs(epochs, nan_proportion_thresh=0.2):
     """
     This function identifies any epochs in which there is more than X% in any channel
@@ -42,7 +64,7 @@ def trend_line_departure(raw, threshold_factor=3, eyes=None, window_length_s=0.0
     :return:
     """
     if eyes is None:
-        eyes = ["L", "R"]
+        eyes = ["pupil_left", "pupil_right"]
     print("="*40)
     print("Trend line departure")
     # Convert the window length to samples:
@@ -50,15 +72,13 @@ def trend_line_departure(raw, threshold_factor=3, eyes=None, window_length_s=0.0
     # Loop through each eye:
     for eye in eyes:
         # Extract the data:
-        data = np.squeeze(raw.copy().get_data(picks="{}Pupil".format(eye)))
+        data = np.squeeze(raw.copy().get_data(picks=eye))
         check_plot_data = data.copy()[0:100000]
         for i in range(n_iter):
-            # Interpolate the data:
-            data_interp = interpolate_nan(data.copy(), raw.times)
             # Smooth the data:
-            data_filt = savgol_filter(data_interp, window_length_n, polyorder)
+            data_filt = savgol_filter(data, window_length_n, polyorder)
             # Compute the difference between the data and the smoothed data:
-            dev = np.abs(data_interp - data_filt)
+            dev = np.abs(data - data_filt)
             # Compute the median absolute deviation:
             inds = mad_outliers_ind(dev, threshold_factor=threshold_factor, axis=0)
             print("Removing {:2f}% samples in iter {}".format((len(inds[0]) / data.shape[0]) * 100, i))
@@ -80,164 +100,12 @@ def trend_line_departure(raw, threshold_factor=3, eyes=None, window_length_s=0.0
         # Add back into raw:
         raw_data = raw.get_data()
         # Extract the index of the channel:
-        ch_ind = np.where(np.array(raw.ch_names) == "{}Pupil".format(eye))[0]
+        ch_ind = np.where(np.array(raw.ch_names) == eye)[0]
         raw_data[ch_ind, :] = data
         # Recreate the raw object:
         raw_new = mne.io.RawArray(raw_data, raw.info, verbose="WARNING")
         raw_new.set_annotations(raw.annotations)
         raw = raw_new
-    return raw
-
-
-def remove_around_gap(raw, gap_reject_s=0.05, gap_duration_s=0.075, eyes=None):
-    """
-    This function removes data points around gaps (i.e. nan data points). When a nan is encountered, the n ms of data
-    before and after are removed
-    :param raw:
-    :param gap_duration_s:
-    :param eyes:
-    :return:
-    """
-    print("="*40)
-    print("Removing data around gaps")
-    # Convert the gap duration to samples:
-    gap_reject_n = int(gap_reject_s * raw.info["sfreq"])
-    gap_duration_n = int(gap_duration_s * raw.info["sfreq"])
-    if eyes is None:
-        eyes = ["L", "R"]
-    # Loop through each eye:
-    for eye in eyes:
-        # Extract the data from this eye:
-        data = np.squeeze(raw.copy().get_data(picks="{}Pupil".format(eye)))
-        check_plot_data = data.copy()[0:100000]
-        # Find the onset and offsets of each gap:
-        nan_onset_inds = np.where(np.diff(np.isnan(data).astype(float)) == 1)[0]
-        nan_offset_inds = np.where(np.diff(np.isnan(data).astype(float)) == -1)[0]
-        if len(nan_onset_inds) != len(nan_offset_inds):
-            if len(nan_onset_inds) + 1 == len(nan_offset_inds) and nan_onset_inds[0] > nan_offset_inds[0]:
-                print("WARNING: the data started with Nans!")
-                nan_onset_inds = np.concatenate([[0], nan_onset_inds])
-            else:
-                print(len(nan_onset_inds))
-                print(len(nan_offset_inds))
-                raise ValueError("The number of nan onsets and offsets is not equal!")
-        # Store the number of removed samples:
-        n_removed = 0
-        # Loop through each nan value:
-        for i, onset_ind in enumerate(nan_onset_inds):
-            if nan_offset_inds[i] < onset_ind:
-                raise ValueError("The offset is before the onset!")
-            if nan_offset_inds[i] - onset_ind >= gap_duration_n:
-                # Remove the data around the onset and the offset:
-                data[onset_ind - gap_reject_n:onset_ind + 1] = np.nan
-                data[nan_offset_inds[i]:nan_offset_inds[i] + gap_reject_n] = np.nan
-                n_removed += gap_reject_n * 2
-
-        # Display the proportion of removed samples:
-        print("Removed {:2f}% samples".format((n_removed / data.shape[0]) * 100))
-        # Add back to the mne raw object:
-        raw_data = raw.get_data()
-        # Extract the index of the channel:
-        ch_ind = np.where(np.array(raw.ch_names) == "{}Pupil".format(eye))[0]
-        raw_data[ch_ind, :] = data
-        # Recreate the raw object:
-        raw_new = mne.io.RawArray(raw_data, raw.info, verbose="WARNING")
-        raw_new.set_annotations(raw.annotations)
-        raw = raw_new
-
-        if show_checks:
-            fig, ax = plt.subplots(nrows=1, ncols=1)
-            ax.scatter(raw.times[0:check_plot_data.shape[0]], check_plot_data, color="blue", label="Before")
-            ax.scatter(raw.times[0:check_plot_data.shape[0]], data[0:check_plot_data.shape[0]], color="red",
-                       label="After")
-            ax.set_xlabel("Time (s)")
-            ax.set_ylabel("Pupil size")
-            ax.set_title("Removing data around gaps")
-            plt.legend()
-            plt.show()
-
-    return raw
-
-
-def set_pupil_nans(raw, eyes=None):
-    """
-    This function sets impossible values to Nans. Impossible values are negative values or zeros:
-    :param raw:
-    :param eyes:
-    :return:
-    """
-    print("="*40)
-    print("Setting impossible values to Nan")
-    if eyes is None:
-        eyes = ["L", "R"]
-    # Loop through each eye:
-    for eye in eyes:
-        # Extract the data from this eye:
-        data = raw.copy().get_data(picks="{}Pupil".format(eye))
-        # Count the proportion of zeros and negative values:
-        prop_rej = np.sum(data <= 0) / data.size
-        print("Proportion of impossible values for eye {}: {:2f}%".format(eye, prop_rej * 100))
-        # Find the samples that are equal to 0:
-        data[data == 0] = np.nan
-        # Set the negative samples to Nan:
-        data[data < 0] = np.nan
-        # Add back to the mne raw object:
-        raw_data = raw.get_data()
-        # Extract the index of the channel:
-        ch_ind = np.where(np.array(raw.ch_names) == "{}Pupil".format(eye))[0]
-        raw_data[ch_ind, :] = data
-        # Recreate the raw object:
-        raw_new = mne.io.RawArray(raw_data, raw.info, verbose="WARNING")
-        raw_new.set_annotations(raw.annotations)
-        raw = raw_new
-    return raw
-
-
-def interpolate_nan(data, times, kind="linear"):
-    """
-    This function interpolates the nan values using a cubic interpolation
-    :param data: (1d numpy array) contains the data with nans to be interpolated!
-    :return: (1d numpy array) interpolated data
-    """
-    if np.isnan(data[0]):
-        data[0] = np.nanmean(data)
-    # Check whether there are any valid indices:
-    valid_indices = np.where(~np.isnan(data))[0]
-    if len(valid_indices) > 1:
-        f = interpolate.interp1d(times[valid_indices], data[valid_indices], kind=kind, fill_value='extrapolate')
-        interpolated_values = f(times)
-    else:
-        raise Exception("Pupil size are all Nan!")
-    return interpolated_values
-
-
-def interpolate_pupil(raw, eyes=None, kind="linear"):
-    """
-
-    :param raw:
-    :param eyes:
-    :param kind:
-    :return:
-    """
-    print("="*40)
-    print("Interpolating pupil values")
-    if eyes is None:
-        eyes = ["L", "R"]
-    for eye in eyes:
-        # Extract the data from this eye:
-        data = np.squeeze(raw.copy().get_data(picks="{}Pupil".format(eye)))
-        # Compute the total proportion of data requiring interpolation:
-        prop_interp = np.sum(np.isnan(data)) / data.size
-        print("Proportion of data requiring interpolation for eye {}: {:2f}%".format(eye, prop_interp * 100))
-        # Interpolate the nan:
-        data_interp = interpolate_nan(data, raw.times, kind=kind)
-        # Add the interpolated data as an extra channel:
-        interpolated_info = mne.create_info(["{}Pupil_interpolated".format(eye)], raw.info["sfreq"],
-                                            ch_types="eeg")
-        interpolated_raw = mne.io.RawArray(np.expand_dims(data_interp, 0), interpolated_info)
-        # Append to raw:
-        raw.add_channels([interpolated_raw])
-
     return raw
 
 
@@ -278,16 +146,26 @@ def mad_outliers_ind(data, threshold_factor=4, axis=0):
 
 
 def dilation_speed_rejection(raw, threshold_factor=4, eyes=None):
+    """
+    This function handles the annotations of samples based on a speed filter. Samples in which pupil dilation speed
+    deviates from a MAD threshold are marked as bad, following
+    https://link.springer.com/article/10.3758/s13428-018-1075-y. The detected segments are annotated as
+    "BAD_speed_outlier" in the raw annotations
+    :param raw: (mne raw object) contains the eyetracking data
+    :param threshold_factor: (float) factors for the MAD outlier detection (if set to 4, samples for which dilation
+    speed deviates from 4 MAD or more are rejected).
+    :param eyes: (list) eyes to apply the filter to
+    :return: raw (mne raw object) contains the data with additional annotations based on dilation speed filtering
+    """
     print("="*40)
     print("Rejecting samples based on dilation speed")
     if eyes is None:
-        eyes = ["L", "R"]
+        eyes = ["left", "right"]
 
     # Loop through each eye:
     for eye in eyes:
         # Extract the pupil size from this eye:
-        data = raw.copy().get_data(picks="{}Pupil".format(eye))
-        check_plot_data = data.copy()[0, 0:100000]
+        data = raw.copy().get_data(picks='pupil_' + eye)
         # Compute the dilation speed:
         dilation_speed = dilation_filter(np.squeeze(data), raw.times, axis=-1)
         # Extract the index of the outliers:
@@ -297,28 +175,27 @@ def dilation_speed_rejection(raw, threshold_factor=4, eyes=None):
         print("{:2f}% of rejected samples ({} out of {})".format((outliers_ind[0].shape[0] / data.shape[-1]) *
                                                                  100,
                                                                  outliers_ind[0].shape[0], data.shape[-1]))
-        # Replace the outliers by nan.
-        data[0, outliers_ind[0]] = np.nan
-        # Add back to the mne raw object:
-        raw_data = raw.get_data()
-        # Extract the index of the channel:
-        ch_ind = np.where(np.array(raw.ch_names) == "{}Pupil".format(eye))[0]
-        raw_data[ch_ind, :] = data
-        # Recreate the raw object:
-        raw_new = mne.io.RawArray(raw_data, raw.info, verbose="WARNING")
-        raw_new.set_annotations(raw.annotations)
-        raw = raw_new
+        # Convert to annotations:
+        onsets, offsets = convert_onset_offset(outliers_ind)
+        # Convert samples to times:
+        onsets = [raw.times[ind] for ind in onsets]
+        offsets = [raw.times[ind] for ind in offsets]
+        # Compute the duration:
+        duration = [offset - onsets[ind] for ind, offset in enumerate(offsets)]
+        desc = ["BAD_speed_outlier"] * len(onsets)
+        ch_names = [('xpos_' + eye, 'ypos_' + eye, 'pupil_' + eye)] * len(onsets)
+        # Create the annotations:
+        annot = mne.Annotations(
+            onset=onsets,  # in seconds
+            duration=duration,  # in seconds, too
+            description=desc,
+            ch_names=ch_names
+        )
+        # Combine annotations:
+        raw.set_annotations(raw.annotations + annot)
 
         if show_checks:
-            fig, ax = plt.subplots(nrows=1, ncols=1)
-            ax.scatter(raw.times[0:check_plot_data.shape[0]], check_plot_data, color="blue", label="Before")
-            ax.scatter(raw.times[0:check_plot_data.shape[0]], data[0, 0:check_plot_data.shape[0]], color="red",
-                       label="After")
-            ax.set_xlabel("Time (s)")
-            ax.set_ylabel("Pupil size")
-            ax.set_title("Dilation speed rejection")
-            plt.legend()
-            plt.show()
+            raw.plot(scalings=dict(eyegaze=1e3))
 
     return raw
 

@@ -57,11 +57,6 @@ def preprocessing(subject, parameters):
         if step == "dilation_speed_rejection":
             raw = dilation_speed_rejection(raw, threshold_factor=step_param["threshold_factor"],
                                            eyes=step_param["eyes"])
-        if step == "remove_around_gap":
-            raw = remove_around_gap(raw, gap_duration_s=step_param["gap_duration_s"],
-                                    eyes=step_param["eyes"])
-        if step == "interpolate_pupil":
-            raw = interpolate_pupil(raw, eyes=step_param["eyes"], kind=step_param["kind"])
         if step == "trend_line_departure":
             raw = trend_line_departure(raw, threshold_factor=step_param["threshold_factor"],
                                        eyes=step_param["eyes"], window_length_s=step_param["window_length_s"],

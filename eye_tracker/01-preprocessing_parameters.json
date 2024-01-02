@@ -4,14 +4,12 @@
   "session": "1",
   "data_type": "eyetrack",
   "preprocessing_steps": [
-    "set_pupil_nans",
     "dilation_speed_rejection",
-    "remove_around_gap",
     "trend_line_departure",
+    "blinks_interpolation",
     "extract_blinks",
     "extract_saccades",
     "extract_fixation",
-    "interpolate_pupil",
     "epochs",
     "remove_bad_epochs",
     "discard_bad_subjects"
@@ -22,26 +20,25 @@
     "nan_threshold": 0.5
   },
   "trend_line_departure": {
-    "channels": ["pupil_left", "pupil_right"],
+    "channels": ["left", "right"],
     "threshold_factor": 4,
     "window_length_s": 0.5,
     "polyorder": 3,
     "n_iter": 4
   },
-  "remove_around_gap": {
-    "channels": ["pupil_left", "pupil_right"],
-    "gap_reject_s": 0.05,
-    "gap_duration_s": 0.075
+  "blinks_interpolation": {
+    "buffer": [0.05, 0.2],
+    "interpolate_gaze": true
   },
   "dilation_speed_rejection": {
     "threshold_factor": 5,
-    "channels": ["pupil_left", "pupil_right"]
+    "channels": ["left", "right"]
   },
   "set_pupil_nans": {
-    "channels": ["pupil_left", "pupil_right"]
+    "channels": ["left", "right"]
   },
   "interpolate_pupil": {
-    "channels": ["pupil_left", "pupil_right"],
+    "channels": ["left", "right"],
     "kind": "linear"
   },
   "extract_blinks": {
