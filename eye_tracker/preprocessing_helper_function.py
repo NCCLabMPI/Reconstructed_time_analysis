@@ -5,7 +5,7 @@ from scipy.signal import savgol_filter
 from scipy import interpolate
 import matplotlib.pyplot as plt
 
-show_checks = True
+show_checks = False
 
 
 def create_bad_annotations(bad_indices, times, description, eye, orig_time):
@@ -365,7 +365,10 @@ def extract_eyelink_events(raw, description="blink", eyes=None):
     data = np.concatenate([data, np.array(desc_vectors)])
     channels = raw.ch_names
     channels.extend(["".join([description, eye]) for eye in eyes])
-    info = mne.create_info(channels, ch_types=["eeg"] * len(channels), sfreq=raw.info["sfreq"])
+    info = mne.create_info(channels,
+                           ch_types=["eeg"] * len(channels),
+                           sfreq=raw.info["sfreq"])
+    info.set_meas_date(raw.info['meas_date'])
     raw_new = mne.io.RawArray(data, info, verbose="WARNING")
     raw_new.set_annotations(raw.annotations)
     return raw_new

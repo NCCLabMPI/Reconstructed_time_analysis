@@ -53,18 +53,38 @@ def preprocessing(subject, parameters):
         # Extract the parameters of the current step:
         step_param = param[step]
 
-        # Performing the cleaning:
+        # Apply dilation speed filter:
         if step == "dilation_speed_rejection":
             raw = dilation_speed_rejection(raw, threshold_factor=step_param["threshold_factor"],
                                            eyes=step_param["eyes"])
+        # Apply trend line departure filter:
         if step == "trend_line_departure":
             raw = trend_line_departure(raw, threshold_factor=step_param["threshold_factor"],
                                        eyes=step_param["eyes"], window_length_s=step_param["window_length_s"],
                                        polyorder=step_param["polyorder"], n_iter=step_param["n_iter"])
-
-        # Performing blinks, saccades and fixaction extraction:
+        # Interpolate the data:
+        if step == "interpolate_blinks":
+            # Extract the bad descriptions:
+            bad_descriptions = list(set([val for val in raw.annotations.description if "BAD_" in val]))
+            # Interpolate
+            mne.preprocessing.eyetracking.interpolate_blinks(raw, buffer=step_param["buffer"],
+                                                             match=bad_descriptions,
+                                                             interpolate_gaze=step_param["interpolate_gaze"])
+            # Create a copy of the raw data to only select the bad annotations:
+            raw_copy = raw.copy()
+            bad_annot_ind = [ind for ind, val in enumerate(raw_copy.annotations.description) if "BAD_" in val]
+            bad_annot = mne.Annotations(
+                onset=raw_copy.annotations.onset[bad_annot_ind],  # in seconds
+                duration=raw_copy.annotations.duration[bad_annot_ind],  # in seconds, too
+                description=raw_copy.annotations.description[bad_annot_ind],
+                ch_names=raw_copy.annotations.ch_names[bad_annot_ind],
+                orig_time=raw_copy.annotations.orig_time
+            )
+            raw_copy.set_annotations(bad_annot)
+            raw_copy.plot(scalings=dict(eyegaze=1e3), block=True)
+        # Extract the eyelink events as channels (to keep them after the epoching):
         if step == "extract_eyelink_events":
-            print("Extracting the {} from the annotation".format(step_param["description"]))
+            print("Extracting the {} from the annotation".format(step_param["events"]))
             # Loop through each event to extract:
             for evt in step_param["events"]:
                 raw = extract_eyelink_events(raw, evt, eyes=step_param["eyes"])

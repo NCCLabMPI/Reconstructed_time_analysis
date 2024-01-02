@@ -6,11 +6,8 @@
   "preprocessing_steps": [
     "dilation_speed_rejection",
     "trend_line_departure",
-    "blinks_interpolation",
+    "interpolate_blinks",
     "extract_eyelink_events",
-    "extract_blinks",
-    "extract_saccades",
-    "extract_fixation",
     "epochs",
     "remove_bad_epochs",
     "discard_bad_subjects"
@@ -22,41 +19,22 @@
   },
   "trend_line_departure": {
     "eyes": ["left", "right"],
-    "threshold_factor": 4,
+    "threshold_factor": 5,
     "window_length_s": 0.5,
     "polyorder": 3,
     "n_iter": 4
-  },
-  "extract_eyelink_events": {
-    "eyes": ["left", "right"],
-    "events": ["BAD_blinks", "saccade", "fixation"]
-  },
-  "blinks_interpolation": {
-    "buffer": [0.05, 0.2],
-    "interpolate_gaze": true
   },
   "dilation_speed_rejection": {
     "threshold_factor": 5,
     "eyes": ["left", "right"]
   },
-  "set_pupil_nans": {
-    "eyes": ["left", "right"]
+  "interpolate_blinks": {
+    "buffer": [0.05, 0.2],
+    "interpolate_gaze": true
   },
-  "interpolate_pupil": {
+  "extract_eyelink_events": {
     "eyes": ["left", "right"],
-    "kind": "linear"
-  },
-  "extract_blinks": {
-    "channels": ["L", "R"],
-    "description": "blink"
-  },
-  "extract_saccades": {
-    "channels": ["L", "R"],
-    "description": "saccade"
-  },
-  "extract_fixation": {
-    "channels": ["L", "R"],
-    "description": "fixation"
+    "events": ["BAD_blinks", "saccade", "fixation"]
   },
   "remove_bad_epochs": {
     "channels": ["L", "R"],
