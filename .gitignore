@@ -3,3 +3,5 @@
 *.png
 eye_tracker\__pycache__\
 *bids/
+*bids_new/
+*raw_data/

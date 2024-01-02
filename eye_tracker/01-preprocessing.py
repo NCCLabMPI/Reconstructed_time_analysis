@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import environment_variables as ev
+import glob, os
 
 
 def preprocessing(subject, parameters):
@@ -29,27 +30,29 @@ def preprocessing(subject, parameters):
 
     # =============================================================================================
     # Load the data:
-    raw_file = Path(ev.bids_root, "sub-" + subject, "ses-" + session, data_type,
-                    "sub-{}_ses-{}_task-{}_{}-raw.fif".format(subject, session, task, data_type))
-    raw = mne.io.read_raw_fif(raw_file, verbose="WARNING")
-    # Plot the data:
-    # raw_ds = raw.copy().resample(100, npad="auto")
-    # Remove the annotations:
-    # raw_ds.annotations.delete(np.arange(len(raw_ds.annotations.description)))
-    # raw_ds.plot(block=True)
+    files_root = Path(ev.bids_root, "sub-" + subject, "ses-" + session, data_type)
+    # Load all the files:
+    raws = []
+    raw_files = []
+    for fl in os.listdir(files_root):
+        if fl.endswith('.asc') and fl.split("_task-")[1].split("_eyetrack.asc")[0] == task:
+            print("Loading: " + fl)
+            raw_files.append(Path(files_root, fl))
+            raw = mne.io.read_raw_eyelink(Path(files_root, fl))
+            raws.append(raw)
+    raw = mne.concatenate_raws(raws)
+
     # Convert the annotations to event for epoching:
     print('Creating annotations')
-    events_from_annot, event_dict = mne.events_from_annotations(raw, verbose="ERROR")
+    events_from_annot, event_dict = mne.events_from_annotations(raw, verbose="ERROR",
+                                                                regexp=param["events_of_interest"][0])
 
     # =============================================================================================
     # Loop through the preprocessing steps:
     for step in preprocessing_steps:
         # Extract the parameters of the current step:
         step_param = param[step]
-        # Performing the cleaning:
-        if step == "set_pupil_nans":
-            raw = set_pupil_nans(raw,
-                                 eyes=step_param["eyes"])
+
         # Performing the cleaning:
         if step == "dilation_speed_rejection":
             raw = dilation_speed_rejection(raw, threshold_factor=step_param["threshold_factor"],

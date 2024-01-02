@@ -16,47 +16,48 @@
     "remove_bad_epochs",
     "discard_bad_subjects"
   ],
+  "events_of_interest": ["vis_onset*"],
   "discard_bad_subjects": {
     "bad_trials_threshold": 0.5,
     "nan_threshold": 0.5
   },
   "trend_line_departure": {
-    "eyes": ["L", "R"],
+    "channels": ["pupil_left", "pupil_right"],
     "threshold_factor": 4,
     "window_length_s": 0.5,
     "polyorder": 3,
     "n_iter": 4
   },
   "remove_around_gap": {
-    "eyes": ["L", "R"],
+    "channels": ["pupil_left", "pupil_right"],
     "gap_reject_s": 0.05,
     "gap_duration_s": 0.075
   },
   "dilation_speed_rejection": {
     "threshold_factor": 5,
-    "eyes": ["L", "R"]
+    "channels": ["pupil_left", "pupil_right"]
   },
   "set_pupil_nans": {
-    "eyes": ["L", "R"]
+    "channels": ["pupil_left", "pupil_right"]
   },
   "interpolate_pupil": {
-    "eyes": ["L", "R"],
+    "channels": ["pupil_left", "pupil_right"],
     "kind": "linear"
   },
   "extract_blinks": {
-    "eyes": ["L", "R"],
+    "channels": ["L", "R"],
     "description": "blink"
   },
   "extract_saccades": {
-    "eyes": ["L", "R"],
+    "channels": ["L", "R"],
     "description": "saccade"
   },
   "extract_fixation": {
-    "eyes": ["L", "R"],
+    "channels": ["L", "R"],
     "description": "fixation"
   },
   "remove_bad_epochs": {
-    "eyes": ["L", "R"],
+    "channels": ["L", "R"],
     "nan_proportion_thresh": 0.5
   },
   "epochs": {
