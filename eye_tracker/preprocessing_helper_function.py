@@ -63,7 +63,7 @@ def convert_onset_offset(bad_indices):
     return onsets, offsets
 
 
-def remove_bad_epochs(epochs, nan_proportion_thresh=0.2):
+def remove_bad_epochs(epochs, channels=None, nan_proportion_thresh=0.2):
     """
     This function identifies any epochs in which there is more than X% in any channel
     :param epochs:
@@ -72,12 +72,15 @@ def remove_bad_epochs(epochs, nan_proportion_thresh=0.2):
     """
     print("=" * 40)
     print("Removing bad epochs (more than {}% nan)".format(nan_proportion_thresh * 100))
+    if channels is None:
+        channels = ["BAD_blinks_left", "BAD_blinks_right"]
     # Extract the data:
-    data = epochs.get_data(["LPupil", "RPupil"])
+    data = epochs.get_data(channels)
+    data_combined = np.logical_and(data[:, 0, :], data[:, 0, :])
     # Compute the proportion of nan:
-    nan_proportion = np.sum(np.isnan(data), axis=2) / data.shape[2]
+    nan_proportion = np.sum(data_combined, axis=1) / data.shape[2]
     # Extract the epochs that have more than X% nan:
-    bad_epochs = np.where(np.max(nan_proportion, axis=1) > nan_proportion_thresh)[0]
+    bad_epochs = np.where(np.max(nan_proportion, axis=0) > nan_proportion_thresh)[0]
     # Remove the bad epochs:
     epochs.drop(bad_epochs, reason='TOO_MANY_NANS')
     proportion_rejected = len(bad_epochs) / len(epochs)
@@ -364,7 +367,7 @@ def extract_eyelink_events(raw, description="blink", eyes=None):
     data = raw.get_data()
     data = np.concatenate([data, np.array(desc_vectors)])
     channels = raw.ch_names
-    channels.extend(["".join([description, eye]) for eye in eyes])
+    channels.extend(["_".join([description, eye]) for eye in eyes])
     info = mne.create_info(channels,
                            ch_types=["eeg"] * len(channels),
                            sfreq=raw.info["sfreq"])

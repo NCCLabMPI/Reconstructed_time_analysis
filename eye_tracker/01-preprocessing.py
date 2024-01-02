@@ -64,24 +64,16 @@ def preprocessing(subject, parameters):
                                        polyorder=step_param["polyorder"], n_iter=step_param["n_iter"])
         # Interpolate the data:
         if step == "interpolate_blinks":
+            # Extract the annotations:
+            annotations = raw.annotations.copy()
             # Extract the bad descriptions:
             bad_descriptions = list(set([val for val in raw.annotations.description if "BAD_" in val]))
             # Interpolate
             mne.preprocessing.eyetracking.interpolate_blinks(raw, buffer=step_param["buffer"],
                                                              match=bad_descriptions,
                                                              interpolate_gaze=step_param["interpolate_gaze"])
-            # Create a copy of the raw data to only select the bad annotations:
-            raw_copy = raw.copy()
-            bad_annot_ind = [ind for ind, val in enumerate(raw_copy.annotations.description) if "BAD_" in val]
-            bad_annot = mne.Annotations(
-                onset=raw_copy.annotations.onset[bad_annot_ind],  # in seconds
-                duration=raw_copy.annotations.duration[bad_annot_ind],  # in seconds, too
-                description=raw_copy.annotations.description[bad_annot_ind],
-                ch_names=raw_copy.annotations.ch_names[bad_annot_ind],
-                orig_time=raw_copy.annotations.orig_time
-            )
-            raw_copy.set_annotations(bad_annot)
-            raw_copy.plot(scalings=dict(eyegaze=1e3), block=True)
+            # Add the annotations back in as we still want to keep track what was interpolated and what wasn't:
+            raw.set_annotations(annotations)
         # Extract the eyelink events as channels (to keep them after the epoching):
         if step == "extract_eyelink_events":
             print("Extracting the {} from the annotation".format(step_param["events"]))
@@ -90,10 +82,11 @@ def preprocessing(subject, parameters):
                 raw = extract_eyelink_events(raw, evt, eyes=step_param["eyes"])
 
         # Print the proportion of NaN in the data:
-        total_nan_proportion = 0
-        # total_nan_proportion = np.mean(
-        #     [np.sum(np.isnan(raw.get_data(picks=["LPupil"]))) / raw.get_data().shape[-1],
-        #      np.sum(np.isnan(raw.get_data(picks=["RPupil"]))) / raw.get_data().shape[-1]])
+        bad_annotations = np.sum([raw.annotations.duration[ind]
+                                  for ind, val in enumerate(raw.annotations.description) if "BAD_" in val])
+        bad_annotation_proportion = bad_annotations / (raw.times[-1] - raw.times[0])
+        print("=" * 100)
+        print("Total of {:2f}% bad data".format(bad_annotation_proportion * 100))
 
         if step == "epochs":
             # Looping through each of the different epochs file to create:
@@ -107,6 +100,8 @@ def preprocessing(subject, parameters):
 
                 if "remove_bad_epochs" in preprocessing_steps:
                     epochs, proportion_rejected_trials = remove_bad_epochs(epochs,
+                                                                           channels=param["remove_bad_epochs"][
+                                                                               "channels"],
                                                                            nan_proportion_thresh=
                                                                            param["remove_bad_epochs"][
                                                                                "nan_proportion_thresh"])
@@ -114,7 +109,7 @@ def preprocessing(subject, parameters):
                 # Plot the epochs:
                 if "discard_bad_subjects" in preprocessing_steps:
                     if (proportion_rejected_trials > param["discard_bad_subjects"]["bad_trials_threshold"] or
-                            np.min(total_nan_proportion) > param["discard_bad_subjects"]["nan_threshold"]):
+                            bad_annotation_proportion > param["discard_bad_subjects"]["nan_threshold"]):
                         print("Subject {} rejected due to bad epochs".format(subject))
                         continue
 
@@ -176,7 +171,7 @@ def preprocessing(subject, parameters):
                     plt.savefig(Path(save_root, file_name))
                     plt.close()
 
-            return total_nan_proportion, proportion_rejected_trials
+            return bad_annotation_proportion, proportion_rejected_trials
 
 
 if __name__ == "__main__":
@@ -184,8 +179,7 @@ if __name__ == "__main__":
     # SX101: differences in sampling rate due to experiment program issues
     # SX104: missing files
     # SX117: no eyetracking data
-    subjects_list = ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112", "SX113",
-                     "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121"]
+    subjects_list = ["SX102"]
     parameters_file = (
         r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker"
         r"\01-preprocessing_parameters.json ")
@@ -197,7 +191,7 @@ if __name__ == "__main__":
         # Append to the summary:
         preprocessing_summary.append(pd.DataFrame({
             "subject": sub,
-            "total_nan": total_nan,
+            "total_bad": total_nan,
             "rejected_trials": rejected_trials,
             "valid_flag": True if rejected_trials < 0.5 and np.min(total_nan) < 0.5 else False
         }, index=[0]))

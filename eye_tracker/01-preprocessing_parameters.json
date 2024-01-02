@@ -37,7 +37,7 @@
     "events": ["BAD_blinks", "saccade", "fixation"]
   },
   "remove_bad_epochs": {
-    "channels": ["L", "R"],
+    "channels": ["BAD_blinks_left", "BAD_blinks_right"],
     "nan_proportion_thresh": 0.5
   },
   "epochs": {
