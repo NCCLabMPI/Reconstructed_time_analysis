@@ -20,7 +20,7 @@
     "nan_threshold": 0.5
   },
   "trend_line_departure": {
-    "channels": ["left", "right"],
+    "eyes": ["left", "right"],
     "threshold_factor": 4,
     "window_length_s": 0.5,
     "polyorder": 3,
@@ -32,13 +32,13 @@
   },
   "dilation_speed_rejection": {
     "threshold_factor": 5,
-    "channels": ["left", "right"]
+    "eyes": ["left", "right"]
   },
   "set_pupil_nans": {
-    "channels": ["left", "right"]
+    "eyes": ["left", "right"]
   },
   "interpolate_pupil": {
-    "channels": ["left", "right"],
+    "eyes": ["left", "right"],
     "kind": "linear"
   },
   "extract_blinks": {

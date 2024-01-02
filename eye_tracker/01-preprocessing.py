@@ -72,9 +72,10 @@ def preprocessing(subject, parameters):
             raw = extract_eyelink_events(raw, step_param["description"])
 
         # Print the proportion of NaN in the data:
-        total_nan_proportion = np.mean(
-            [np.sum(np.isnan(raw.get_data(picks=["LPupil"]))) / raw.get_data().shape[-1],
-             np.sum(np.isnan(raw.get_data(picks=["RPupil"]))) / raw.get_data().shape[-1]])
+        total_nan_proportion = 0
+        # total_nan_proportion = np.mean(
+        #     [np.sum(np.isnan(raw.get_data(picks=["LPupil"]))) / raw.get_data().shape[-1],
+        #      np.sum(np.isnan(raw.get_data(picks=["RPupil"]))) / raw.get_data().shape[-1]])
 
         if step == "epochs":
             # Looping through each of the different epochs file to create:

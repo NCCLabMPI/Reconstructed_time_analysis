@@ -5,10 +5,10 @@ from scipy.signal import savgol_filter
 from scipy import interpolate
 import matplotlib.pyplot as plt
 
-show_checks = False
+show_checks = True
 
 
-def create_bad_annotations(bad_indices, times, description, eye):
+def create_bad_annotations(bad_indices, times, description, eye, orig_time):
     """
     This function takes in an array of indices marking each bad data according to whatever metric and converts it
     to mne annotations to be append to the raw object.
@@ -16,6 +16,8 @@ def create_bad_annotations(bad_indices, times, description, eye):
     :param times: (np array) time vector from the mne raw object
     :param description: (string) description of the bad annotation
     :param eye: (string) left or right, for the eye to annotate
+    :param orig_time: (POSIX Timestamp) start time of the recording. This is necessary to be able to concatenate with
+    other annotations
     :return: (mne annotations object) generated annotations
     """
     # Convert to annotations:
@@ -32,7 +34,8 @@ def create_bad_annotations(bad_indices, times, description, eye):
         onset=onsets,  # in seconds
         duration=duration,  # in seconds, too
         description=desc,
-        ch_names=ch_names
+        ch_names=ch_names,
+        orig_time=orig_time
     )
     return annot
 
@@ -111,7 +114,7 @@ def trend_line_departure(raw, threshold_factor=3, eyes=None, window_length_s=0.0
     for eye in eyes:
         bad_indices = []
         # Extract the raw data:
-        raw_data = raw.copy().get_data(picks='pupil_' + eye)
+        raw_data = np.squeeze(raw.copy().get_data(picks='pupil_' + eye))
         for i in range(n_iter):
             # Filter the data:
             data_filt = savgol_filter(raw_data, window_length_n, polyorder)
@@ -119,19 +122,20 @@ def trend_line_departure(raw, threshold_factor=3, eyes=None, window_length_s=0.0
             dev = np.abs(raw_data - data_filt)
             # Compute the median absolute deviation:
             inds = mad_outliers_ind(dev, threshold_factor=threshold_factor, axis=0)
-            print("Removing {:2f}% samples in iter {}".format((len(inds[0]) / raw_data.shape[0]) * 100, i))
+            print("Removing {:2f}% samples in iter {}".format((len(inds) / raw_data.shape[0]) * 100, i))
             # Append the bad indices to the data:
             bad_indices.append(inds)
             # Set the bad samples to nan, so that they are excluded from the next computation:
             raw_data[inds] = np.nan
         # Set the bad indices in the annotations:
-        bad_indices = list(set(bad_indices))
+        bad_indices = list(np.unique(np.concatenate(bad_indices, axis=0)))
         # Convert to annotations:
-        annot = create_bad_annotations(bad_indices, raw.times, "BAD_speed_outlier", eye)
+        annot = create_bad_annotations(bad_indices, raw.times, "BAD_trend_line_departure", eye,
+                                       raw.annotations.orig_time)
         # Combine annotations:
         raw.set_annotations(raw.annotations + annot)
-        if show_checks:
-            raw.plot(scalings=dict(eyegaze=1e3))
+    if show_checks:
+        raw.plot(scalings=dict(eyegaze=1e3), block=True)
 
     return raw
 
@@ -168,7 +172,7 @@ def mad_outliers_ind(data, threshold_factor=4, axis=0):
     # Compute the threshold:
     thresh = np.nanmedian(data, axis=axis) + threshold_factor * mad
     # Find the outliers:
-    outliers_ind = np.where(data > thresh)
+    outliers_ind = np.where(data > thresh)[0]
     return outliers_ind
 
 
@@ -199,16 +203,17 @@ def dilation_speed_rejection(raw, threshold_factor=4, eyes=None):
         outliers_ind = mad_outliers_ind(dilation_speed, threshold_factor=threshold_factor, axis=0)
         # Display some information about the proportion of outliers that were found:
         print("For {} eye: ".format(eye))
-        print("{:2f}% of rejected samples ({} out of {})".format((outliers_ind[0].shape[0] / data.shape[-1]) *
+        print("{:2f}% of rejected samples ({} out of {})".format((outliers_ind.shape[0] / data.shape[-1]) *
                                                                  100,
-                                                                 outliers_ind[0].shape[0], data.shape[-1]))
+                                                                 outliers_ind.shape[0], data.shape[-1]))
         # Convert to annotations:
-        annot = create_bad_annotations(outliers_ind, raw.times, "BAD_speed_outlier", eye)
+        annot = create_bad_annotations(list(outliers_ind), raw.times, "BAD_speed_outlier", eye,
+                                       raw.annotations.orig_time)
         # Combine annotations:
         raw.set_annotations(raw.annotations + annot)
 
-        if show_checks:
-            raw.plot(scalings=dict(eyegaze=1e3))
+    if show_checks:
+        raw.plot(scalings=dict(eyegaze=1e3), block=True)
 
     return raw
 
