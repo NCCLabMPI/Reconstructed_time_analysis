@@ -110,7 +110,7 @@ def preprocessing(subject, parameters):
                     epochs, proportion_rejected_trials = remove_bad_epochs(epochs,
                                                                            channels=param["remove_bad_epochs"][
                                                                                "channels"],
-                                                                           nan_proportion_thresh=
+                                                                           bad_proportion_thresh=
                                                                            param["remove_bad_epochs"][
                                                                                "nan_proportion_thresh"])
 

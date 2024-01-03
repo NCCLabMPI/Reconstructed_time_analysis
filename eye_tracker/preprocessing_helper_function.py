@@ -19,7 +19,7 @@ def compute_proportion_bad(raw, desc="BAD_", eyes=None):
     """
     if eyes is None:
         eyes = ["left", "right"]
-    bad_proportion = []
+    bad_proportions = []
     print("="*40)
     print("Proportion of the data marked as {}".format(desc))
     # Loop through each eye
@@ -36,8 +36,8 @@ def compute_proportion_bad(raw, desc="BAD_", eyes=None):
         # Compute the proportion:
         bad_proportion = bad_dur / (raw.times[-1] - raw.times[0])
         print("{} eye:       {:2f}%".format(eye, bad_proportion))
-        bad_proportion.append(bad_dur / (raw.times[-1] - raw.times[0]))
-    return bad_proportion
+        bad_proportions.append(bad_dur / (raw.times[-1] - raw.times[0]))
+    return bad_proportions
 
 
 def read_calib(fname):
@@ -76,10 +76,10 @@ def show_bad_segments(raw, eye, pad_sec=1):
     """
     This function shows the segments with bad annotations in a way that is easy to visualize, better than the MNE
     visualizer for that purpose.
-    :param raw:
-    :param eye:
-    param pad_sec:
-    :return:
+    :param raw: (mne raw object) contains the eyetracking data
+    :param eye: (list of strings) eyes for which to plot the bad segments
+    :param pad_sec: (float) how many seconds before and after an event to display
+    :return: None
     """
     # Compute how many samples needed for padding:
     pad_sample = int(pad_sec * raw.info["sfreq"])
@@ -210,15 +210,18 @@ def convert_onset_offset(bad_indices):
     return onsets, offsets
 
 
-def remove_bad_epochs(epochs, channels=None, nan_proportion_thresh=0.2):
+def remove_bad_epochs(epochs, channels=None, bad_proportion_thresh=0.2):
     """
     This function identifies any epochs in which there is more than X% in any channel
-    :param epochs:
-    :param threshold:
+    :param epochs: (mne epochs data) contains the epoched eyelink data
+    :param channels: (list of strings) name of the channels on which to base the epochs removal
+    :param bad_proportion_thresh: (float) proportion of bad segments beyond which to remove an epoch
     :return:
+        - epochs: (mne epochs data) with bad epoched dropped
+        - proportion_rejected: (float) proportion of dropped epochs
     """
     print("=" * 40)
-    print("Removing bad epochs (more than {}% nan)".format(nan_proportion_thresh * 100))
+    print("Removing bad epochs (more than {}% nan)".format(bad_proportion_thresh * 100))
     if channels is None:
         channels = ["BAD_blink_left", "BAD_blink_right"]
     # Extract the data:
@@ -227,7 +230,7 @@ def remove_bad_epochs(epochs, channels=None, nan_proportion_thresh=0.2):
     # Compute the proportion of nan:
     nan_proportion = np.sum(data_combined, axis=1) / data.shape[2]
     # Extract the epochs that have more than X% nan:
-    bad_epochs = np.where(np.max(nan_proportion, axis=0) > nan_proportion_thresh)[0]
+    bad_epochs = np.where(np.max(nan_proportion, axis=0) > bad_proportion_thresh)[0]
     # Remove the bad epochs:
     epochs.drop(bad_epochs, reason='TOO_MANY_NANS')
     proportion_rejected = len(bad_epochs) / len(epochs)
@@ -238,7 +241,7 @@ def remove_bad_epochs(epochs, channels=None, nan_proportion_thresh=0.2):
     return epochs, proportion_rejected
 
 
-def trend_line_departure(raw, threshold_factor=3, eyes=None, window_length_s=0.05, n_iter=4, polyorder=3):
+def trend_line_departure(raw, threshold_factor=3, eyes=None, window_length_s=0.05, n_iter=4):
     """
     This function performs an iterative procedure in which the trendline is computed using a savegol filter. Then,
     the unfiltered data are compared to the filtered one. Sample which deviates from more than X mad (3 is the default)
@@ -251,8 +254,8 @@ def trend_line_departure(raw, threshold_factor=3, eyes=None, window_length_s=0.0
     :param eyes: (string) left or right
     :param window_length_s: (float) length of the window for the savgol filter to compute the trend line
     :param n_iter: (int) number of iteration to perform
-    :paranm polyorder: (int) polynomial order of the savegol filter.
     :return:
+        - raw: (mne raw object) containing data with marked segments showing trend line departure
     """
     if eyes is None:
         eyes = ["left", "right"]
@@ -337,6 +340,14 @@ def dilation_filter(pupil_size, times, axis=-1):
 
 
 def mad_outliers_ind(data, threshold_factor=4, axis=0):
+    """
+    This function identifies sample showing an absolute median deviation above a specific threshold
+    :param data: (1d numpy array) data on which to perform rejection
+    :param threshold_factor: (float or int) above how many median absolute deviation a sample is considered an outlier
+    :param axis: (int) axis along which to perform the operation
+    :return:
+        - outliers_ind: (list) containing the indices of all sample considered outliers
+    """
     if len(data.shape) > 1:
         raise Exception("This function only supports 1D arrays")
     # Compute the MAD:
