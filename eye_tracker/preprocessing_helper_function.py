@@ -10,6 +10,36 @@ from scipy.ndimage import gaussian_filter1d
 show_checks = False
 
 
+def read_calib(fname):
+    """
+
+    :param fname:
+    :return:
+    """
+    # Open file
+    f = open(fname, 'r')
+    fl_txt = f.read().splitlines(True)  # split into lines
+    fl_txt = list(filter(None, fl_txt))  # remove emptys
+    # Extract screen distance:
+    screen_distance = [txt.strip("\n") for txt in fl_txt if "Screen_distance_mm" in txt][0].split(":")[-1].split(" ")
+    # Convert to float:
+    screen_distance = [float(val) for val in screen_distance if val.isdigit()]
+    # Extract screen size:
+    screen_size = [txt.strip("\n") for txt in fl_txt if "Screen_size_mm" in txt][0].split(":")[-1].split(" ")
+    # Convert to float:
+    screen_size = [float(val) for val in screen_size if val.isdigit()]
+    # Extract screen res:
+    screen_res = [txt.strip("\n") for txt in fl_txt if "GAZE_COORDS" in txt][0].split("GAZE_COORDS")[-1].split(" ")
+    # Convert to float:
+    screen_res = [float(val) for val in screen_res if val.replace(".", "").isdigit()]
+    # Read in the calib:
+    calib = mne.preprocessing.eyetracking.read_eyelink_calibration(fname,
+                                                                   screen_size=[screen_size[1], screen_size[0]],
+                                                                   screen_distance=np.mean(screen_distance),
+                                                                   screen_resolution=[screen_res[2], screen_res[3]])
+    return calib
+
+
 def show_bad_segments(raw, eye, pad_sec=1):
     """
     This function shows the segments with bad annotations in a way that is easy to visualize, better than the MNE
@@ -465,16 +495,10 @@ def extract_eyelink_events(raw, description="blink", eyes=None):
         desc_vectors.append(desc_vector)
 
     # Add these two channels to the raw data:
-    data = raw.get_data()
-    data = np.concatenate([data, np.array(desc_vectors)])
-    channel_types = raw.get_channel_types() + ['misc'] * len(eyes)
-    channels = raw.ch_names
-    channels.extend(["_".join([description, eye]) for eye in eyes])
-
-    info = mne.create_info(channels,
-                           ch_types=channel_types,
-                           sfreq=raw.info["sfreq"])
-    info.set_meas_date(raw.info['meas_date'])
-    raw_new = mne.io.RawArray(data, info, verbose="WARNING")
-    raw_new.set_annotations(raw.annotations)
-    return raw_new
+    evts_info = mne.create_info(["_".join([description, eye]) for eye in eyes],
+                                ch_types=['misc'] * len(eyes),
+                                sfreq=raw.info["sfreq"])
+    evts_info.set_meas_date(raw.info['meas_date'])
+    raw_evts = mne.io.RawArray(np.array(desc_vectors), evts_info, verbose="WARNING")
+    raw.add_channels([raw_evts])
+    return raw

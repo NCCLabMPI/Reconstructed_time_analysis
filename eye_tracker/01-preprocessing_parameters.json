@@ -13,6 +13,7 @@
     "discard_bad_subjects"
   ],
   "events_of_interest": ["vis_onset*"],
+  "plot_calibration": true,
   "discard_bad_subjects": {
     "bad_trials_threshold": 0.5,
     "nan_threshold": 0.5

@@ -4,14 +4,16 @@ from mne.viz.eyetracking import plot_gaze
 import json
 from pathlib import Path
 from eye_tracker.preprocessing_helper_function import (extract_eyelink_events, epoch_data, dilation_speed_rejection,
-                                                       trend_line_departure, remove_bad_epochs, show_bad_segments)
+                                                       trend_line_departure, remove_bad_epochs, show_bad_segments,
+                                                       read_calib)
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import environment_variables as ev
 import glob, os
 
-DEBUG = True
+DEBUG = False
+show_interpolated = False
 
 
 def preprocessing(subject, parameters):
@@ -36,6 +38,7 @@ def preprocessing(subject, parameters):
     # Load all the files:
     raws = []
     raw_files = []
+    calibs = []
     ctr = 0
     for fl in os.listdir(files_root):
         if DEBUG and ctr > 2:  # Load only a subpart of the files for the debugging
@@ -45,8 +48,11 @@ def preprocessing(subject, parameters):
             raw_files.append(Path(files_root, fl))
             raw = mne.io.read_raw_eyelink(Path(files_root, fl))
             raws.append(raw)
+            calibs.append(read_calib(Path(files_root, fl)))
             ctr += 1
     raw = mne.concatenate_raws(raws)
+    # Remove the empty calibrations:
+    calibs = list(filter(None, calibs))
 
     # =============================================================================================
     # Loop through the preprocessing steps:
@@ -77,8 +83,9 @@ def preprocessing(subject, parameters):
             # Add the annotations back in as we still want to keep track what was interpolated and what wasn't:
             raw.set_annotations(annotations)
             # Show where the data were interpolated:
-            show_bad_segments(raw, "left", pad_sec=1)
-            show_bad_segments(raw, "right", pad_sec=1)
+            if show_interpolated:
+                show_bad_segments(raw, "left", pad_sec=1)
+                show_bad_segments(raw, "right", pad_sec=1)
         # Extract the eyelink events as channels (to keep them after the epoching):
         if step == "extract_eyelink_events":
             print("Extracting the {} from the annotation".format(step_param["events"]))
@@ -182,6 +189,16 @@ def preprocessing(subject, parameters):
                                                                                data_type, epoch_name)
                 plt.savefig(Path(save_root, file_name))
                 plt.close()
+
+                # Finally, plot the calibrations:
+                if param["plot_calibration"]:
+                    for calib_i, calib in enumerate(calibs):
+                        print(f"Calibration: {calib_i}")
+                        print(calib)
+                        calib.plot()
+                        file_name = "calibration-{}.png".format(calib_i)
+                        plt.savefig(Path(save_root, file_name))
+                        plt.close()
 
             return bad_annotation_proportion, proportion_rejected_trials
 
