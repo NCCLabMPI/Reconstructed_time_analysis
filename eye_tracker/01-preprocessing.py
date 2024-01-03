@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from eye_tracker.preprocessing_helper_function import (extract_eyelink_events, epoch_data, dilation_speed_rejection,
                                                        trend_line_departure, remove_bad_epochs, show_bad_segments,
-                                                       read_calib)
+                                                       read_calib, compute_proportion_bad)
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -94,11 +94,7 @@ def preprocessing(subject, parameters):
                 raw = extract_eyelink_events(raw, evt, eyes=step_param["eyes"])
 
         # Print the proportion of NaN in the data:
-        bad_annotations = np.sum([raw.annotations.duration[ind]
-                                  for ind, val in enumerate(raw.annotations.description) if "BAD_" in val])
-        bad_annotation_proportion = bad_annotations / (raw.times[-1] - raw.times[0])
-        print("=" * 100)
-        print("Total of {:2f}% bad data".format(bad_annotation_proportion * 100))
+        proportion_bad = compute_proportion_bad(raw, desc="BAD_", eyes=["left", "right"])
 
         if step == "epochs":
             # Looping through each of the different epochs file to create:
@@ -121,7 +117,7 @@ def preprocessing(subject, parameters):
                 # Plot the epochs:
                 if "discard_bad_subjects" in preprocessing_steps:
                     if (proportion_rejected_trials > param["discard_bad_subjects"]["bad_trials_threshold"] or
-                            bad_annotation_proportion > param["discard_bad_subjects"]["nan_threshold"]):
+                            np.mean(proportion_bad) > param["discard_bad_subjects"]["nan_threshold"]):
                         print("Subject {} rejected due to bad epochs".format(subject))
                         continue
 
@@ -200,7 +196,7 @@ def preprocessing(subject, parameters):
                         plt.savefig(Path(save_root, file_name))
                         plt.close()
 
-            return bad_annotation_proportion, proportion_rejected_trials
+            return np.mean(proportion_bad), proportion_rejected_trials
 
 
 if __name__ == "__main__":

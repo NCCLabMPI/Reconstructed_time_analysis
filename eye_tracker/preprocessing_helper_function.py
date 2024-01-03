@@ -1,8 +1,6 @@
 import mne
 import numpy as np
 import pandas as pd
-from scipy.signal import savgol_filter
-from scipy import interpolate
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from scipy.ndimage import gaussian_filter1d
@@ -10,11 +8,45 @@ from scipy.ndimage import gaussian_filter1d
 show_checks = False
 
 
+def compute_proportion_bad(raw, desc="BAD_", eyes=None):
+    """
+    This function computes the proportion of data that are marked as bad according to the specified description. The
+    proportion of data affected by the annotation is returned per eye for binocular recordings.
+    :param raw: (mne raw object) contains the eyelink data
+    :param desc: (string) string identifier to compute proportion of affected data
+    :param eyes: (list) eyes to investigate
+    :return: (list) proportion of affected data for each eye
+    """
+    if eyes is None:
+        eyes = ["left", "right"]
+    bad_proportion = []
+    print("="*40)
+    print("Proportion of the data marked as {}".format(desc))
+    # Loop through each eye
+    for eye in eyes:
+        # Extract the indices of this eye matching the description:
+        bad_annot_ind = np.intersect1d([ind for ind, val in enumerate(raw.annotations.description) if desc in val],
+                                       np.array([ind for ind in range(len(raw.annotations.ch_names))
+                                                 if len(raw.annotations.ch_names[ind]) > 0
+                                                 if eye in raw.annotations.ch_names[ind][0]])
+                                       )
+        # Compute the sum of the duration:
+        bad_dur = np.sum(raw.annotations.duration[bad_annot_ind])
+
+        # Compute the proportion:
+        bad_proportion = bad_dur / (raw.times[-1] - raw.times[0])
+        print("{} eye:       {:2f}%".format(eye, bad_proportion))
+        bad_proportion.append(bad_dur / (raw.times[-1] - raw.times[0]))
+    return bad_proportion
+
+
 def read_calib(fname):
     """
-
-    :param fname:
-    :return:
+    This functions reads the eyelink calib using the mne function read_eyelink_calibration. What is added is the reading
+    of the screen physical settings directly from the ascii file.
+    :param fname: (string or path object) path to the ascii file that contains the calib
+    :return: (list mne calib object or empty list) eyelink calib. In case no calib is found in the file, return
+    empty list.
     """
     # Open file
     f = open(fname, 'r')
