@@ -35,7 +35,7 @@ def compute_proportion_bad(raw, desc="BAD_", eyes=None):
 
         # Compute the proportion:
         bad_proportion = bad_dur / (raw.times[-1] - raw.times[0])
-        print("{} eye:       {:2f}%".format(eye, bad_proportion))
+        print("{} eye:       {:2f}%".format(eye, bad_proportion * 100))
         bad_proportions.append(bad_dur / (raw.times[-1] - raw.times[0]))
     return bad_proportions
 

@@ -12,7 +12,7 @@ import pandas as pd
 import environment_variables as ev
 import glob, os
 
-DEBUG = False
+DEBUG = True
 show_interpolated = False
 
 
@@ -69,7 +69,7 @@ def preprocessing(subject, parameters):
         if step == "trend_line_departure":
             raw = trend_line_departure(raw, threshold_factor=step_param["threshold_factor"],
                                        eyes=step_param["eyes"], window_length_s=step_param["window_length_s"],
-                                       polyorder=step_param["polyorder"], n_iter=step_param["n_iter"])
+                                       n_iter=step_param["n_iter"])
         # Interpolate the data:
         if step == "interpolate_blinks":
             # Extract the annotations:
