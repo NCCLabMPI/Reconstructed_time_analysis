@@ -12,7 +12,7 @@ import pandas as pd
 import environment_variables as ev
 import glob, os
 
-DEBUG = True
+DEBUG = False
 show_interpolated = False
 
 
