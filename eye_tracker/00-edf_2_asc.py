@@ -36,11 +36,11 @@ def ascii2mne_batch(raw_root, subjects, bids_root, session="1", convert_exe=""):
     # Loop through each subject
     for subject in subjects:
         # Get the subject directory:
-        subject_dir = Path(raw_root, subject, "ses-" + session)
+        subject_dir = Path(raw_root, "sub-" + subject, "ses-" + session)
         # List the files in there:
         subject_files = [fl for fl in os.listdir(subject_dir) if fl.endswith(".edf")]
         # Create the save dir:
-        save_dir = Path(bids_root, subject, "ses-" + session, "eyetrack")
+        save_dir = Path(bids_root, "sub-" + subject, "ses-" + session, "eyetrack")
         if not os.path.isdir(save_dir):
             os.makedirs(save_dir)
         for task in tasks:
@@ -63,7 +63,8 @@ def ascii2mne_batch(raw_root, subjects, bids_root, session="1", convert_exe=""):
 
 if __name__ == "__main__":
     subjects_list = [
-        "sub-SX102"
+        "SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112", "SX113",
+        "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121"
     ]
     tasks = ["prp"]
     # data_root = r"C:\Users\alexander.lepauvre\Documents\PhD\Reconstructed_Time\raw_data"
