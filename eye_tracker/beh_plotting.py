@@ -4,6 +4,7 @@ from pathlib import Path
 import matplotlib
 import matplotlib.pyplot as plt
 from general_helper_function import cousineau_morey_correction
+from plotter_functions import plot_within_subject_boxplot
 
 SMALL_SIZE = 36
 MEDIUM_SIZE = 38
@@ -112,20 +113,12 @@ cmap = matplotlib.colormaps.get_cmap('Reds')
 
 # Boxplot:
 fig, ax = plt.subplots(nrows=1, ncols=2, sharex=True, sharey=True, figsize=[14, 14])
-bplot1 = ax[0].boxplot(data_tr_2d, patch_artist=True, notch=True,
-                       positions=avg_onset_locked_ti['SOA'].unique(), widths=0.1)
-ax[0].plot(avg_onset_locked_ti['SOA'].unique(), data_tr_2d.T, linewidth=0.6,
-           color=[0.5, 0.5, 0.5], alpha=0.5)
-ax[0].tick_params(axis='x', labelrotation=45)
-ax[0].set_title("Task relevant")
-ax[0].set_xlabel("SOA (sec)")
-ax[0].set_ylabel("Cousineau Morey Corrected RT (sec)")
-bplot2 = ax[1].boxplot(data_ti_2d, patch_artist=True, notch=True,
-                       positions=avg_onset_locked_ti['SOA'].unique(), widths=0.1)
-ax[1].plot(avg_onset_locked_ti['SOA'].unique(), data_ti_2d.T, linewidth=0.6,
-           color=[0.5, 0.5, 0.5], alpha=0.5)
-ax[1].tick_params(axis='x', labelrotation=45)
-ax[1].set_title("Task irrelevant")
+_, bplot1, _ = plot_within_subject_boxplot(onset_locked_ti, 'sub_id', 'SOA', 'RT_aud',
+                                           positions='SOA', ax=ax[0], cousineau_correction=True, title="Task relevant",
+                                           xlabel="SOA (sec)", ylabel="Cousineau Morey Corrected RT (sec)")
+_, bplot2, _ = plot_within_subject_boxplot(onset_locked_tr, 'sub_id', 'SOA', 'RT_aud',
+                                           positions='SOA', ax=ax[1], cousineau_correction=True, title="Task relevant",
+                                           xlabel="SOA (sec)", ylabel="Cousineau Morey Corrected RT (sec)")
 plt.xlim([-0.1, 0.55])
 ylims = ax[1].get_ylim()
 # fill with colors
@@ -254,7 +247,6 @@ for i, bplot in enumerate(bplots):
 plt.tight_layout()
 plt.savefig(r"C:\Users\alexander.lepauvre\Downloads\Figure2_tr.png", dpi=300)
 
-
 # ===========================================================================================================
 # 2.2. Offset locked:
 # In the case of the offset locked, there are no effects of task relevance but there is an effect of duration:
@@ -311,4 +303,3 @@ for i, bplot in enumerate(bplots):
         patch.set_facecolor(cmap(color_vals[i, ii]))
 plt.tight_layout()
 plt.savefig(r"C:\Users\alexander.lepauvre\Downloads\Figure2_ti.png", dpi=300)
-
