@@ -53,6 +53,8 @@ def preprocessing(subject, parameters):
     raw = mne.concatenate_raws(raws)
     # Remove the empty calibrations:
     calibs = list(filter(None, calibs))
+    # Flatten the list:
+    calibs = [item for items in calibs for item in items]
 
     # =============================================================================================
     # Loop through the preprocessing steps:
@@ -191,7 +193,7 @@ def preprocessing(subject, parameters):
                     for calib_i, calib in enumerate(calibs):
                         print(f"Calibration: {calib_i}")
                         print(calib)
-                        calib.plot()
+                        calib.plot(show=False)
                         file_name = "calibration-{}.png".format(calib_i)
                         plt.savefig(Path(save_root, file_name))
                         plt.close()
