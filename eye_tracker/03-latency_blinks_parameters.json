@@ -8,7 +8,7 @@
   "crop": [0, 3.5],
   "baseline": null,
   "baseline_window": null,
-  "picks": ["Lblink", "Rblink"],
+  "picks": ["BAD_blink_left", "BAD_blink_right"],
   "task_relevance": ["non-target", "irrelevant"],
   "durations": ["0.5", "1", "1.5"],
   "soas": ["0", "0.116", "0.232", "0.466"],

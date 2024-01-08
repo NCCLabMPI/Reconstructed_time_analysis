@@ -7,7 +7,7 @@
   "crop": [-0.5, 3.5],
   "baseline": "ratio",
   "baseline_window": [null, -0.05],
-  "picks": ["LPupil", "RPupil"],
+  "picks": ["pupil_left", "pupil_right"],
   "task_relevance": ["non-target", "irrelevant"],
   "durations": ["0.5", "1", "1.5"],
   "soas": ["0", "0.116", "0.232", "0.466"],

@@ -51,7 +51,7 @@ def pupil_peak_latency(parameters_file, subjects):
                 for lock in param["locks"]:
                     for soa in param["soas"]:
                         # Extract the data:
-                        data = epochs.copy()["/".join([task_rel, duration, lock, soa])].get_data()
+                        data = epochs.copy()["/".join([task_rel, duration, lock, soa])].get_data(copy=False)
                         # Average across trials:
                         data = np.mean(data, axis=0)
                         # Average across channels:
@@ -118,7 +118,7 @@ def pupil_peak_latency(parameters_file, subjects):
 
 if __name__ == "__main__":
     subjects_list = ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX112", "SX113",
-                     "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121"]
+                     "SX114", "SX115", "SX116"] # , "SX118", "SX119", "SX120", "SX121"]
     parameters = (
         r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker"
         r"\02-pupil_peak_latency_parameters.json ")

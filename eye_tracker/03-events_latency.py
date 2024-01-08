@@ -55,12 +55,12 @@ def events_latency(parameters_file, subjects):
                         if lock == 'onset':
                             data = epochs.copy()["/".join([task_rel, duration,
                                                            lock, soa])].crop(float(soa),
-                                                                             float(soa) + 1).get_data()
+                                                                             float(soa) + 1).get_data(copy=False)
                         else:
                             data = epochs.copy()["/".join([task_rel, duration,
                                                            lock, soa])].crop(float(soa) + float(duration),
                                                                              float(soa) + 1 +
-                                                                             float(duration)).get_data()
+                                                                             float(duration)).get_data(copy=False)
                         # Reject any  event that was found only in 1 eye:
                         data = np.logical_and(data[:, 0, :], data[:, 1, :])
                         times = np.arange(0, 1 + 1 / epochs.info['sfreq'], 1 / epochs.info['sfreq'])
@@ -178,10 +178,10 @@ def events_latency(parameters_file, subjects):
 
 if __name__ == "__main__":
     subjects_list = ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX112", "SX113",
-                     "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121"]
+                     "SX114", "SX115", "SX116"] #, "SX118", "SX119", "SX120", "SX121"]
     # Perform the blinks latency analysis
     events_latency(r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker"
-                   r"\03-blinking_latency_parameters.json ", subjects_list)
+                   r"\03-latency_blinks_parameters.json ", subjects_list)
     # Perform the saccades latency analysis
     events_latency(r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker"
-                   r"\03-saccades_latency_parameters.json ", subjects_list)
+                   r"\03-latency_saccades_parameters.json ", subjects_list)
