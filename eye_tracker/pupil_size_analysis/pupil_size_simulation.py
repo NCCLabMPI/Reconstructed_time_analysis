@@ -94,14 +94,14 @@ def run_simulation(jitter, ntrials_per_cond, noise, beta_noise, show_plots=True)
     # Retrieve parameters using glm:
     # Define the range bounds. We can enforce certain parameters not to vary in this way:
     range_bounds = [
-        [0, 0, 1],  # Visual onset
-        [0, 0, 1],
-        [0, 0.5, 100],
-        [0, 0, 1],
-        [0, 0, 1],
-        [0, 0, 1],
-        [0, 0.5, 100],
-        [0, 0, 1]
+        [0, 0, 1],  # Visual onset-SOA1
+        [0, 0, 1],  # Visual offset-SOA1
+        [0, 0.5, 100],  # Audio-SOA1
+        [0, 0, 1],  # RT-SOA1
+        [0, 0, 1],  # Visual onset-SOA2
+        [0, 0, 1],  # Visual offset-SOA2
+        [0, 0.5, 100],  # Audio-SOA2
+        [0, 0, 1]  # RT-SOA2
     ]
     optimal_latencies, glm_results, expl_results = latency_glm(sim_data, purf, timing_matrix, condition_matrix, TIMES,
                                                                range_bounds=range_bounds)
@@ -183,11 +183,11 @@ def run_simulation(jitter, ntrials_per_cond, noise, beta_noise, show_plots=True)
 
 
 if __name__ == "__main__":
-    jitters = [0.001, 0.01, 0.1]
-    ntrials_per_conds = [4]
-    noises = [1 / 16, 1 / 8, 1 / 4, 1 / 2]
-    beta_noises = [1 / 16, 1 / 8, 1 / 4, 1 / 2]
-    n_iter = 20
+    jitters = [0.001, 0.005, 0.01, 0.05, 0.1]
+    ntrials_per_conds = [10, 20, 40, 80]
+    noises = [1/32, 1/16, 1/8, 1/4, 1/2]
+    beta_noises = [1/8]
+    n_iter = 10
     simulation_results = []
     for jit in jitters:
         for ntrials in ntrials_per_conds:
