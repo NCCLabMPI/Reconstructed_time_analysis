@@ -8,6 +8,53 @@ from scipy.ndimage import gaussian_filter1d
 show_checks = False
 
 
+def add_logfiles_info(epochs, log_files):
+    """
+    This function is highly specific to the PRP experiment from Micha and Alex, combining the information found in the
+    behavioral log file with the epochs data, enabling the use of the same exclusion criterion and so on.
+    :param epochs:
+    :param log_files:
+    :return:
+    """
+    # Load the behavioral log file:
+    beh_log = pd.read_csv(log_files, sep=",")
+    # 1. Check that the sizes match:
+    assert beh_log.shape[0] == epochs.metadata.shape[0], "The log file and the epochs metadata have different number of events!"
+    # 2. Check that all the conditions of interest match:
+    # 2.a. Task relevance:
+    assert all(beh_log["task_relevance"].to_numpy() == epochs.metadata["task relevance"].to_numpy()), \
+        "The task relevance information is misaligned between the log files and the eyetracker metadata!"
+    # 2.b. Category:
+    assert all(beh_log["category"].to_numpy() == epochs.metadata["category"].to_numpy()), \
+        "The category information is misaligned between the log files and the eyetracker metadata!"
+    # 2.c. Orientation:
+    assert all(beh_log["orientation"].to_numpy() == epochs.metadata["orientation"].to_numpy()), \
+        "The orientation information is misaligned between the log files and the eyetracker metadata!"
+    # 2.d. Identity:
+    assert all(beh_log["identity"].to_numpy() == epochs.metadata["identity"].to_numpy()), \
+        "The identity information is misaligned between the log files and the eyetracker metadata!"
+    # 2.e. Identity:
+    assert all(beh_log["SOA_lock"].to_numpy() == epochs.metadata["lock"].to_numpy()), \
+        "The SOA_lock information is misaligned between the log files and the eyetracker metadata!"
+    # 2.f. Duration:
+    assert all(beh_log["duration"].to_numpy() == epochs.metadata["duration"].to_numpy().astype(float)), \
+        "The duration information is misaligned between the log files and the eyetracker metadata!"
+    # 2.g. SOA:
+    assert all(beh_log["SOA"].to_numpy() == epochs.metadata["SOA"].to_numpy().astype(float)), \
+        "The SOA information is misaligned between the log files and the eyetracker metadata!"
+    # 2.h. Pitch:
+    assert all(beh_log["pitch"].to_numpy() == epochs.metadata["pitch"].to_numpy().astype(float)), \
+        "The pitch information is misaligned between the log files and the eyetracker metadata!"
+    # Now, add the relevant info to the metadata:
+    epochs.metadata.loc[:, "trial_response_vis"] = beh_log["trial_response_vis"]
+    epochs.metadata.loc[:, "trial_accuracy_aud"] = beh_log["trial_accuracy_aud"]
+    epochs.metadata.loc[:, "trial_second_button_press"] = beh_log["trial_second_button_press"]
+    epochs.metadata.loc[:, "RT_aud"] = beh_log["RT_aud"]
+    epochs.metadata.loc[:, "RT_vis"] = beh_log["RT_vis"]
+
+    return epochs
+
+
 def compute_proportion_bad(raw, desc="BAD_", eyes=None):
     """
     This function computes the proportion of data that are marked as bad according to the specified description. The
