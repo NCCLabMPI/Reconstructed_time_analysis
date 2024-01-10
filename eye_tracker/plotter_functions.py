@@ -3,10 +3,10 @@ import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 import matplotlib.patches as patches
 import numpy as np
-from general_helper_function import get_event_ts
-from general_helper_function import cousineau_morey_correction
+from eye_tracker.general_helper_function import get_event_ts
+from eye_tracker.general_helper_function import cousineau_morey_correction
 
-font = {'size': 18}
+font = {'size': 12}
 matplotlib.rc('font', **font)
 # Get matplotlib colors:
 prop_cycle = plt.rcParams['axes.prop_cycle']
@@ -123,7 +123,7 @@ def latency_raster_plot(epochs, lock, durations, soas, channels=None, audio_lock
 
 def plot_within_subject_boxplot(data_df, within_column, between_column, dependent_variable, positions=None,
                                 ax=None, cousineau_correction=True, title="", xlabel="", ylabel="", xlim=None,
-                                width=0.1, face_colors=None):
+                                width=0.1, face_colors=None, edge_colors=None, xlabel_fontsize=9):
     """
     This function generates within subject design boxplot with line plots connecting each subjects dots across
     conditions. Further offers the option to apply Cousineau Morey correction. Importantly, data must be passed before
@@ -180,11 +180,11 @@ def plot_within_subject_boxplot(data_df, within_column, between_column, dependen
         for row_ind in nan_inds[0]:
             for col_ind in nan_inds[1]:
                 avg_data_2d[row_ind, col_ind] = np.mean(avg_data_2d[col_ind])
-    bplot = ax.boxplot(avg_data_2d, patch_artist=True, notch=True,
-                       positions=positions, widths=width)
-    lineplot = ax.plot(positions, avg_data_2d.T, linewidth=0.6,
+    bplot = ax.boxplot(avg_data_2d, patch_artist=True, notch=False,
+                       positions=positions, widths=width, medianprops=dict(color="black", linewidth=1.5))
+    lineplot = ax.plot(positions, avg_data_2d.T, ':', linewidth=0.5,
                        color=[0.5, 0.5, 0.5], alpha=0.5)
-    ax.tick_params(axis='x', labelrotation=45)
+    ax.tick_params(axis='x', labelrotation=45, labelsize=xlabel_fontsize)
     ax.set_title(title)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
@@ -194,5 +194,7 @@ def plot_within_subject_boxplot(data_df, within_column, between_column, dependen
     if face_colors is not None:
         for i, patch in enumerate(bplot['boxes']):
             patch.set_facecolor(face_colors[i])
-
+    if edge_colors is not None:
+        for i, patch in enumerate(bplot['boxes']):
+            patch.set_edgecolor(edge_colors[i])
     return ax, bplot, lineplot
