@@ -1,16 +1,15 @@
-import os
 import mne
 from mne.viz.eyetracking import plot_gaze
 import json
 from pathlib import Path
 from eye_tracker.preprocessing_helper_function import (extract_eyelink_events, epoch_data, dilation_speed_rejection,
                                                        trend_line_departure, remove_bad_epochs, show_bad_segments,
-                                                       read_calib, compute_proportion_bad)
+                                                       load_raw_eyetracker, compute_proportion_bad, add_logfiles_info)
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import environment_variables as ev
-import glob, os
+import os
 
 DEBUG = False
 show_interpolated = False
@@ -35,26 +34,19 @@ def preprocessing(subject, parameters):
     # =============================================================================================
     # Load the data:
     files_root = Path(ev.bids_root, "sub-" + subject, "ses-" + session, data_type)
-    # Load all the files:
-    raws = []
-    raw_files = []
-    calibs = []
-    ctr = 0
-    for fl in os.listdir(files_root):
-        if DEBUG and ctr > 2:  # Load only a subpart of the files for the debugging
-            continue
-        if fl.endswith('.asc') and fl.split("_task-")[1].split("_eyetrack.asc")[0] == task:
-            print("Loading: " + fl)
-            raw_files.append(Path(files_root, fl))
-            raw = mne.io.read_raw_eyelink(Path(files_root, fl))
-            raws.append(raw)
-            calibs.append(read_calib(Path(files_root, fl)))
-            ctr += 1
-    raw = mne.concatenate_raws(raws)
+    # Load the eyetracker data and associated files:
+    logs_list, raws_list, calibs_list = load_raw_eyetracker(files_root, subject, session, task, ev.raw_root,
+                                                            param["beh_file_name"],
+                                                            param["epochs"]["visual_onset"]["metadata_column"],
+                                                            'vis_onset', verbose=False, debug=DEBUG)
+    # Concatenate the objects
+    raw = mne.concatenate_raws(raws_list)
     # Remove the empty calibrations:
-    calibs = list(filter(None, calibs))
+    calibs = list(filter(None, calibs_list))
     # Flatten the list:
     calibs = [item for items in calibs for item in items]
+    # Concatenate the log files:
+    log_df = pd.concat(logs_list).reset_index(drop=True)
 
     # =============================================================================================
     # Loop through the preprocessing steps:
@@ -106,7 +98,12 @@ def preprocessing(subject, parameters):
                 print('Creating annotations')
                 events_from_annot, event_dict = mne.events_from_annotations(raw, verbose="ERROR",
                                                                             regexp=param["events_of_interest"][0])
+                # Epoch the data:
                 epochs = epoch_data(raw, events_from_annot, event_dict, **step_param[epoch_name])
+
+                # Add the log file information to the metadata
+                if len(param["log_file_columns"]) > 0:
+                    epochs = add_logfiles_info(epochs, log_df, param["log_file_columns"])
 
                 if "remove_bad_epochs" in preprocessing_steps:
                     epochs, proportion_rejected_trials = remove_bad_epochs(epochs,
@@ -206,8 +203,10 @@ if __name__ == "__main__":
     # SX101: differences in sampling rate due to experiment program issues
     # SX104: missing files
     # SX117: no eyetracking data
-    subjects_list = ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112", "SX113",
-                     "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121"]
+    # "SX118": Issue with mne reader
+    subjects_list = ["SX102", "SX103", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX112", "SX113",
+                     "SX114", "SX115", "SX116", "SX119", "SX120", "SX121"]
+
     parameters_file = (
         r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker"
         r"\01-preprocessing_parameters.json ")

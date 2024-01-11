@@ -6,6 +6,7 @@
   "preprocessing_steps": [
     "dilation_speed_rejection",
     "trend_line_departure",
+    "interpolate_blinks",
     "extract_eyelink_events",
     "epochs",
     "remove_bad_epochs",
@@ -13,7 +14,8 @@
   ],
   "events_of_interest": ["vis_onset*"],
   "plot_calibration": true,
-  "beh_file_name": "sub-{}_ses-{}_run-all_task-{}_events.csv",
+  "beh_file_name": "sub-{}_ses-{}_run-{}_task-{}_events.csv",
+  "log_file_columns":  ["trial_response_vis", "trial_accuracy_aud", "trial_second_button_press", "RT_aud", "RT_vis"],
   "discard_bad_subjects": {
     "bad_trials_threshold": 0.5,
     "nan_threshold": 0.5
