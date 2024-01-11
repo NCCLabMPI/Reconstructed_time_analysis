@@ -1,6 +1,9 @@
+import os
+import re
 import mne
 import numpy as np
 import pandas as pd
+from pathlib import Path
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from scipy.ndimage import gaussian_filter1d
@@ -8,50 +11,106 @@ from scipy.ndimage import gaussian_filter1d
 show_checks = False
 
 
-def add_logfiles_info(epochs, log_files):
+def load_raw_eyetracker(files_root, subject, session, task, beh_files_root, beh_file_name,
+                        annotations_col_names, event_of_interest, verbose=False, debug=False):
+    """
+    This functions loads the eyetracking data using mne python function. In addition, it loads the log files from the
+    raw root to extract additional information. For a few subjects, some triggers weren't received by the eyetracker
+    and therefore, the logs need to be aligned back to the eyetracker trigger to avoid any mismatch, which is what this
+    function does. In addition, loading the calibration results.
+    :param files_root: (Path or string) path to the eyetracking files
+    :param subject: (string) name of the subject
+    :param session: (string) session
+    :param task: (string) task
+    :param beh_files_root: (path or string) path to the behavioral log files
+    :param beh_file_name: (string) template string  for the name of the behavioral log files
+    :param annotations_col_names: (list of strings) name to give the columns of the annotation table
+    :param event_of_interest: (string) identifier of the events of interest
+    :param verbose: (bool) verbose
+    :para debug: (bool) debug mode loads only 2 files
+    :return:
+    """
+    # Load all the files:
+    raws = []
+    calibs = []
+    logs = []
+    ctr = 0
+    for fl in os.listdir(files_root):
+        if debug and ctr > 2:  # Load only a subpart of the files for the debugging
+            continue
+        if fl.endswith('.asc') and fl.split("_task-")[1].split("_eyetrack.asc")[0] == task:
+            if verbose:
+                print("Loading: " + fl)
+
+            if ctr == 59:
+                print("A")
+            # Load the raw file:
+            raw = mne.io.read_raw_eyelink(Path(files_root, fl), verbose=verbose)
+
+            # Extract the run ID:
+            run_i = int(re.search(r'run-(\d{2})', fl).group(1))
+            # Load the log file:
+            log_file = pd.read_csv(Path(beh_files_root, "sub-" + subject, "ses-" + session,
+                                        beh_file_name.format(subject, session, run_i, task)))
+            # Extract the events of interest from the raw annotations:
+            evt = [desc.split("/") for desc in raw.annotations.description[
+                np.where([event_of_interest in val for val in raw.annotations.description])[0]]]
+            # Convert the annotations to a pandas dataframe:
+            annotations_df = pd.DataFrame(evt, columns=annotations_col_names)
+
+            # Compare the log files to the annotations to identify and  address any discrepancies:
+            if log_file.shape[0] == annotations_df.shape[0]:
+                # If the two data frames have the same length, compare the identity column in each respectively.
+                # Identity changes on a trial by trial basis:
+                assert all(annotations_df["identity"] == log_file["identity"]), \
+                    "The events logged in the logs do not match the events in the eyetracker triggers!"
+            elif log_file.shape[0] > annotations_df.shape[0]:
+                n_miss_triggers = log_file.shape[0] - annotations_df.shape[0]
+                start_index = -1
+                identities_log_file = log_file["identity"].to_list()
+                identities_et = annotations_df["identity"].to_list()
+                for i in range(len(identities_log_file) - len(identities_et) + 1):
+                    if identities_log_file[i:i + len(identities_et)] == identities_et:
+                        start_index = i
+                        break
+                if start_index >= 0:
+                    log_file = log_file.iloc[start_index:start_index + len(identities_et)]
+                    print("WARNING: There were {} missing triggers in run-{} of task-{} in ses-{}!".format(
+                        n_miss_triggers, run_i, task, session))
+                else:
+                    raise Exception("The events in the log file do not match the events in the Eyetracking triggers!!!")
+            else:
+                raise Exception("More triggers than there were events in the log file!!!")
+            logs.append(log_file)
+            raws.append(raw)
+            calibs.append(read_calib(Path(files_root, fl)))
+            ctr += 1
+
+    return logs, raws, calibs
+
+
+def add_logfiles_info(epochs, log_file, columns):
     """
     This function is highly specific to the PRP experiment from Micha and Alex, combining the information found in the
     behavioral log file with the epochs data, enabling the use of the same exclusion criterion and so on.
-    :param epochs:
-    :param log_files:
+    :param epochs: (mne epochs object) object containing the metadata
+    :param log_file: (pd dataframe) log file containing the additional info
+    :param columns: (list of strings) name of the columns from the log file to transfer to the metadata
     :return:
     """
-    # Load the behavioral log file:
-    beh_log = pd.read_csv(log_files, sep=",")
-    # 1. Check that the sizes match:
-    assert beh_log.shape[0] == epochs.metadata.shape[0], "The log file and the epochs metadata have different number of events!"
-    # 2. Check that all the conditions of interest match:
-    # 2.a. Task relevance:
-    assert all(beh_log["task_relevance"].to_numpy() == epochs.metadata["task relevance"].to_numpy()), \
-        "The task relevance information is misaligned between the log files and the eyetracker metadata!"
-    # 2.b. Category:
-    assert all(beh_log["category"].to_numpy() == epochs.metadata["category"].to_numpy()), \
-        "The category information is misaligned between the log files and the eyetracker metadata!"
-    # 2.c. Orientation:
-    assert all(beh_log["orientation"].to_numpy() == epochs.metadata["orientation"].to_numpy()), \
-        "The orientation information is misaligned between the log files and the eyetracker metadata!"
-    # 2.d. Identity:
-    assert all(beh_log["identity"].to_numpy() == epochs.metadata["identity"].to_numpy()), \
-        "The identity information is misaligned between the log files and the eyetracker metadata!"
-    # 2.e. Identity:
-    assert all(beh_log["SOA_lock"].to_numpy() == epochs.metadata["lock"].to_numpy()), \
-        "The SOA_lock information is misaligned between the log files and the eyetracker metadata!"
-    # 2.f. Duration:
-    assert all(beh_log["duration"].to_numpy() == epochs.metadata["duration"].to_numpy().astype(float)), \
-        "The duration information is misaligned between the log files and the eyetracker metadata!"
-    # 2.g. SOA:
-    assert all(beh_log["SOA"].to_numpy() == epochs.metadata["SOA"].to_numpy().astype(float)), \
-        "The SOA information is misaligned between the log files and the eyetracker metadata!"
-    # 2.h. Pitch:
-    assert all(beh_log["pitch"].to_numpy() == epochs.metadata["pitch"].to_numpy().astype(float)), \
-        "The pitch information is misaligned between the log files and the eyetracker metadata!"
-    # Now, add the relevant info to the metadata:
-    epochs.metadata.loc[:, "trial_response_vis"] = beh_log["trial_response_vis"]
-    epochs.metadata.loc[:, "trial_accuracy_aud"] = beh_log["trial_accuracy_aud"]
-    epochs.metadata.loc[:, "trial_second_button_press"] = beh_log["trial_second_button_press"]
-    epochs.metadata.loc[:, "RT_aud"] = beh_log["RT_aud"]
-    epochs.metadata.loc[:, "RT_vis"] = beh_log["RT_vis"]
-
+    # Check if some epochs were dropped to remove them from the log file too:
+    log_file = log_file[[True if len(val) == 0 else False for val in epochs.drop_log]]
+    # Make sure the logs and the metadata have the same length:
+    assert log_file.shape[0] == epochs.metadata.shape[0], \
+        "The log file and the epochs metadata have different number of events!"
+    for col in columns:
+        # Now, add the relevant info to the metadata:
+        if col == "RT_aud":
+            epochs.metadata.loc[:, col] = log_file["time_of_resp_aud"].to_numpy() - log_file["aud_stim_time"].to_numpy()
+        elif col == "RT_vis":
+            epochs.metadata.loc[:, col] = log_file["time_of_resp_vis"].to_numpy() - log_file["vis_stim_time"].to_numpy()
+        else:
+            epochs.metadata.loc[:, col] = log_file[col]
     return epochs
 
 
@@ -67,7 +126,7 @@ def compute_proportion_bad(raw, desc="BAD_", eyes=None):
     if eyes is None:
         eyes = ["left", "right"]
     bad_proportions = []
-    print("="*40)
+    print("=" * 40)
     print("Proportion of the data marked as {}".format(desc))
     # Loop through each eye
     for eye in eyes:
