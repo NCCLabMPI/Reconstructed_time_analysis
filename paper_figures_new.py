@@ -101,7 +101,7 @@ subjects_data = load_beh_data(root, subjects_list, session='1', task='prp', do_t
 
 # Target:
 d = 1.5
-fig_ta, ax_ta = plt.subplots(nrows=1, ncols=4, sharex=False, sharey=True, figsize=[8.3/2, 11.7 / 2])
+fig_ta, ax_ta = plt.subplots(nrows=1, ncols=4, sharex=False, sharey=True, figsize=[8.3/3, 11.7 / 2])
 _, _, _ = plot_within_subject_boxplot(subjects_data[(subjects_data["task_relevance"] == 'target')
                                                     & (subjects_data["SOA_lock"] == 'onset')],
                                       'sub_id', 'onset_SOA', 'RT_aud',
@@ -109,7 +109,7 @@ _, _, _ = plot_within_subject_boxplot(subjects_data[(subjects_data["task_relevan
                                       title="",
                                       xlabel="", ylabel="",
                                       xlim=[-0.1, 0.6], width=0.1,
-                                      face_colors=[val for val in ev.colors["soa"].values()])
+                                      face_colors=[val for val in ev.colors["soa_onset_locked"].values()])
 # Loop through each duration to plot the offset locked SOA separately:
 for i, dur in enumerate(sorted(list(subjects_data["duration"].unique()))):
     _, _, _ = plot_within_subject_boxplot(subjects_data[(subjects_data["task_relevance"] == 'target')
@@ -121,7 +121,7 @@ for i, dur in enumerate(sorted(list(subjects_data["duration"].unique()))):
                                           title="",
                                           xlabel="", ylabel="",
                                           xlim=[dur-0.1, dur + 0.6], width=0.1,
-                                          face_colors=[val for val in ev.colors["soa"].values()])
+                                          face_colors=[val for val in ev.colors["soa_offset_locked_{}ms".format(int(dur*1000))].values()])
     ax_ta[i + 1].yaxis.set_visible(False)
 # Remove the spines:
 for i in [0, 1, 2]:
@@ -137,7 +137,7 @@ for i in [0, 1, 2]:
 plt.subplots_adjust(wspace=0.05)
 
 # Task relevant:
-fig_tr, ax_tr = plt.subplots(nrows=1, ncols=4, sharex=False, sharey=True, figsize=[8.3/2, 11.7 / 2])
+fig_tr, ax_tr = plt.subplots(nrows=1, ncols=4, sharex=False, sharey=True, figsize=[8.3/3, 11.7 / 2])
 _, _, _ = plot_within_subject_boxplot(subjects_data[(subjects_data["task_relevance"] == 'non-target')
                                                     & (subjects_data["SOA_lock"] == 'onset')], 'sub_id', 'onset_SOA',
                                       'RT_aud',
@@ -145,7 +145,7 @@ _, _, _ = plot_within_subject_boxplot(subjects_data[(subjects_data["task_relevan
                                       title="",
                                       xlabel="", ylabel="",
                                       xlim=[-0.1, 0.6], width=0.1,
-                                      face_colors=[val for val in ev.colors["soa"].values()])
+                                      face_colors=[val for val in ev.colors["soa_onset_locked"].values()])
 # Loop through each duration to plot the offset locked SOA separately:
 for i, dur in enumerate(sorted(list(subjects_data["duration"].unique()))):
     _, _, _ = plot_within_subject_boxplot(subjects_data[(subjects_data["task_relevance"] == 'non-target')
@@ -157,7 +157,7 @@ for i, dur in enumerate(sorted(list(subjects_data["duration"].unique()))):
                                           title="",
                                           xlabel="", ylabel="",
                                           xlim=[dur-0.1, dur + 0.6], width=0.1,
-                                          face_colors=[val for val in ev.colors["soa"].values()])
+                                          face_colors=[val for val in ev.colors["soa_offset_locked_{}ms".format(int(dur*1000))].values()])
     ax_tr[i + 1].yaxis.set_visible(False)
 # Remove the spines:
 for i in [0, 1, 2]:
@@ -173,7 +173,7 @@ for i in [0, 1, 2]:
 plt.subplots_adjust(wspace=0.05)
 
 # Task irrelevant:
-fig_ti, ax_ti = plt.subplots(nrows=1, ncols=4, sharex=False, sharey=True, figsize=[8.3/2, 11.7 / 2])
+fig_ti, ax_ti = plt.subplots(nrows=1, ncols=4, sharex=False, sharey=True, figsize=[8.3/3, 11.7 / 2])
 _, _, _ = plot_within_subject_boxplot(subjects_data[(subjects_data["task_relevance"] == 'irrelevant')
                                                     & (subjects_data["SOA_lock"] == 'onset')], 'sub_id', 'onset_SOA',
                                       'RT_aud',
@@ -181,7 +181,7 @@ _, _, _ = plot_within_subject_boxplot(subjects_data[(subjects_data["task_relevan
                                       title="",
                                       xlabel="", ylabel="",
                                       xlim=[-0.1, 0.6], width=0.1,
-                                      face_colors=[val for val in ev.colors["soa"].values()])
+                                      face_colors=[val for val in ev.colors["soa_onset_locked"].values()])
 # Loop through each duration to plot the offset locked SOA separately:
 for i, dur in enumerate(sorted(list(subjects_data["duration"].unique()))):
     _, _, _ = plot_within_subject_boxplot(subjects_data[(subjects_data["task_relevance"] == 'irrelevant')
@@ -193,7 +193,7 @@ for i, dur in enumerate(sorted(list(subjects_data["duration"].unique()))):
                                           title="",
                                           xlabel="", ylabel="",
                                           xlim=[dur-0.1, dur + 0.6], width=0.1,
-                                          face_colors=[val for val in ev.colors["soa"].values()])
+                                          face_colors=[val for val in ev.colors["soa_offset_locked_{}ms".format(int(dur*1000))].values()])
     ax_ti[i + 1].yaxis.set_visible(False)
 # Remove the spines:
 for i in [0, 1, 2]:
@@ -241,27 +241,27 @@ plt.close(fig_ti)
 subject_data_corrected = cousineau_morey_correction(subjects_data, 'sub_id', 'onset_SOA', 'RT_aud')
 
 # Task relevant onset:
-fig_tr_onset, ax_tr_onset = plt.subplots(nrows=1, ncols=1, figsize=[8.3/2, 11.7 / 2])
+fig_tr_onset, ax_tr_onset = plt.subplots(nrows=1, ncols=1, figsize=[8.3/2, 8.3 / 4])
 for soa in list(subject_data_corrected["SOA"].unique()):
     data = subjects_data[(subjects_data["task_relevance"] == 'non-target')
                          & (subjects_data["SOA_lock"] == 'onset')
                          & (subjects_data["SOA"] == soa)]["RT_aud"].to_numpy()
     # Remove the nans:
     data = data[~np.isnan(data)]
-    ax_tr_onset.ecdf(data, label=str(soa), color=ev.colors["soa"][str(soa)])
+    ax_tr_onset.ecdf(data, label=str(soa), color=ev.colors["soa_onset_locked"][str(soa)])
 # Task irrelevant onset:
-fig_ti_onset, ax_ti_onset = plt.subplots(nrows=1, ncols=1, figsize=[8.3/2, 11.7 / 2])
+fig_ti_onset, ax_ti_onset = plt.subplots(nrows=1, ncols=1, figsize=[8.3/2, 8.3 / 4])
 for soa in list(subject_data_corrected["SOA"].unique()):
     data = subjects_data[(subjects_data["task_relevance"] == 'irrelevant')
                          & (subjects_data["SOA_lock"] == 'onset')
                          & (subjects_data["SOA"] == soa)]["RT_aud"].to_numpy()
     # Remove the nans:
     data = data[~np.isnan(data)]
-    ax_ti_onset.ecdf(data, label=str(soa), color=ev.colors["soa"][str(soa)])
+    ax_ti_onset.ecdf(data, label=str(soa), color=ev.colors["soa_onset_locked"][str(soa)])
 
 
 # Offset 500:
-fig_offset_short, ax_offset_short = plt.subplots(nrows=1, ncols=1, figsize=[8.3/2, 11.7 / 2])
+fig_offset_short, ax_offset_short = plt.subplots(nrows=1, ncols=1, figsize=[8.3/3, 8.3 / 4])
 for soa in list(subject_data_corrected["SOA"].unique()):
     data = subjects_data[(subjects_data["task_relevance"].isin(['non-target', 'irrelevant']))
                          & (subjects_data["SOA_lock"] == 'offset')
@@ -269,10 +269,10 @@ for soa in list(subject_data_corrected["SOA"].unique()):
                          & (subjects_data["duration"] == 0.5)]["RT_aud"].to_numpy()
     # Remove the nans:
     data = data[~np.isnan(data)]
-    ax_offset_short.ecdf(data, label=str(soa), color=ev.colors["soa"][str(soa)])
+    ax_offset_short.ecdf(data, label=str(soa), color=ev.colors["soa_offset_locked_500ms"][str(soa)])
 
 # Offset 1000:
-fig_offset_int, ax_offset_int = plt.subplots(nrows=1, ncols=1, figsize=[8.3/2, 11.7 / 2])
+fig_offset_int, ax_offset_int = plt.subplots(nrows=1, ncols=1, figsize=[8.3/3, 8.3 / 4])
 for soa in list(subject_data_corrected["SOA"].unique()):
     data = subjects_data[(subjects_data["task_relevance"].isin(['non-target', 'irrelevant']))
                          & (subjects_data["SOA_lock"] == 'offset')
@@ -280,10 +280,10 @@ for soa in list(subject_data_corrected["SOA"].unique()):
                          & (subjects_data["duration"] == 1.0)]["RT_aud"].to_numpy()
     # Remove the nans:
     data = data[~np.isnan(data)]
-    ax_offset_int.ecdf(data, label=str(soa), color=ev.colors["soa"][str(soa)])
+    ax_offset_int.ecdf(data, label=str(soa), color=ev.colors["soa_offset_locked_1000ms"][str(soa)])
 
 # Offset 1500:
-fig_offset_long, ax_offset_long = plt.subplots(nrows=1, ncols=1, figsize=[8.3/2, 11.7 / 2])
+fig_offset_long, ax_offset_long = plt.subplots(nrows=1, ncols=1, figsize=[8.3/3, 8.3 / 4])
 for soa in list(subject_data_corrected["SOA"].unique()):
     data = subjects_data[(subjects_data["task_relevance"].isin(['non-target', 'irrelevant']))
                          & (subjects_data["SOA_lock"] == 'offset')
@@ -291,7 +291,7 @@ for soa in list(subject_data_corrected["SOA"].unique()):
                          & (subjects_data["duration"] == 1.5)]["RT_aud"].to_numpy()
     # Remove the nans:
     data = data[~np.isnan(data)]
-    ax_offset_long.ecdf(data, label=str(soa), color=ev.colors["soa"][str(soa)])
+    ax_offset_long.ecdf(data, label=str(soa), color=ev.colors["soa_offset_locked_1500ms"][str(soa)])
 
 # Add axes decorations:
 ax_tr_onset.set_ylabel("Cumulative Probability")
