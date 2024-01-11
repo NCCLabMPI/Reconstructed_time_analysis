@@ -6,7 +6,8 @@ import os
 import mne
 
 
-def epochs2mat(subjects, output_dir, session="1", task="prp", conditions_filter=None, factors=None):
+def epochs2mat(subjects, output_dir, session="1", task="prp", conditions_filter=None, factors=None,
+               rt_column="RT_aud"):
     """
 
     :param subjects:
@@ -15,6 +16,7 @@ def epochs2mat(subjects, output_dir, session="1", task="prp", conditions_filter=
     :param task:
     :param conditions_filter:
     :param factors:
+    :param rt_column:
     :return:
     """
     # Create the output directory:
@@ -35,12 +37,12 @@ def epochs2mat(subjects, output_dir, session="1", task="prp", conditions_filter=
             epochs = epochs[conditions_filter]
         # Prepare the conditions vector:
         # Extract the conditions of interests:
-        metadata = epochs.metadata[factors].copy().reset_index(drop=True)
+        metadata = epochs.metadata[factors + [rt_column]].copy().reset_index(drop=True)
         # Sort the conditions to ensure that the string encoding produces the same labels:
         metadata_sorted = metadata.sort_values(factors).replace("-", "", regex=True)
         trials_order = list(metadata_sorted.index)
         # Replace the floats by strings:
-        metadata_strings = metadata_sorted.copy()
+        metadata_strings = metadata_sorted.copy()[factors]
         for col in metadata_strings.columns:
             try:
                 float(metadata_strings.loc[0, col])
@@ -59,7 +61,7 @@ def epochs2mat(subjects, output_dir, session="1", task="prp", conditions_filter=
                 lats[1] = float(trial["SOA"]) + float(trial["duration"])
             else:
                 lats[1] = float(trial["SOA"])
-            lats[2] = 0.7
+            lats[2] = trial[rt_column]
             lats[3] = float(trial["duration"])
             latency_matrix.append(lats)
         # Convert to a dataframe:
@@ -85,4 +87,4 @@ if __name__ == "__main__":
                      "SX114", "SX115", "SX116"]  # "SX118", "SX119", "SX120", "SX121"]
     epochs2mat(subjects_list, Path(ev.bids_root, "derivatives", "pret"), session="1", task="prp",
                conditions_filter=["non-target", "irrelevant"],
-               factors=["SOA", "duration", "lock", "task relevance"])
+               factors=["SOA", "duration", "lock", "task relevance"], rt_column="RT_aud")

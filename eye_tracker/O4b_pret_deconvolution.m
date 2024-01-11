@@ -6,10 +6,11 @@ addpath("C:\Users\alexander.lepauvre\Documents\GitHub\PRET")
 
 %% Set parameters:
 % Set the data parameters:
-root = extractBidsRoot("..\environment_variables.py");
+root = fullfile(extractBidsRoot("..\environment_variables.py"), 'derivatives', 'pret');
 session = '1';
 task = 'prp';
-subjects = "SX102"; % List of subjects to model
+subjects = ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX112", "SX113", ...
+    "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121"]; % List of subjects to model
 
 % PRET parameters:
 % Preprocessing parameters:
@@ -17,7 +18,7 @@ baseline_win = [-0.2  * 1000, 0  * 1000]; % Baseline time window for baseline no
 normflag = 1;
 blinkflag = 0;
 % Model parameters:
-model_window = [0, 2500];  % Time window to model
+model_window = [0, 2500]; % Time window to model
 yintflag = 0;
 slopeflag = 0;
 ampbounds = [-100; 100]; % Amplitude can vary between positive and negative values
@@ -50,8 +51,11 @@ for subject_i = 1:length(subjects)
         fprintf("Modelling condition: %s\n", cond)
         % Extract the data of this condition:
         cond_data = {data(strcmp(cond_labels,cond), :)};
+        % Set the reaction time to the mean:
+        eventtimes = latency(strcmp(cond_labels,cond), :);
+        eventtimes(:, 3) = mean(eventtimes(:, 3));
         % Extract  the latency of this condition:
-        eventtimes = unique(latency(strcmp(cond_labels,cond), :), 'rows');
+        eventtimes = unique(eventtimes, 'rows');
 
         %% Create preprocessing options;
         dflt_opt = pret_default_options;
@@ -66,9 +70,9 @@ for subject_i = 1:length(subjects)
         model = pret_model();
 
         % While the trial window of our task is from -500 to 3500 ms, here we are
-        % not interested in what's happening before 0. So
-        % let's set the model window to fit only to the region betweeen 0 and 3500
-        % ms (the cost function will only be evaluated along this interval).
+        % not interested in what's happening before 0. So let's set the model 
+        % window to fit only to the region betweeen 0 and 3500ms (the cost 
+        % function will only be evaluated along this interval).
         model.window = model_window;
 
         % We already know the sampling frequency.
@@ -76,11 +80,12 @@ for subject_i = 1:length(subjects)
 
         % Add the events time of the task. Importantly, it needs to be
         % sorted:
+        rt = round(eventtimes(3) * 1000);
         [sorted_evt_times, I] = sort(eventtimes); 
-        model.eventtimes = sorted_evt_times .* 1000;
+        model.eventtimes = round(sorted_evt_times .* 1000);
         model.eventlabels = cellstr(eventlabels); %optional
         model.eventlabels = model.eventlabels(I);
-        model.boxtimes = {[0 2000]};
+        model.boxtimes = {[0 rt]};
         model.boxlabels = {'task'}; %optional
 
         % Let's say we want to fit a model with the following parameters:

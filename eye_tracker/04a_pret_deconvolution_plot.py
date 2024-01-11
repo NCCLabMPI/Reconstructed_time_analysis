@@ -55,12 +55,12 @@ def plot_pret_latencies(data_dir, session="1", task="prp", conditions_mapping=No
     # ===========================================================================
     # Onset locked:
     fig, ax_tr = plt.subplots(nrows=1, ncols=1)
-    plot_within_subject_boxplot(results[(results["lock"] == "onset") & (results["task"] == "nontarget")],
+    plot_within_subject_boxplot(results[results["lock"] == "onset"],
                                 "subject", "SOA",
                                 "audOnset", positions="SOA",
                                 ax=ax_tr, cousineau_correction=False, title="", xlabel="", ylabel="", xlim=None,
                                 width=0.1, face_colors=face_colors_audio, edge_colors=None, xlabel_fontsize=9)
-    plot_within_subject_boxplot(results[(results["lock"] == "onset") & (results["task"] == "nontarget")],
+    plot_within_subject_boxplot(results[results["lock"] == "onset"],
                                 "subject", "SOA",
                                 "visOnset", positions="SOA",
                                 ax=ax_tr, cousineau_correction=False, title="", xlabel="", ylabel="", xlim=None,
@@ -68,6 +68,7 @@ def plot_pret_latencies(data_dir, session="1", task="prp", conditions_mapping=No
     ax_tr.set_xlim([-0.1, 0.5])
     ax_tr.set_xlabel("SOA (sec.)")
     ax_tr.set_ylabel("Event latency (sec.)")
+    plt.show()
 
     fig, ax_ti = plt.subplots(nrows=1, ncols=1)
     plot_within_subject_boxplot(results[(results["lock"] == "onset") & (results["task"] == "irrelevant")],
