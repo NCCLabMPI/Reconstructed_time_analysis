@@ -1,7 +1,45 @@
 from mne.baseline import rescale
 import numpy as np
 import pandas as pd
+from mne._fiff.pick import _picks_to_idx
+from scipy.ndimage import gaussian_filter
 
+
+def generate_gaze_map(epochs, height, width, sigma=20):
+    """
+    This function takes in the eyetracker data in the mne epochs object and generates gaze maps. This is highly inspired
+    from this code https://github.com/mne-tools/mne-python/blob/main/mne/viz/eyetracking/heatmap.py#L13-L104
+    :param epochs:
+    :param height:
+    :param width:
+    :param sigma:
+    :return:
+    """
+
+    pos_picks = _picks_to_idx(epochs.info, "eyegaze")
+    gaze_data = epochs.get_data(picks=pos_picks)
+    gaze_ch_loc = np.array([epochs.info["chs"][idx]["loc"] for idx in pos_picks])
+    x_data = gaze_data[:, np.where(gaze_ch_loc[:, 4] == -1)[0], :]
+    y_data = gaze_data[:, np.where(gaze_ch_loc[:, 4] == 1)[0], :]
+    if x_data.shape[1] > 1:  # binocular recording. Average across eyes
+        x_data = np.nanmean(x_data, axis=1)  # shape (n_epochs, n_samples)
+        y_data = np.nanmean(y_data, axis=1)
+    canvas = np.vstack((x_data.flatten(), y_data.flatten()))  # shape (2, n_samples)
+
+    hist, _, _ = np.histogram2d(
+        canvas[1, :],
+        canvas[0, :],
+        bins=(height, width),
+        range=[[0, height], [0, width]],
+    )
+
+    # Convert density from samples to seconds
+    hist /= epochs.info["sfreq"]
+    # Smooth the heatmap
+    if sigma:
+        hist = gaussian_filter(hist, sigma=sigma)
+
+    return hist
 
 def cousineau_morey_correction(data, within_col, between_col, dependent_var):
     """

@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 from eye_tracker.general_helper_function import cousineau_morey_correction
 from eye_tracker.plotter_functions import plot_within_subject_boxplot
 import environment_variables as ev
+from eye_tracker.general_helper_function import generate_gaze_map
+import mne
 
 
 SMALL_SIZE = 12
@@ -68,7 +70,8 @@ def load_beh_data(root, subjects, session='1', task='prp', do_trial_exclusion=Tr
 
         # Apply trial rejection:
         n_trial = len(subject_data)
-        subject_data = perform_exclusion(subject_data)
+        if do_trial_exclusion:
+            subject_data = perform_exclusion(subject_data)
         # Add the subject ID:
         subject_data["subject"] = subject
         subjects_data.append(subject_data.reset_index(drop=True))
@@ -90,18 +93,127 @@ file_name = "sub-{}_ses-1_run-all_task-prp_events.csv"
 save_root = Path(ev.bids_root, "derivatives", "figures")
 if not os.path.isdir(save_root):
     os.makedirs(save_root)
+# Load the data without trial exclusion:
+subjects_data_raw = load_beh_data(root, subjects_list, session='1', task='prp', do_trial_exclusion=False)
+
 # Load the data:
 subjects_data = load_beh_data(root, subjects_list, session='1', task='prp', do_trial_exclusion=True)
+# ========================================================================================================
+# Figure quality checks:
+
+# ======================================================
+# A: Accuracy:
+fig1, ax1 = plt.subplots(nrows=1, ncols=2, sharex=False, sharey=True, figsize=[8.3, 8.3])
+# T1 target detection accuracy per category:
+t1_accuracy = []
+categories = ["face", "object", "letter", "false-font"]
+for subject in subjects_data_raw["sub_id"].unique():
+    for category in categories:
+        # Extract the data:
+        df = subjects_data_raw[(subjects_data_raw["sub_id"] == subject) &
+                               (subjects_data_raw["category"] == category.replace("-", "_")) &
+                               (subjects_data_raw["task_relevance"] == "target")]
+        acc = (df["trial_response_vis"].value_counts().get("hit", 0) / df.shape[0]) * 100
+        t1_accuracy.append([subject, category, acc])
+t1_accuracy = pd.DataFrame(t1_accuracy, columns=["sub_id", "category", "T1_accuracy"])
+
+# T2 pitch detection accuracy:
+t2_accuracy = []
+pitches = [1000, 1100]
+for subject in subjects_data_raw["sub_id"].unique():
+    for pitch in pitches:
+        # Extract the data:
+        df = subjects_data_raw[(subjects_data_raw["sub_id"] == subject) &
+                               (subjects_data_raw["pitch"] == pitch) &
+                               (subjects_data_raw["task_relevance"] == "target")]
+        acc = (np.nansum(df["trial_accuracy_aud"].to_numpy()) / df.shape[0]) * 100
+        t2_accuracy.append([subject, pitch, acc])
+t2_accuracy = pd.DataFrame(t2_accuracy, columns=["sub_id", "pitch", "T2_accuracy"])
+
+_, _, _ = plot_within_subject_boxplot(t1_accuracy,
+                                      'sub_id', 'category', 'T1_accuracy',
+                                      positions=[1, 2, 3, 4], ax=ax1[0], cousineau_correction=False,
+                                      title="",
+                                      xlabel="Category", ylabel="Accuracy (%)",
+                                      xlim=None, width=0.5,
+                                      face_colors=[val for val in ev.colors["category"].values()])
+_, _, _ = plot_within_subject_boxplot(t2_accuracy,
+                                      'sub_id', 'pitch', 'T2_accuracy',
+                                      positions=[1, 2], ax=ax1[1], cousineau_correction=False,
+                                      title="",
+                                      xlabel="Pitch", ylabel="",
+                                      xlim=None, width=0.3,
+                                      face_colors=[val for val in ev.colors["pitch"].values()])
+ax1[0].set_xticklabels(categories)
+ax1[1].set_xticklabels(pitches)
+ax1[0].spines['right'].set_visible(False)
+ax1[1].spines['left'].set_visible(False)
+ax1[1].yaxis.set_visible(False)
+plt.subplots_adjust(wspace=0)
+fig1.suptitle("Task performances")
+fig1.savefig(Path(save_root, "t1t2_accuracy.svg"), transparent=True, dpi=dpi)
+fig1.savefig(Path(save_root, "t1t2_accuracy.png"), transparent=True, dpi=dpi)
+plt.close(fig1)
+
+# ======================================================
+# B: Reaction time:
+fig2, ax2 = plt.subplots(nrows=1, ncols=1, sharex=False, sharey=True, figsize=[8.3/2, 8.3])
+_, _, _ = plot_within_subject_boxplot(subjects_data,
+                                      'sub_id', 'category', 'RT_vis',
+                                      positions=[1, 2, 3, 4], ax=ax2, cousineau_correction=False,
+                                      title="",
+                                      xlabel="Category", ylabel="Reaction time (sec.)",
+                                      xlim=None, width=0.5,
+                                      face_colors=[val for val in ev.colors["category"].values()])
+ax2.set_xticklabels(categories)
+fig2.suptitle("T1 reaction time")
+fig2.savefig(Path(save_root, "t1_rt.svg"), transparent=True, dpi=dpi)
+fig2.savefig(Path(save_root, "t1_rt.png"), transparent=True, dpi=dpi)
+plt.close(fig2)
+
+# ======================================================
+# C: Fixation:
+# Load the eyetracking data:
+hists = []
+for subject in ["SX102", "SX103", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX112", "SX113",
+                "SX114", "SX115", "SX116", "SX119", "SX120", "SX121"]:
+    epochs_root = Path(ev.bids_root, "derivatives", "preprocessing", "sub-" + subject, "ses-1", "eyetrack",
+                       "sub-{}_ses-1_task-prp_eyetrack_desc-visual_onset-epo.fif".format(subject))
+    gaze_map = generate_gaze_map(mne.read_epochs(epochs_root), 1080, 1920, sigma=20)
+    hists.append(gaze_map)
+hists = np.nanmean(np.array(hists), axis=0)
+fig3, ax3 = plt.subplots(nrows=1, ncols=1, sharex=False, sharey=True, figsize=[8.3, 8.3 * 1080/1920])
+vmin = np.nanmin(hists)
+vmax = np.nanmax(hists)
+extent = [0, 1920, 1080, 0]  # origin is the top left of the screen
+# Plot heatmap
+im = ax3.imshow(
+    hists,
+    aspect="equal",
+    cmap="RdYlBu_r",
+    alpha=1,
+    extent=extent,
+    origin="upper",
+    vmin=vmin,
+    vmax=vmax,
+)
+ax3.set_title("Gaze heatmap")
+ax3.set_xlabel("X position")
+ax3.set_ylabel("Y position")
+fig3.colorbar(im, ax=ax3, shrink=0.8, label="Dwell time (seconds)")
+fig3.savefig(Path(save_root, "fixation_map.svg"), transparent=True, dpi=dpi)
+fig3.savefig(Path(save_root, "fixation_map.png"), transparent=True, dpi=dpi)
+plt.close(fig3)
+plt.show()
 
 # ========================================================================================================
 # Figure 5:
-
 # ==================================
 # Figure 5a:
 
 # Target:
 d = 1.5
-fig_ta, ax_ta = plt.subplots(nrows=1, ncols=4, sharex=False, sharey=True, figsize=[8.3/3, 11.7 / 2])
+fig_ta, ax_ta = plt.subplots(nrows=1, ncols=4, sharex=False, sharey=True, figsize=[8.3 / 3, 11.7 / 2])
 _, _, _ = plot_within_subject_boxplot(subjects_data[(subjects_data["task_relevance"] == 'target')
                                                     & (subjects_data["SOA_lock"] == 'onset')],
                                       'sub_id', 'onset_SOA', 'RT_aud',
@@ -120,8 +232,9 @@ for i, dur in enumerate(sorted(list(subjects_data["duration"].unique()))):
                                           positions='onset_SOA', ax=ax_ta[i + 1], cousineau_correction=True,
                                           title="",
                                           xlabel="", ylabel="",
-                                          xlim=[dur-0.1, dur + 0.6], width=0.1,
-                                          face_colors=[val for val in ev.colors["soa_offset_locked_{}ms".format(int(dur*1000))].values()])
+                                          xlim=[dur - 0.1, dur + 0.6], width=0.1,
+                                          face_colors=[val for val in ev.colors[
+                                              "soa_offset_locked_{}ms".format(int(dur * 1000))].values()])
     ax_ta[i + 1].yaxis.set_visible(False)
 # Remove the spines:
 for i in [0, 1, 2]:
@@ -137,7 +250,7 @@ for i in [0, 1, 2]:
 plt.subplots_adjust(wspace=0.05)
 
 # Task relevant:
-fig_tr, ax_tr = plt.subplots(nrows=1, ncols=4, sharex=False, sharey=True, figsize=[8.3/3, 11.7 / 2])
+fig_tr, ax_tr = plt.subplots(nrows=1, ncols=4, sharex=False, sharey=True, figsize=[8.3 / 3, 11.7 / 2])
 _, _, _ = plot_within_subject_boxplot(subjects_data[(subjects_data["task_relevance"] == 'non-target')
                                                     & (subjects_data["SOA_lock"] == 'onset')], 'sub_id', 'onset_SOA',
                                       'RT_aud',
@@ -156,8 +269,9 @@ for i, dur in enumerate(sorted(list(subjects_data["duration"].unique()))):
                                           positions='onset_SOA', ax=ax_tr[i + 1], cousineau_correction=True,
                                           title="",
                                           xlabel="", ylabel="",
-                                          xlim=[dur-0.1, dur + 0.6], width=0.1,
-                                          face_colors=[val for val in ev.colors["soa_offset_locked_{}ms".format(int(dur*1000))].values()])
+                                          xlim=[dur - 0.1, dur + 0.6], width=0.1,
+                                          face_colors=[val for val in ev.colors[
+                                              "soa_offset_locked_{}ms".format(int(dur * 1000))].values()])
     ax_tr[i + 1].yaxis.set_visible(False)
 # Remove the spines:
 for i in [0, 1, 2]:
@@ -173,7 +287,7 @@ for i in [0, 1, 2]:
 plt.subplots_adjust(wspace=0.05)
 
 # Task irrelevant:
-fig_ti, ax_ti = plt.subplots(nrows=1, ncols=4, sharex=False, sharey=True, figsize=[8.3/3, 11.7 / 2])
+fig_ti, ax_ti = plt.subplots(nrows=1, ncols=4, sharex=False, sharey=True, figsize=[8.3 / 3, 11.7 / 2])
 _, _, _ = plot_within_subject_boxplot(subjects_data[(subjects_data["task_relevance"] == 'irrelevant')
                                                     & (subjects_data["SOA_lock"] == 'onset')], 'sub_id', 'onset_SOA',
                                       'RT_aud',
@@ -192,8 +306,9 @@ for i, dur in enumerate(sorted(list(subjects_data["duration"].unique()))):
                                           positions='onset_SOA', ax=ax_ti[i + 1], cousineau_correction=True,
                                           title="",
                                           xlabel="", ylabel="",
-                                          xlim=[dur-0.1, dur + 0.6], width=0.1,
-                                          face_colors=[val for val in ev.colors["soa_offset_locked_{}ms".format(int(dur*1000))].values()])
+                                          xlim=[dur - 0.1, dur + 0.6], width=0.1,
+                                          face_colors=[val for val in ev.colors[
+                                              "soa_offset_locked_{}ms".format(int(dur * 1000))].values()])
     ax_ti[i + 1].yaxis.set_visible(False)
 # Remove the spines:
 for i in [0, 1, 2]:
@@ -241,7 +356,7 @@ plt.close(fig_ti)
 subject_data_corrected = cousineau_morey_correction(subjects_data, 'sub_id', 'onset_SOA', 'RT_aud')
 
 # Task relevant onset:
-fig_tr_onset, ax_tr_onset = plt.subplots(nrows=1, ncols=1, figsize=[8.3/2, 8.3 / 4])
+fig_tr_onset, ax_tr_onset = plt.subplots(nrows=1, ncols=1, figsize=[8.3 / 2, 8.3 / 4])
 for soa in list(subject_data_corrected["SOA"].unique()):
     data = subjects_data[(subjects_data["task_relevance"] == 'non-target')
                          & (subjects_data["SOA_lock"] == 'onset')
@@ -250,7 +365,7 @@ for soa in list(subject_data_corrected["SOA"].unique()):
     data = data[~np.isnan(data)]
     ax_tr_onset.ecdf(data, label=str(soa), color=ev.colors["soa_onset_locked"][str(soa)])
 # Task irrelevant onset:
-fig_ti_onset, ax_ti_onset = plt.subplots(nrows=1, ncols=1, figsize=[8.3/2, 8.3 / 4])
+fig_ti_onset, ax_ti_onset = plt.subplots(nrows=1, ncols=1, figsize=[8.3 / 2, 8.3 / 4])
 for soa in list(subject_data_corrected["SOA"].unique()):
     data = subjects_data[(subjects_data["task_relevance"] == 'irrelevant')
                          & (subjects_data["SOA_lock"] == 'onset')
@@ -259,9 +374,8 @@ for soa in list(subject_data_corrected["SOA"].unique()):
     data = data[~np.isnan(data)]
     ax_ti_onset.ecdf(data, label=str(soa), color=ev.colors["soa_onset_locked"][str(soa)])
 
-
 # Offset 500:
-fig_offset_short, ax_offset_short = plt.subplots(nrows=1, ncols=1, figsize=[8.3/3, 8.3 / 4])
+fig_offset_short, ax_offset_short = plt.subplots(nrows=1, ncols=1, figsize=[8.3 / 3, 8.3 / 4])
 for soa in list(subject_data_corrected["SOA"].unique()):
     data = subjects_data[(subjects_data["task_relevance"].isin(['non-target', 'irrelevant']))
                          & (subjects_data["SOA_lock"] == 'offset')
@@ -272,7 +386,7 @@ for soa in list(subject_data_corrected["SOA"].unique()):
     ax_offset_short.ecdf(data, label=str(soa), color=ev.colors["soa_offset_locked_500ms"][str(soa)])
 
 # Offset 1000:
-fig_offset_int, ax_offset_int = plt.subplots(nrows=1, ncols=1, figsize=[8.3/3, 8.3 / 4])
+fig_offset_int, ax_offset_int = plt.subplots(nrows=1, ncols=1, figsize=[8.3 / 3, 8.3 / 4])
 for soa in list(subject_data_corrected["SOA"].unique()):
     data = subjects_data[(subjects_data["task_relevance"].isin(['non-target', 'irrelevant']))
                          & (subjects_data["SOA_lock"] == 'offset')
@@ -283,7 +397,7 @@ for soa in list(subject_data_corrected["SOA"].unique()):
     ax_offset_int.ecdf(data, label=str(soa), color=ev.colors["soa_offset_locked_1000ms"][str(soa)])
 
 # Offset 1500:
-fig_offset_long, ax_offset_long = plt.subplots(nrows=1, ncols=1, figsize=[8.3/3, 8.3 / 4])
+fig_offset_long, ax_offset_long = plt.subplots(nrows=1, ncols=1, figsize=[8.3 / 3, 8.3 / 4])
 for soa in list(subject_data_corrected["SOA"].unique()):
     data = subjects_data[(subjects_data["task_relevance"].isin(['non-target', 'irrelevant']))
                          & (subjects_data["SOA_lock"] == 'offset')
