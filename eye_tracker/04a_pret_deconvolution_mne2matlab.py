@@ -7,7 +7,7 @@ import mne
 
 
 def epochs2mat(subjects, output_dir, session="1", task="prp", conditions_filter=None, factors=None,
-               rt_column="RT_aud"):
+               rt_column="RT_aud", decim_factor=5):
     """
 
     :param subjects:
@@ -17,6 +17,7 @@ def epochs2mat(subjects, output_dir, session="1", task="prp", conditions_filter=
     :param conditions_filter:
     :param factors:
     :param rt_column:
+    :param decim_factor:
     :return:
     """
     # Create the output directory:
@@ -35,6 +36,9 @@ def epochs2mat(subjects, output_dir, session="1", task="prp", conditions_filter=
                                                                                                         task)))
         if conditions_filter is not None:
             epochs = epochs[conditions_filter]
+        # Downsample the data:
+        if decim_factor > 0:
+            epochs.decimate(decim_factor)
         # Prepare the conditions vector:
         # Extract the conditions of interests:
         metadata = epochs.metadata[factors + [rt_column]].copy().reset_index(drop=True)
@@ -87,4 +91,4 @@ if __name__ == "__main__":
                      "SX114", "SX115", "SX116"]  # "SX118", "SX119", "SX120", "SX121"]
     epochs2mat(subjects_list, Path(ev.bids_root, "derivatives", "pret"), session="1", task="prp",
                conditions_filter=["non-target", "irrelevant"],
-               factors=["SOA", "duration", "lock", "task relevance"], rt_column="RT_aud")
+               factors=["SOA", "duration", "lock", "task relevance"], rt_column="RT_aud", decim_factor=5)
