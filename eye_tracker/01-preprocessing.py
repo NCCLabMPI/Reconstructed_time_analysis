@@ -4,7 +4,8 @@ import json
 from pathlib import Path
 from eye_tracker.preprocessing_helper_function import (extract_eyelink_events, epoch_data, dilation_speed_rejection,
                                                        trend_line_departure, remove_bad_epochs, show_bad_segments,
-                                                       load_raw_eyetracker, compute_proportion_bad, add_logfiles_info)
+                                                       load_raw_eyetracker, compute_proportion_bad, add_logfiles_info,
+                                                       gaze_to_dva)
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -35,10 +36,11 @@ def preprocessing(subject, parameters):
     # Load the data:
     files_root = Path(ev.bids_root, "sub-" + subject, "ses-" + session, data_type)
     # Load the eyetracker data and associated files:
-    logs_list, raws_list, calibs_list = load_raw_eyetracker(files_root, subject, session, task, ev.raw_root,
-                                                            param["beh_file_name"],
-                                                            param["epochs"]["visual_onset"]["metadata_column"],
-                                                            'vis_onset', verbose=False, debug=DEBUG)
+    logs_list, raws_list, calibs_list, screen_size, screen_distance, screen_res = (
+        load_raw_eyetracker(files_root, subject, session, task, ev.raw_root,
+                            param["beh_file_name"],
+                            param["epochs"]["visual_onset"]["metadata_column"],
+                            'vis_onset', verbose=False, debug=DEBUG))
     # Concatenate the objects
     raw = mne.concatenate_raws(raws_list)
     # Remove the empty calibrations:
@@ -86,6 +88,9 @@ def preprocessing(subject, parameters):
             # Loop through each event to extract:
             for evt in step_param["events"]:
                 raw = extract_eyelink_events(raw, evt, eyes=step_param["eyes"])
+
+        if step == "gaze_to_dva":
+            raw = gaze_to_dva(raw, screen_size, screen_distance, eyes=step_param["eyes"])
 
         # Print the proportion of NaN in the data:
         proportion_bad = compute_proportion_bad(raw, desc="BAD_", eyes=["left", "right"])
@@ -204,8 +209,9 @@ if __name__ == "__main__":
     # SX104: missing files
     # SX117: no eyetracking data
     # "SX118": Issue with mne reader
-    subjects_list = ["SX102", "SX103", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX112", "SX113",
-                     "SX114", "SX115", "SX116", "SX119", "SX120", "SX121"]
+    # , "SX103", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX112", "SX113",
+    #                      "SX114", "SX115", "SX116", "SX119", "SX120", "SX121"
+    subjects_list = ["SX102"]
 
     parameters_file = (
         r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker"

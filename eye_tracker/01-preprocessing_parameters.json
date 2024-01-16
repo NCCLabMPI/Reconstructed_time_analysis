@@ -4,8 +4,7 @@
   "session": "1",
   "data_type": "eyetrack",
   "preprocessing_steps": [
-    "dilation_speed_rejection",
-    "trend_line_departure",
+    "gaze_to_dva",
     "interpolate_blinks",
     "extract_eyelink_events",
     "epochs",
@@ -19,6 +18,9 @@
   "discard_bad_subjects": {
     "bad_trials_threshold": 0.5,
     "nan_threshold": 0.5
+  },
+  "gaze_to_dva": {
+    "eyes": ["left", "right"]
   },
   "trend_line_departure": {
     "eyes": ["left", "right"],
