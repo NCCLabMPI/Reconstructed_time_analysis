@@ -24,25 +24,31 @@ plt.rc('legend', fontsize=SMALL_SIZE)  # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
 
-def perform_exclusion(data):
+def perform_exclusion(data_df):
     """
     This function performs the exclusion criterion reported in the paper. Packaged in a function such that we can use
     it in various places:
-    :param data:
+    :param data_df:
     :return:
     """
     # 1. Remove the trials with wrong visual responses:
-    data = data[data["trial_response_vis"] != "fa"]
+    data_df_clean = data_df[data_df["trial_response_vis"] != "fa"]
     # 2. Remove the trials with wrong auditory responses:
-    data = data[data["trial_accuracy_aud"] != 0]
+    data_df_clean = data_df_clean[data_df_clean["trial_accuracy_aud"] != 0]
     # 3. Remove trials where the visual stimuli were responded second:
-    data = data[data["trial_second_button_press"] != 1]
-    # 4. Remove trials in which the participants responded to the auditory stimulus in less than 100ms:
-    data = data[data["RT_aud"] >= 0.1]
-    # 5. Remove the trials in which the participants took more than 1.260sec to respond:
-    data = data[data["RT_aud"] <= 1.260]
+    data_df_clean = data_df_clean[data_df_clean["trial_second_button_press"] != 1]
+    # 4. Remove trials in which the participants responded to the auditory stimulus in less than 100ms and more than
+    # 1260ms:
+    data_df_clean = data_df_clean[(data_df_clean["RT_aud"] >= 0.1) & (data_df_clean["RT_aud"] <= 1.260)]
 
-    return data
+    # Compute the proportion of rejected trials for each condition:
+    prop_vis_fa = data_df[data_df["trial_response_vis"] == "fa"].shape[0] / data_df.shape[0]
+    prop_false_aud = data_df[data_df["trial_accuracy_aud"] == 0].shape[0] / data_df.shape[0]
+    prop_vis_second = data_df[data_df["trial_second_button_press"] == 1].shape[0] / data_df.shape[0]
+    prop_rt_outlier = (data_df[(data_df["RT_aud"] <= 0.1) & (data_df["RT_aud"] >= 1.260)].shape[0] /
+                       data_df.shape[0])
+
+    return data_df_clean, prop_vis_fa, prop_false_aud, prop_vis_second, prop_rt_outlier
 
 
 def load_beh_data(root, subjects, session='1', task='prp', do_trial_exclusion=True):
@@ -57,28 +63,44 @@ def load_beh_data(root, subjects, session='1', task='prp', do_trial_exclusion=Tr
     """
     # Load the data:
     subjects_data = []
+    if do_trial_exclusion:
+        prop_rejected = []
+        for subject in subjects_list:
+            if subject == "SX106" or subject == "SX107":
+                behavioral_file = Path(root, "sub-" + subject, "ses-" + ses,
+                                       "sub-{}_ses-1_run-all_task-prp_events_repetition_1.csv".format(subject))
+            else:
+                behavioral_file = Path(root, "sub-" + subject, "ses-" + ses, file_name.format(subject))
+            # Load the file:
+            subject_data = pd.read_csv(behavioral_file, sep=",")
+            # Add the subject ID:
+            subject_data["subject"] = subject
+            # Apply trial rejection:
+            subject_data, prop_vis_fa, prop_false_aud, prop_vis_second, prop_rt_outlier = (
+                perform_exclusion(subject_data))
+            # Append to the rest of the subject
+            subjects_data.append(subject_data.reset_index(drop=True))
+            # Compute the proportion of rejected trials:
+            rejected_trials_prop = prop_vis_fa + prop_false_aud + prop_vis_second + prop_rt_outlier
+            # Print the proportion of trials that were discarded:
+            print("Subject {} - {:.2f}% trials were discarded".format(subject, rejected_trials_prop * 100))
+            prop_rejected.append(rejected_trials_prop)
 
-    for subject in subjects_list:
-        if subject == "SX106" or subject == "SX107":
-            behavioral_file = Path(root, "sub-" + subject, "ses-" + ses,
-                                   "sub-{}_ses-1_run-all_task-prp_events_repetition_1.csv".format(subject))
-        else:
-            behavioral_file = Path(root, "sub-" + subject, "ses-" + ses, file_name.format(subject))
-        # Load the file:
-        subject_data = pd.read_csv(behavioral_file, sep=",")
-
-        # Apply trial rejection:
-        n_trial = len(subject_data)
-        if do_trial_exclusion:
-            subject_data = perform_exclusion(subject_data)
-        # Add the subject ID:
-        subject_data["subject"] = subject
-        subjects_data.append(subject_data.reset_index(drop=True))
-        # Print the proportion of trials that were discarded:
-        print("Subject {} - {}% trials were discarded".format(subject,
-                                                              ((n_trial - len(subject_data)) / n_trial) * 100))
-
-    # Concatenate the data:
+        print("The mean proportion of rejected trials is {:.2f}% +- {:.2f}".format(np.mean(prop_rejected) * 100,
+                                                                           np.std(prop_rejected) * 100))
+    else:
+        for subject in subjects_list:
+            if subject == "SX106" or subject == "SX107":
+                behavioral_file = Path(root, "sub-" + subject, "ses-" + ses,
+                                       "sub-{}_ses-1_run-all_task-prp_events_repetition_1.csv".format(subject))
+            else:
+                behavioral_file = Path(root, "sub-" + subject, "ses-" + ses, file_name.format(subject))
+            # Load the file:
+            subject_data = pd.read_csv(behavioral_file, sep=",")
+            # Add the subject ID:
+            subject_data["subject"] = subject
+            # Append to the rest of the subjects:
+            subjects_data.append(subject_data.reset_index(drop=True))
     return pd.concat(subjects_data).reset_index(drop=True)
 
 
@@ -98,6 +120,7 @@ subjects_data_raw = load_beh_data(root, subjects_list, session='1', task='prp', 
 
 # Load the data:
 subjects_data = load_beh_data(root, subjects_list, session='1', task='prp', do_trial_exclusion=True)
+
 # ========================================================================================================
 # Figure quality checks:
 if plot_check_plots:
