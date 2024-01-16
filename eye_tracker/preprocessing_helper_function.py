@@ -29,10 +29,6 @@ def pix_to_deg(x_pix, y_pix, screen_size_mm, screen_res, screen_dist_mm):
                     (y_pix - screen_res[0] / 2) * deg_per_pixel)
     # Convert to distance from the center of the screen:
     distance_deg = np.sqrt(x_deg ** 2 + y_deg ** 2)
-    plt.plot(distance_deg)
-    plt.xlabel("Time")
-    plt.ylabel("Degrees")
-    plt.show()
     return distance_deg
 
 
