@@ -7,11 +7,12 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from scipy.ndimage import gaussian_filter1d
+from math import atan2, degrees
 
 show_checks = False
 
 
-def pix_to_deg(x_pix, y_pix, screen_size_mm, screen_dist_mm):
+def pix_to_deg(x_pix, y_pix, screen_size_mm, screen_res, screen_dist_mm):
     """
     This function converts the gaze coordinates to degree of visual angle from center of the screen.
     :param x_pix:
@@ -20,25 +21,22 @@ def pix_to_deg(x_pix, y_pix, screen_size_mm, screen_dist_mm):
     :param screen_dist_mm:
     :return:
     """
-    # Convert screen dimensions to degrees
-    screen_width_deg = np.degrees(2 * np.arctan((screen_size_mm[0] / 2) / screen_dist_mm))
-    screen_height_deg = np.degrees(2 * np.arctan((screen_size_mm[0] / 2) / screen_dist_mm))
-
-    # Calculate pixels per degree for both dimensions
-    pixels_per_degree_x = x_pix / screen_width_deg
-    pixels_per_degree_y = y_pix / screen_height_deg
-
-    # Calculate gaze positions in degrees
-    x_degrees = (x_pix / pixels_per_degree_x) - (screen_width_deg / 2)
-    y_degrees = (y_pix / pixels_per_degree_y) - (screen_height_deg / 2)
-
-    # Pythagoras conversion to distance from the center of the screen.
-    distance_degrees = np.sqrt(x_degrees ** 2 + y_degrees ** 2)
-
-    return distance_degrees
+    # Calculate deg/px:
+    deg_per_pixel = np.mean([degrees(atan2(.5 * screen_size_mm[0], screen_dist_mm)) / (.5 * screen_res[0]),
+                             degrees(atan2(.5 * screen_size_mm[1], screen_dist_mm)) / (.5 * screen_res[1])])
+    # Convert x and y coordinates from pixels to cm:
+    x_deg, y_deg = ((x_pix - screen_res[1] / 2) * deg_per_pixel,
+                    (y_pix - screen_res[0] / 2) * deg_per_pixel)
+    # Convert to distance from the center of the screen:
+    distance_deg = np.sqrt(x_deg ** 2 + y_deg ** 2)
+    plt.plot(distance_deg)
+    plt.xlabel("Time")
+    plt.ylabel("Degrees")
+    plt.show()
+    return distance_deg
 
 
-def gaze_to_dva(raw, screen_size_mm, screen_dist_mm, eyes=None):
+def gaze_to_dva(raw, screen_size_mm, screen_res, screen_dist_mm, eyes=None):
     """
     This function converts the gaze measurements from pixel coordinates to degrees of visual angle (dva) from the
     middle of the screen.
@@ -60,10 +58,10 @@ def gaze_to_dva(raw, screen_size_mm, screen_dist_mm, eyes=None):
         eye_x, eye_y = (np.squeeze(raw.get_data(picks=["xpos_{}".format(eye)])),
                         np.squeeze(raw.get_data(picks=["ypos_{}".format(eye)])))
         # Convert to dva:
-        fixation_dist = pix_to_deg(eye_x, eye_y, screen_size_mm, screen_dist_mm)
+        fixation_dist = pix_to_deg(eye_x, eye_y, screen_size_mm, screen_res, screen_dist_mm)
         # Create a raw object for this channel:
         info = mne.create_info(ch_names=["_".join(["fixdist", eye])],
-                               ch_types=['eyetrack'],
+                               ch_types=['eyegaze'],
                                sfreq=raw.info["sfreq"])
         # Add measurement date:
         info.set_meas_date(raw.info['meas_date'])
@@ -164,8 +162,10 @@ def load_raw_eyetracker(files_root, subject, session, task, beh_files_root, beh_
     assert len(np.unique(screen_sizes)) == 2, "Found different screen sizes within the same participant!"
     assert len(np.unique(screen_distances)) == 1, "Found different screen distances within the same participant!"
     assert len(np.unique(screen_ress)) == 3, "Found different screen resolutions within the same participant!"
-
-    return logs, raws, calibs, np.unique(screen_sizes), np.unique(screen_distances)[0], np.unique(screen_ress)[1:3] + 1
+    screen_size = np.unique(screen_sizes)
+    screen_distance = np.unique(screen_distances)[0]
+    screen_res = np.unique(screen_ress)[1:3] + 1
+    return logs, raws, calibs, screen_size, screen_distance, screen_res
 
 
 def add_logfiles_info(epochs, log_file, columns):

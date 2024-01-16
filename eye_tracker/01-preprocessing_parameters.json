@@ -4,8 +4,8 @@
   "session": "1",
   "data_type": "eyetrack",
   "preprocessing_steps": [
-    "gaze_to_dva",
     "interpolate_blinks",
+    "gaze_to_dva",
     "extract_eyelink_events",
     "epochs",
     "remove_bad_epochs",

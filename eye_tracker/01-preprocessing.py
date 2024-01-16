@@ -90,7 +90,7 @@ def preprocessing(subject, parameters):
                 raw = extract_eyelink_events(raw, evt, eyes=step_param["eyes"])
 
         if step == "gaze_to_dva":
-            raw = gaze_to_dva(raw, screen_size, screen_distance, eyes=step_param["eyes"])
+            raw = gaze_to_dva(raw, screen_size, screen_res, screen_distance, eyes=step_param["eyes"])
 
         # Print the proportion of NaN in the data:
         proportion_bad = compute_proportion_bad(raw, desc="BAD_", eyes=["left", "right"])
