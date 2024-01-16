@@ -10,7 +10,7 @@ root = fullfile(extractBidsRoot("..\environment_variables.py"), 'derivatives', '
 session = '1';
 task = 'prp';
 subjects = ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX112", "SX113", ...
-    "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121"]; % List of subjects to model
+    "SX114", "SX115", "SX116", "SX119", "SX120", "SX121"]; % List of subjects to model , "SX118"
 
 % PRET parameters:
 % Preprocessing parameters:
@@ -27,7 +27,7 @@ boxampbounds = [0;100]; % Box amplitude constrained to positive values, as it mo
 tmaxbounds = [500;2500]; % Bound for the tmax parameter of the pupil response function
 yintval = 0;
 slopeval = 0;
-optimnum = 20; % Take the 20 best starting values for optimization
+optimnum = 12; % Take the 20 best starting values for optimization
 wnum = 4; % Number of cores to use
 
 % Prepare variable to store the results
@@ -53,7 +53,7 @@ for subject_i = 1:length(subjects)
         cond_data = {data(strcmp(cond_labels,cond), :)};
         % Set the reaction time to the mean:
         eventtimes = latency(strcmp(cond_labels,cond), :);
-        eventtimes(:, 3) = mean(eventtimes(:, 3));
+        eventtimes(:, 3) = nanmean(eventtimes(:, 3));
         % Extract  the latency of this condition:
         eventtimes = unique(eventtimes, 'rows');
 
@@ -80,7 +80,7 @@ for subject_i = 1:length(subjects)
 
         % Add the events time of the task. Importantly, it needs to be
         % sorted:
-        rt = round(eventtimes(3) * 1000);
+        rt = (round(eventtimes(3) * sfreq) * 1 / sfreq) * 1000;
         [sorted_evt_times, I] = sort(eventtimes); 
         model.eventtimes = round(sorted_evt_times .* 1000);
         model.eventlabels = cellstr(eventlabels); %optional
@@ -115,7 +115,10 @@ for subject_i = 1:length(subjects)
         sj = pret_preprocess(cond_data,sfreq,[tmin * 1000, tmax  * 1000], {cond}, baseline_win,prepro_opt);
 
         %% Fit the model:
+        tstart = tic;
         sj = pret_estimate_sj(sj,model,wnum,set_opt);
+        tend = toc(tstart);
+        fprintf("Elapsed time: %d\n", tend)
         sj.subject = subject;
         sj.estim.(cond).eventlabels = model.eventlabels;
         sj_res = [sj_res, sj];

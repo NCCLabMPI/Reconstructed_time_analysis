@@ -178,7 +178,7 @@ def events_latency(parameters_file, subjects):
 
 if __name__ == "__main__":
     subjects_list = ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX112", "SX113",
-                     "SX114", "SX115", "SX116"] #, "SX118", "SX119", "SX120", "SX121"]
+                     "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121"]
     # Perform the blinks latency analysis
     events_latency(r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker"
                    r"\03-latency_blinks_parameters.json ", subjects_list)
