@@ -5,11 +5,10 @@ from pathlib import Path
 import matplotlib
 import matplotlib.pyplot as plt
 from eye_tracker.general_helper_function import cousineau_morey_correction
-from eye_tracker.plotter_functions import plot_within_subject_boxplot
+from eye_tracker.plotter_functions import plot_within_subject_boxplot, soa_boxplot
 import environment_variables as ev
 from eye_tracker.general_helper_function import generate_gaze_map
 import mne
-
 
 SMALL_SIZE = 12
 MEDIUM_SIZE = 12
@@ -83,6 +82,7 @@ def load_beh_data(root, subjects, session='1', task='prp', do_trial_exclusion=Tr
     return pd.concat(subjects_data).reset_index(drop=True)
 
 
+plot_check_plots = False
 # ======================================================================================================================
 # Set parameters:
 root = r"P:\2023-0357-ReconTime\03_data\raw_data"
@@ -100,111 +100,111 @@ subjects_data_raw = load_beh_data(root, subjects_list, session='1', task='prp', 
 subjects_data = load_beh_data(root, subjects_list, session='1', task='prp', do_trial_exclusion=True)
 # ========================================================================================================
 # Figure quality checks:
+if plot_check_plots:
+    # ======================================================
+    # A: Accuracy:
+    fig1, ax1 = plt.subplots(nrows=1, ncols=2, sharex=False, sharey=True, figsize=[8.3, 8.3])
+    # T1 target detection accuracy per category:
+    t1_accuracy = []
+    categories = ["face", "object", "letter", "false-font"]
+    for subject in subjects_data_raw["sub_id"].unique():
+        for category in categories:
+            # Extract the data:
+            df = subjects_data_raw[(subjects_data_raw["sub_id"] == subject) &
+                                   (subjects_data_raw["category"] == category.replace("-", "_")) &
+                                   (subjects_data_raw["task_relevance"] == "target")]
+            acc = (df["trial_response_vis"].value_counts().get("hit", 0) / df.shape[0]) * 100
+            t1_accuracy.append([subject, category, acc])
+    t1_accuracy = pd.DataFrame(t1_accuracy, columns=["sub_id", "category", "T1_accuracy"])
 
-# ======================================================
-# A: Accuracy:
-fig1, ax1 = plt.subplots(nrows=1, ncols=2, sharex=False, sharey=True, figsize=[8.3, 8.3])
-# T1 target detection accuracy per category:
-t1_accuracy = []
-categories = ["face", "object", "letter", "false-font"]
-for subject in subjects_data_raw["sub_id"].unique():
-    for category in categories:
-        # Extract the data:
-        df = subjects_data_raw[(subjects_data_raw["sub_id"] == subject) &
-                               (subjects_data_raw["category"] == category.replace("-", "_")) &
-                               (subjects_data_raw["task_relevance"] == "target")]
-        acc = (df["trial_response_vis"].value_counts().get("hit", 0) / df.shape[0]) * 100
-        t1_accuracy.append([subject, category, acc])
-t1_accuracy = pd.DataFrame(t1_accuracy, columns=["sub_id", "category", "T1_accuracy"])
+    # T2 pitch detection accuracy:
+    t2_accuracy = []
+    pitches = [1000, 1100]
+    for subject in subjects_data_raw["sub_id"].unique():
+        for pitch in pitches:
+            # Extract the data:
+            df = subjects_data_raw[(subjects_data_raw["sub_id"] == subject) &
+                                   (subjects_data_raw["pitch"] == pitch) &
+                                   (subjects_data_raw["task_relevance"] == "target")]
+            acc = (np.nansum(df["trial_accuracy_aud"].to_numpy()) / df.shape[0]) * 100
+            t2_accuracy.append([subject, pitch, acc])
+    t2_accuracy = pd.DataFrame(t2_accuracy, columns=["sub_id", "pitch", "T2_accuracy"])
 
-# T2 pitch detection accuracy:
-t2_accuracy = []
-pitches = [1000, 1100]
-for subject in subjects_data_raw["sub_id"].unique():
-    for pitch in pitches:
-        # Extract the data:
-        df = subjects_data_raw[(subjects_data_raw["sub_id"] == subject) &
-                               (subjects_data_raw["pitch"] == pitch) &
-                               (subjects_data_raw["task_relevance"] == "target")]
-        acc = (np.nansum(df["trial_accuracy_aud"].to_numpy()) / df.shape[0]) * 100
-        t2_accuracy.append([subject, pitch, acc])
-t2_accuracy = pd.DataFrame(t2_accuracy, columns=["sub_id", "pitch", "T2_accuracy"])
+    _, _, _ = plot_within_subject_boxplot(t1_accuracy,
+                                          'sub_id', 'category', 'T1_accuracy',
+                                          positions=[1, 2, 3, 4], ax=ax1[0], cousineau_correction=False,
+                                          title="",
+                                          xlabel="Category", ylabel="Accuracy (%)",
+                                          xlim=None, width=0.5,
+                                          face_colors=[val for val in ev.colors["category"].values()])
+    _, _, _ = plot_within_subject_boxplot(t2_accuracy,
+                                          'sub_id', 'pitch', 'T2_accuracy',
+                                          positions=[1, 2], ax=ax1[1], cousineau_correction=False,
+                                          title="",
+                                          xlabel="Pitch", ylabel="",
+                                          xlim=None, width=0.3,
+                                          face_colors=[val for val in ev.colors["pitch"].values()])
+    ax1[0].set_xticklabels(categories)
+    ax1[1].set_xticklabels(pitches)
+    ax1[0].spines['right'].set_visible(False)
+    ax1[1].spines['left'].set_visible(False)
+    ax1[1].yaxis.set_visible(False)
+    plt.subplots_adjust(wspace=0)
+    fig1.suptitle("Task performances")
+    fig1.savefig(Path(save_root, "t1t2_accuracy.svg"), transparent=True, dpi=dpi)
+    fig1.savefig(Path(save_root, "t1t2_accuracy.png"), transparent=True, dpi=dpi)
+    plt.close(fig1)
 
-_, _, _ = plot_within_subject_boxplot(t1_accuracy,
-                                      'sub_id', 'category', 'T1_accuracy',
-                                      positions=[1, 2, 3, 4], ax=ax1[0], cousineau_correction=False,
-                                      title="",
-                                      xlabel="Category", ylabel="Accuracy (%)",
-                                      xlim=None, width=0.5,
-                                      face_colors=[val for val in ev.colors["category"].values()])
-_, _, _ = plot_within_subject_boxplot(t2_accuracy,
-                                      'sub_id', 'pitch', 'T2_accuracy',
-                                      positions=[1, 2], ax=ax1[1], cousineau_correction=False,
-                                      title="",
-                                      xlabel="Pitch", ylabel="",
-                                      xlim=None, width=0.3,
-                                      face_colors=[val for val in ev.colors["pitch"].values()])
-ax1[0].set_xticklabels(categories)
-ax1[1].set_xticklabels(pitches)
-ax1[0].spines['right'].set_visible(False)
-ax1[1].spines['left'].set_visible(False)
-ax1[1].yaxis.set_visible(False)
-plt.subplots_adjust(wspace=0)
-fig1.suptitle("Task performances")
-fig1.savefig(Path(save_root, "t1t2_accuracy.svg"), transparent=True, dpi=dpi)
-fig1.savefig(Path(save_root, "t1t2_accuracy.png"), transparent=True, dpi=dpi)
-plt.close(fig1)
+    # ======================================================
+    # B: Reaction time:
+    fig2, ax2 = plt.subplots(nrows=1, ncols=1, sharex=False, sharey=True, figsize=[8.3 / 2, 8.3])
+    _, _, _ = plot_within_subject_boxplot(subjects_data,
+                                          'sub_id', 'category', 'RT_vis',
+                                          positions=[1, 2, 3, 4], ax=ax2, cousineau_correction=False,
+                                          title="",
+                                          xlabel="Category", ylabel="Reaction time (sec.)",
+                                          xlim=None, width=0.5,
+                                          face_colors=[val for val in ev.colors["category"].values()])
+    ax2.set_xticklabels(categories)
+    fig2.suptitle("T1 reaction time")
+    fig2.savefig(Path(save_root, "t1_rt.svg"), transparent=True, dpi=dpi)
+    fig2.savefig(Path(save_root, "t1_rt.png"), transparent=True, dpi=dpi)
+    plt.close(fig2)
 
-# ======================================================
-# B: Reaction time:
-fig2, ax2 = plt.subplots(nrows=1, ncols=1, sharex=False, sharey=True, figsize=[8.3/2, 8.3])
-_, _, _ = plot_within_subject_boxplot(subjects_data,
-                                      'sub_id', 'category', 'RT_vis',
-                                      positions=[1, 2, 3, 4], ax=ax2, cousineau_correction=False,
-                                      title="",
-                                      xlabel="Category", ylabel="Reaction time (sec.)",
-                                      xlim=None, width=0.5,
-                                      face_colors=[val for val in ev.colors["category"].values()])
-ax2.set_xticklabels(categories)
-fig2.suptitle("T1 reaction time")
-fig2.savefig(Path(save_root, "t1_rt.svg"), transparent=True, dpi=dpi)
-fig2.savefig(Path(save_root, "t1_rt.png"), transparent=True, dpi=dpi)
-plt.close(fig2)
-
-# ======================================================
-# C: Fixation:
-# Load the eyetracking data:
-hists = []
-for subject in ["SX102", "SX103", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX112", "SX113",
-                "SX114", "SX115", "SX116", "SX119", "SX120", "SX121"]:
-    epochs_root = Path(ev.bids_root, "derivatives", "preprocessing", "sub-" + subject, "ses-1", "eyetrack",
-                       "sub-{}_ses-1_task-prp_eyetrack_desc-visual_onset-epo.fif".format(subject))
-    gaze_map = generate_gaze_map(mne.read_epochs(epochs_root), 1080, 1920, sigma=20)
-    hists.append(gaze_map)
-hists = np.nanmean(np.array(hists), axis=0)
-fig3, ax3 = plt.subplots(nrows=1, ncols=1, sharex=False, sharey=True, figsize=[8.3, 8.3 * 1080/1920])
-vmin = np.nanmin(hists)
-vmax = np.nanmax(hists)
-extent = [0, 1920, 1080, 0]  # origin is the top left of the screen
-# Plot heatmap
-im = ax3.imshow(
-    hists,
-    aspect="equal",
-    cmap="RdYlBu_r",
-    alpha=1,
-    extent=extent,
-    origin="upper",
-    vmin=vmin,
-    vmax=vmax,
-)
-ax3.set_title("Gaze heatmap")
-ax3.set_xlabel("X position")
-ax3.set_ylabel("Y position")
-fig3.colorbar(im, ax=ax3, shrink=0.8, label="Dwell time (seconds)")
-fig3.savefig(Path(save_root, "fixation_map.svg"), transparent=True, dpi=dpi)
-fig3.savefig(Path(save_root, "fixation_map.png"), transparent=True, dpi=dpi)
-plt.close(fig3)
-plt.show()
+    # ======================================================
+    # C: Fixation:
+    # Load the eyetracking data:
+    hists = []
+    for subject in ["SX102", "SX103", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX112", "SX113",
+                    "SX114", "SX115", "SX116", "SX119", "SX120", "SX121"]:
+        epochs_root = Path(ev.bids_root, "derivatives", "preprocessing", "sub-" + subject, "ses-1", "eyetrack",
+                           "sub-{}_ses-1_task-prp_eyetrack_desc-visual_onset-epo.fif".format(subject))
+        gaze_map = generate_gaze_map(mne.read_epochs(epochs_root), 1080, 1920, sigma=20)
+        hists.append(gaze_map)
+    hists = np.nanmean(np.array(hists), axis=0)
+    fig3, ax3 = plt.subplots(nrows=1, ncols=1, sharex=False, sharey=True, figsize=[8.3, 8.3 * 1080 / 1920])
+    vmin = np.nanmin(hists)
+    vmax = np.nanmax(hists)
+    extent = [0, 1920, 1080, 0]  # origin is the top left of the screen
+    # Plot heatmap
+    im = ax3.imshow(
+        hists,
+        aspect="equal",
+        cmap="RdYlBu_r",
+        alpha=1,
+        extent=extent,
+        origin="upper",
+        vmin=vmin,
+        vmax=vmax,
+    )
+    ax3.set_title("Gaze heatmap")
+    ax3.set_xlabel("X position")
+    ax3.set_ylabel("Y position")
+    fig3.colorbar(im, ax=ax3, shrink=0.8, label="Dwell time (seconds)")
+    fig3.savefig(Path(save_root, "fixation_map.svg"), transparent=True, dpi=dpi)
+    fig3.savefig(Path(save_root, "fixation_map.png"), transparent=True, dpi=dpi)
+    plt.close(fig3)
+    plt.show()
 
 # ========================================================================================================
 # Figure 5:
@@ -213,122 +213,22 @@ plt.show()
 
 # Target:
 d = 1.5
-fig_ta, ax_ta = plt.subplots(nrows=1, ncols=4, sharex=False, sharey=True, figsize=[8.3 / 3, 11.7 / 2])
-_, _, _ = plot_within_subject_boxplot(subjects_data[(subjects_data["task_relevance"] == 'target')
-                                                    & (subjects_data["SOA_lock"] == 'onset')],
-                                      'sub_id', 'onset_SOA', 'RT_aud',
-                                      positions='onset_SOA', ax=ax_ta[0], cousineau_correction=True,
-                                      title="",
-                                      xlabel="", ylabel="",
-                                      xlim=[-0.1, 0.6], width=0.1,
-                                      face_colors=[val for val in ev.colors["soa_onset_locked"].values()])
-# Loop through each duration to plot the offset locked SOA separately:
-for i, dur in enumerate(sorted(list(subjects_data["duration"].unique()))):
-    _, _, _ = plot_within_subject_boxplot(subjects_data[(subjects_data["task_relevance"] == 'target')
-                                                        & (subjects_data["SOA_lock"] == 'offset')
-                                                        & (subjects_data["duration"] == dur)], 'sub_id',
-                                          'onset_SOA',
-                                          'RT_aud',
-                                          positions='onset_SOA', ax=ax_ta[i + 1], cousineau_correction=True,
-                                          title="",
-                                          xlabel="", ylabel="",
-                                          xlim=[dur - 0.1, dur + 0.6], width=0.1,
-                                          face_colors=[val for val in ev.colors[
-                                              "soa_offset_locked_{}ms".format(int(dur * 1000))].values()])
-    ax_ta[i + 1].yaxis.set_visible(False)
-# Remove the spines:
-for i in [0, 1, 2]:
-    ax_ta[i].spines['right'].set_visible(False)
-    ax_ta[i + 1].spines['left'].set_visible(False)
-    # Add cut axis marks:
-    kwargs = dict(marker=[(-1, -d), (1, d)], markersize=12,
-                  linestyle="none", color='k', mec='k', mew=1, clip_on=False)
-    ax_ta[i].plot([1, 1], [0, 0], transform=ax_ta[i].transAxes, **kwargs)
-    ax_ta[i + 1].plot([0, 0], [0, 0], transform=ax_ta[i + 1].transAxes, **kwargs)
-    ax_ta[i].plot([1, 1], [1, 1], transform=ax_ta[i].transAxes, **kwargs)
-    ax_ta[i + 1].plot([0, 0], [1, 1], transform=ax_ta[i + 1].transAxes, **kwargs)
-plt.subplots_adjust(wspace=0.05)
-
+fig_ta, ax_ta = soa_boxplot(subjects_data[subjects_data["task_relevance"] == 'target'],
+                            "RT_aud",
+                            fig_size=[8.3 / 3, 11.7 / 2])
 # Task relevant:
-fig_tr, ax_tr = plt.subplots(nrows=1, ncols=4, sharex=False, sharey=True, figsize=[8.3 / 3, 11.7 / 2])
-_, _, _ = plot_within_subject_boxplot(subjects_data[(subjects_data["task_relevance"] == 'non-target')
-                                                    & (subjects_data["SOA_lock"] == 'onset')], 'sub_id', 'onset_SOA',
-                                      'RT_aud',
-                                      positions='onset_SOA', ax=ax_tr[0], cousineau_correction=True,
-                                      title="",
-                                      xlabel="", ylabel="",
-                                      xlim=[-0.1, 0.6], width=0.1,
-                                      face_colors=[val for val in ev.colors["soa_onset_locked"].values()])
-# Loop through each duration to plot the offset locked SOA separately:
-for i, dur in enumerate(sorted(list(subjects_data["duration"].unique()))):
-    _, _, _ = plot_within_subject_boxplot(subjects_data[(subjects_data["task_relevance"] == 'non-target')
-                                                        & (subjects_data["SOA_lock"] == 'offset')
-                                                        & (subjects_data["duration"] == dur)], 'sub_id',
-                                          'onset_SOA',
-                                          'RT_aud',
-                                          positions='onset_SOA', ax=ax_tr[i + 1], cousineau_correction=True,
-                                          title="",
-                                          xlabel="", ylabel="",
-                                          xlim=[dur - 0.1, dur + 0.6], width=0.1,
-                                          face_colors=[val for val in ev.colors[
-                                              "soa_offset_locked_{}ms".format(int(dur * 1000))].values()])
-    ax_tr[i + 1].yaxis.set_visible(False)
-# Remove the spines:
-for i in [0, 1, 2]:
-    ax_tr[i].spines['right'].set_visible(False)
-    ax_tr[i + 1].spines['left'].set_visible(False)
-    # Add cut axis marks:
-    kwargs = dict(marker=[(-1, -d), (1, d)], markersize=12,
-                  linestyle="none", color='k', mec='k', mew=1, clip_on=False)
-    ax_tr[i].plot([1, 1], [0, 0], transform=ax_tr[i].transAxes, **kwargs)
-    ax_tr[i + 1].plot([0, 0], [0, 0], transform=ax_tr[i + 1].transAxes, **kwargs)
-    ax_tr[i].plot([1, 1], [1, 1], transform=ax_tr[i].transAxes, **kwargs)
-    ax_tr[i + 1].plot([0, 0], [1, 1], transform=ax_tr[i + 1].transAxes, **kwargs)
-plt.subplots_adjust(wspace=0.05)
-
+fig_tr, ax_tr = soa_boxplot(subjects_data[subjects_data["task_relevance"] == 'non-target'],
+                            "RT_aud",
+                            fig_size=[8.3 / 3, 11.7 / 2])
 # Task irrelevant:
-fig_ti, ax_ti = plt.subplots(nrows=1, ncols=4, sharex=False, sharey=True, figsize=[8.3 / 3, 11.7 / 2])
-_, _, _ = plot_within_subject_boxplot(subjects_data[(subjects_data["task_relevance"] == 'irrelevant')
-                                                    & (subjects_data["SOA_lock"] == 'onset')], 'sub_id', 'onset_SOA',
-                                      'RT_aud',
-                                      positions='onset_SOA', ax=ax_ti[0], cousineau_correction=True,
-                                      title="",
-                                      xlabel="", ylabel="",
-                                      xlim=[-0.1, 0.6], width=0.1,
-                                      face_colors=[val for val in ev.colors["soa_onset_locked"].values()])
-# Loop through each duration to plot the offset locked SOA separately:
-for i, dur in enumerate(sorted(list(subjects_data["duration"].unique()))):
-    _, _, _ = plot_within_subject_boxplot(subjects_data[(subjects_data["task_relevance"] == 'irrelevant')
-                                                        & (subjects_data["SOA_lock"] == 'offset')
-                                                        & (subjects_data["duration"] == dur)], 'sub_id',
-                                          'onset_SOA',
-                                          'RT_aud',
-                                          positions='onset_SOA', ax=ax_ti[i + 1], cousineau_correction=True,
-                                          title="",
-                                          xlabel="", ylabel="",
-                                          xlim=[dur - 0.1, dur + 0.6], width=0.1,
-                                          face_colors=[val for val in ev.colors[
-                                              "soa_offset_locked_{}ms".format(int(dur * 1000))].values()])
-    ax_ti[i + 1].yaxis.set_visible(False)
-# Remove the spines:
-for i in [0, 1, 2]:
-    ax_ti[i].spines['right'].set_visible(False)
-    ax_ti[i + 1].spines['left'].set_visible(False)
-    # Add cut axis marks:
-    kwargs = dict(marker=[(-1, -d), (1, d)], markersize=12,
-                  linestyle="none", color='k', mec='k', mew=1, clip_on=False)
-    ax_ti[i].plot([1, 1], [0, 0], transform=ax_ti[i].transAxes, **kwargs)
-    ax_ti[i + 1].plot([0, 0], [0, 0], transform=ax_ti[i + 1].transAxes, **kwargs)
-    ax_ti[i].plot([1, 1], [1, 1], transform=ax_ti[i].transAxes, **kwargs)
-    ax_ti[i + 1].plot([0, 0], [1, 1], transform=ax_ti[i + 1].transAxes, **kwargs)
-plt.subplots_adjust(wspace=0.05)
-
+fig_ti, ax_ti = soa_boxplot(subjects_data[subjects_data["task_relevance"] == 'irrelevant'],
+                            "RT_aud",
+                            fig_size=[8.3 / 3, 11.7 / 2])
 # Set the y limit to be the same for both plots:
 lims = [[ax_tr[0].get_ylim()[0], ax_ti[0].get_ylim()[0]], [ax_tr[0].get_ylim()[1], ax_ti[0].get_ylim()[1]]]
 max_lims = [min(min(lims)), max(max(lims))]
 ax_tr[0].set_ylim(max_lims)
 ax_ti[0].set_ylim(max_lims)
-
 # Axes decoration:
 fig_ta.suptitle("Target")
 fig_tr.suptitle("Relevant non-target")

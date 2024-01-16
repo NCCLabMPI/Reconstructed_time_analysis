@@ -5,6 +5,7 @@ import matplotlib.patches as patches
 import numpy as np
 from eye_tracker.general_helper_function import get_event_ts
 from eye_tracker.general_helper_function import cousineau_morey_correction
+import environment_variables as ev
 
 font = {'size': 12}
 matplotlib.rc('font', **font)
@@ -198,3 +199,52 @@ def plot_within_subject_boxplot(data_df, within_column, between_column, dependen
         for i, patch in enumerate(bplot['boxes']):
             patch.set_edgecolor(edge_colors[i])
     return ax, bplot, lineplot
+
+
+def soa_boxplot(data_df, dependent_variable, fig_size=None):
+    """
+    This function plots the PRP study data in a standardized format, so that it can be used across experiments and data
+    types. It is not super well documented, but it is not meant to be reuused as highly specific to this design.
+    :param data_df:
+    :param fig_size:
+    :return:
+    """
+    if fig_size is None:
+        fig_size = [8.3 / 3, 11.7 / 2]
+    fig, ax = plt.subplots(nrows=1, ncols=4, sharex=False, sharey=True, figsize=fig_size)
+    d = 1.5
+    # Onset locked data:
+    _, _, _ = plot_within_subject_boxplot(data_df[data_df["SOA_lock"] == 'onset'],
+                                          'sub_id', 'onset_SOA', dependent_variable,
+                                          positions='onset_SOA', ax=ax[0], cousineau_correction=True,
+                                          title="",
+                                          xlabel="", ylabel="",
+                                          xlim=[-0.1, 0.6], width=0.1,
+                                          face_colors=[val for val in ev.colors["soa_onset_locked"].values()])
+    # Loop through each duration to plot the offset locked SOA separately:
+    for i, dur in enumerate(sorted(list(data_df["duration"].unique()))):
+        _, _, _ = plot_within_subject_boxplot(data_df[(data_df["SOA_lock"] == 'offset')
+                                                      & (data_df["duration"] == dur)], 'sub_id',
+                                              'onset_SOA',
+                                              dependent_variable,
+                                              positions='onset_SOA', ax=ax[i + 1], cousineau_correction=True,
+                                              title="",
+                                              xlabel="", ylabel="",
+                                              xlim=[dur - 0.1, dur + 0.6], width=0.1,
+                                              face_colors=[val for val in ev.colors[
+                                                  "soa_offset_locked_{}ms".format(int(dur * 1000))].values()])
+        ax[i + 1].yaxis.set_visible(False)
+    # Remove the spines:
+    for i in [0, 1, 2]:
+        ax[i].spines['right'].set_visible(False)
+        ax[i + 1].spines['left'].set_visible(False)
+        # Add cut axis marks:
+        kwargs = dict(marker=[(-1, -d), (1, d)], markersize=12,
+                      linestyle="none", color='k', mec='k', mew=1, clip_on=False)
+        ax[i].plot([1, 1], [0, 0], transform=ax[i].transAxes, **kwargs)
+        ax[i + 1].plot([0, 0], [0, 0], transform=ax[i + 1].transAxes, **kwargs)
+        ax[i].plot([1, 1], [1, 1], transform=ax[i].transAxes, **kwargs)
+        ax[i + 1].plot([0, 0], [1, 1], transform=ax[i + 1].transAxes, **kwargs)
+    plt.subplots_adjust(wspace=0.05)
+
+    return fig, ax
