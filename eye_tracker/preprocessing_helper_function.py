@@ -62,9 +62,10 @@ def gaze_to_dva(raw, screen_size_mm, screen_res, screen_dist_mm, eyes=None):
         # Add measurement date:
         info.set_meas_date(raw.info['meas_date'])
         # Combine to a mne raw object:
-        raw_fix = mne.io.RawArray(np.array(fixation_dist), info, verbose="WARNING")
+        raw_fix = mne.io.RawArray(np.expand_dims(fixation_dist, axis=0), info, verbose="WARNING")
         # Add channel to the raw object:
         raw.add_channels([raw_fix])
+    # raw.plot()
     return raw
 
 
