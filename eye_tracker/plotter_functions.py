@@ -295,3 +295,44 @@ def plot_ts_ci(data, times, color, plot_ci=True, ax=None, label="", clusters=Non
                     ax.axvspan(times[c.start], times[c.stop - 1], color=(0.3, 0.3, 0.3), alpha=clusters_alpha)
     ax.set_xlim([times[0], times[-1]])
     return ax
+
+
+def plot_pupil_latency(evoked_dict, times, latencies_df, colors):
+    """
+
+    :param evoked_dict:
+    :param latencies_df:
+    :return:
+    """
+    import pandas as pd
+
+    fig = plt.figure(figsize=[10, 11.7 / 4], constrained_layout=True)
+    spec = fig.add_gridspec(ncols=4, nrows=1)
+    ax1 = fig.add_subplot(spec[0, 0:3])
+    ax2 = fig.add_subplot(spec[0, 3])
+
+    for soa in evoked_dict.keys():
+        # Plot the evoked pupil response:
+        plot_ts_ci(np.array(evoked_dict[soa]), times, colors[soa], plot_ci=False, ax=ax1, label=soa)
+        # Extract the mean latencies:
+        lat = np.mean(latencies_df[latencies_df["SOA"] == soa]["latency"].to_numpy())
+        # Plot the latency:
+        ax1.vlines(x=float(soa), ymin=-0.02, ymax=-0.01, linestyle="-",
+                   color=ev.colors["soa_onset_locked"][soa], linewidth=2, zorder=10)
+        ax1.vlines(x=lat, ymin=-0.02,
+                   ymax=np.mean(np.array(evoked_dict[soa]), axis=0)[np.argmin(np.abs(times - lat))],
+                   linestyle="--",
+                   color=colors[soa], linewidth=2, zorder=10)
+    ax1.set_ylim([-0.02, 0.09])
+    ax1.legend()
+    ax1.set_xlabel("Time (sec.)")
+    ax1.set_ylabel("Pupil size (norm.)")
+    # Plot the latency as a function of SOA:
+    plot_within_subject_boxplot(latencies_df, "sub_id", "SOA_float", "latency_aud",
+                                positions="SOA_float", ax=ax2, cousineau_correction=False, title="", xlabel="SOA",
+                                ylabel=r'$\tau_{\mathrm{audio}}$', xlim=[-0.1, 0.6], width=0.1,
+                                face_colors=[colors[soa] for soa in list(evoked_dict.keys())])
+    ax2.set_ylim([0, 1.5])
+    plt.suptitle("Pupil peak latency")
+    return fig
+

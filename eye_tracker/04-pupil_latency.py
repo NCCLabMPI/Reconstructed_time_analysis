@@ -5,7 +5,7 @@ import numpy as np
 from pathlib import Path
 import matplotlib.pyplot as plt
 from eye_tracker.general_helper_function import baseline_scaling, max_percentage_index
-from eye_tracker.plotter_functions import plot_ts_ci, plot_within_subject_boxplot
+from eye_tracker.plotter_functions import plot_pupil_latency
 import environment_variables as ev
 import pandas as pd
 
@@ -42,88 +42,57 @@ def pupil_latency(parameters_file, subjects):
         # Baseline correction:
         baseline_scaling(epochs, correction_method=param["baseline"], baseline=param["baseline_window"])
         subjects_epochs[sub] = epochs
+    # Extract the times of the first subject (assuming that it is the same for all subjects, which it should be):
+    times = subjects_epochs[subjects[0]].times
 
     # ==================================================================================================================
-    # SOAs comparisons:
+    # Create LMM tables:
     # ===========================================================
-    # Plot the pupil response separately to each SOA for the onset locked trials:
-    lock = "onset"
-    fig = plt.figure(figsize=[10, 11.7 / 2], constrained_layout=True)
-    spec = fig.add_gridspec(ncols=4, nrows=1)
-    ax1 = fig.add_subplot(spec[0, 0:3])
-    ax2 = fig.add_subplot(spec[0, 3])
-    latencies = []
+    latencies_lmm = []
     for soa in param["soas"]:
-        evks = []
-        lats = []
-        vals = []
-        # Loop through each subject:
-        for sub in subjects_epochs.keys():
-            # Average the data across both eyes:
-            data = np.nanmean(subjects_epochs[sub].copy()["/".join([soa, lock])], axis=1)
-            # Remove any trials containing Nan:
-            data = np.array([data[i, :] for i in range(data.shape[0]) if not any(np.isnan(data[i, :]))])
-            # Remove any trials containing Nan:
-            data = np.array([data[i, :] for i in range(data.shape[0]) if not any(np.isinf(data[i, :]))])
-            evk = np.mean(data, axis=0)
-            # Find the time at % peak:
-            ind, val = max_percentage_index(evk, 90)
-            lats.append(subjects_epochs[sub].times[ind])
-            vals.append(val)
-            latencies.append(pd.DataFrame({
-                "sub_id": sub,
-                "SOA_lock": "onset",
-                "SOA": soa,
-                "SOA_float": float(soa),
-                "latency": subjects_epochs[sub].times[ind],
-                "latency_aud": subjects_epochs[sub].times[ind] - float(soa),
-                "value": val
-            }, index=[0]))
-            evks.append(evk)
-        # Plot the evoked pupil response:
-        plot_ts_ci(np.array(evks), epochs.times, ev.colors["soa_onset_locked"][soa], plot_ci=False, ax=ax1, label=soa)
-        # Plot the latency:
-        mean_lat = np.mean(lats)
-        ax1.vlines(x=float(soa), ymin=-0.02, ymax=-0.01, linestyle="-",
-                   color=ev.colors["soa_onset_locked"][soa], linewidth=2, zorder=10)
-        ax1.vlines(x=mean_lat, ymin=-0.02,
-                   ymax=np.mean(np.array(evks), axis=0)[np.argmin(np.abs(epochs.times - mean_lat))],
-                   linestyle="--",
-                   color=ev.colors["soa_onset_locked"][soa], linewidth=2, zorder=10)
-    ax1.set_ylim([-0.02, 0.09])
-    ax1.legend()
-    ax1.set_xlabel("Time (sec.)")
-    ax1.set_ylabel("Pupil size (norm.)")
-    # Plot the latency as a function of SOA:
-    latencies = pd.concat(latencies).reset_index(drop=True)
-    plot_within_subject_boxplot(latencies, "sub_id", "SOA_float", "latency_aud",
-                                positions="SOA_float", ax=ax2, cousineau_correction=False, title="", xlabel="SOA",
-                                ylabel=r'$\tau_{\mathrm{audio}}$', xlim=[-0.1, 0.6], width=0.1,
-                                face_colors=[ev.colors["soa_onset_locked"][soa] for soa in param["soas"]])
-    ax2.set_ylim([0, 1.5])
-    plt.suptitle("Pupil peak latency")
-    fig.savefig(Path(save_dir, "pupil_latency_titr_{}.svg".format(lock)), transparent=True, dpi=300)
-    fig.savefig(Path(save_dir, "pupil_latency_titr_{}.png".format(lock)), transparent=True, dpi=300)
-    plt.close()
+        for task in param["task_relevance"]:
+            for duration in param["duration"]:
+                for lock in param["lock"]:
+                    for sub in subjects_epochs.keys():
+                        # Average the data across both eyes:
+                        data = np.nanmean(subjects_epochs[sub].copy()["/".join([soa, task, duration, lock])], axis=1)
+                        # Remove any trials containing Nan:
+                        data = np.array([data[i, :] for i in range(data.shape[0]) if not any(np.isnan(data[i, :]))])
+                        # Remove any trials containing Nan:
+                        data = np.array([data[i, :] for i in range(data.shape[0]) if not any(np.isinf(data[i, :]))])
+                        evk = np.mean(data, axis=0)
+                        # Find the time at % peak:
+                        ind, val = max_percentage_index(evk, 90)
+                        latencies_lmm.append(pd.DataFrame({
+                            "sub_id": sub,
+                            "SOA": soa,
+                            "task": task,
+                            "duration": duration,
+                            "lock": lock,
+                            "SOA_float": float(soa),
+                            "latency": subjects_epochs[sub].times[ind],
+                            "latency_aud": subjects_epochs[sub].times[ind] - float(soa),
+                            "amplitude": val
+                        }, index=[0]))
+    # Convert to data frame:
+    latencies_lmm = pd.concat(latencies_lmm).reset_index(drop=True)
+    # Save the peak latencies:
+    latencies_lmm.to_csv(Path(save_dir, "pupil_peak_latencies.csv"))
 
-    # ===========================================================
-    # Plot the pupil response separately to each SOA for the onset locked trials separately for each task relevance
-    # conditions:
-    lock = "onset"
-    for task in param["task_relevance"]:
-        fig = plt.figure(figsize=[10, 11.7 / 4], constrained_layout=True)
-        spec = fig.add_gridspec(ncols=4, nrows=1)
-        ax1 = fig.add_subplot(spec[0, 0:3])
-        ax2 = fig.add_subplot(spec[0, 3])
+    # ==================================================================================================================
+    # Plotting of SOAs comparisons:
+    # ===============================================================================================
+    # Looping through onset and offset locked separately:
+    for lock in param["lock"]:
+        # ===========================================================
+        # Per SOA:
         latencies = []
+        evks = {soa: [] for soa in param["soas"]}
         for soa in param["soas"]:
-            evks = []
-            lats = []
-            vals = []
             # Loop through each subject:
             for sub in subjects_epochs.keys():
                 # Average the data across both eyes:
-                data = np.nanmean(subjects_epochs[sub].copy()["/".join([soa, lock, task])], axis=1)
+                data = np.nanmean(subjects_epochs[sub].copy()["/".join([soa, lock])], axis=1)
                 # Remove any trials containing Nan:
                 data = np.array([data[i, :] for i in range(data.shape[0]) if not any(np.isnan(data[i, :]))])
                 # Remove any trials containing Nan:
@@ -131,8 +100,7 @@ def pupil_latency(parameters_file, subjects):
                 evk = np.mean(data, axis=0)
                 # Find the time at % peak:
                 ind, val = max_percentage_index(evk, 90)
-                lats.append(subjects_epochs[sub].times[ind])
-                vals.append(val)
+                # Package in a dictionary:
                 latencies.append(pd.DataFrame({
                     "sub_id": sub,
                     "SOA_lock": "onset",
@@ -140,34 +108,121 @@ def pupil_latency(parameters_file, subjects):
                     "SOA_float": float(soa),
                     "latency": subjects_epochs[sub].times[ind],
                     "latency_aud": subjects_epochs[sub].times[ind] - float(soa),
-                    "value": val
+                    "amplitude": val
                 }, index=[0]))
-                evks.append(evk)
-            # Plot the evoked pupil response:
-            plot_ts_ci(np.array(evks), epochs.times, ev.colors["soa_onset_locked"][soa], plot_ci=False, ax=ax1, label=soa)
-            # Plot the latency:
-            mean_lat = np.mean(lats)
-            ax1.vlines(x=float(soa), ymin=-0.02, ymax=-0.01, linestyle="-",
-                       color=ev.colors["soa_onset_locked"][soa], linewidth=2, zorder=10)
-            ax1.vlines(x=mean_lat, ymin=-0.02,
-                       ymax=np.mean(np.array(evks), axis=0)[np.argmin(np.abs(epochs.times - mean_lat))],
-                       linestyle="--",
-                       color=ev.colors["soa_onset_locked"][soa], linewidth=2, zorder=10)
-        ax1.set_ylim([-0.02, 0.09])
-        ax1.legend()
-        ax1.set_xlabel("Time (sec.)")
-        ax1.set_ylabel("Pupil size (norm.)")
-        # Plot the latency as a function of SOA:
+                evks[soa].append(evk)
         latencies = pd.concat(latencies).reset_index(drop=True)
-        plot_within_subject_boxplot(latencies, "sub_id", "SOA_float", "latency_aud",
-                                    positions="SOA_float", ax=ax2, cousineau_correction=False, title="", xlabel="SOA",
-                                    ylabel=r'$\tau_{\mathrm{audio}}$', xlim=[-0.1, 0.6], width=0.1,
-                                    face_colors=[ev.colors["soa_onset_locked"][soa] for soa in param["soas"]])
-        ax2.set_ylim([0, 1.5])
-        plt.suptitle("Pupil peak latency")
-        fig.savefig(Path(save_dir, "pupil_latency_titr_{}-{}.svg".format(lock, task)), transparent=True, dpi=300)
-        fig.savefig(Path(save_dir, "pupil_latency_titr_{}-{}.png".format(lock, task)), transparent=True, dpi=300)
+        fig = plot_pupil_latency(evks, times, latencies, ev.colors["soa_onset_locked"])
+        fig.savefig(Path(save_dir, "pupil_latency_{}.svg".format(lock)), transparent=True, dpi=300)
+        fig.savefig(Path(save_dir, "pupil_latency_{}.png".format(lock)), transparent=True, dpi=300)
         plt.close()
+
+        # ===========================================================
+        # Separately for each task relevance condition:
+        for task in param["task_relevance"]:
+            latencies = []
+            evks = {soa: [] for soa in param["soas"]}
+            for soa in param["soas"]:
+                # Loop through each subject:
+                for sub in subjects_epochs.keys():
+                    # Average the data across both eyes:
+                    data = np.nanmean(subjects_epochs[sub].copy()["/".join([soa, lock, task])], axis=1)
+                    # Remove any trials containing Nan:
+                    data = np.array([data[i, :] for i in range(data.shape[0]) if not any(np.isnan(data[i, :]))])
+                    # Remove any trials containing Nan:
+                    data = np.array([data[i, :] for i in range(data.shape[0]) if not any(np.isinf(data[i, :]))])
+                    evk = np.mean(data, axis=0)
+                    # Find the time at % peak:
+                    ind, val = max_percentage_index(evk, 90)
+                    # Package in a dictionary:
+                    latencies.append(pd.DataFrame({
+                        "sub_id": sub,
+                        "SOA_lock": "onset",
+                        "SOA": soa,
+                        "SOA_float": float(soa),
+                        "latency": subjects_epochs[sub].times[ind],
+                        "latency_aud": subjects_epochs[sub].times[ind] - float(soa),
+                        "amplitude": val
+                    }, index=[0]))
+                    evks[soa].append(evk)
+            latencies = pd.concat(latencies).reset_index(drop=True)
+            fig = plot_pupil_latency(evks, times, latencies, ev.colors["soa_onset_locked"])
+            fig.savefig(Path(save_dir, "pupil_latency_{}-{}.svg".format(lock, task)), transparent=True, dpi=300)
+            fig.savefig(Path(save_dir, "pupil_latency_{}-{}.png".format(lock, task)), transparent=True, dpi=300)
+            plt.close()
+
+        # ===========================================================
+        # Separately for each durations:
+        for duration in param["duration"]:
+            latencies = []
+            evks = {soa: [] for soa in param["soas"]}
+            for soa in param["soas"]:
+                # Loop through each subject:
+                for sub in subjects_epochs.keys():
+                    # Average the data across both eyes:
+                    data = np.nanmean(subjects_epochs[sub].copy()["/".join([soa, lock, duration])], axis=1)
+                    # Remove any trials containing Nan:
+                    data = np.array([data[i, :] for i in range(data.shape[0]) if not any(np.isnan(data[i, :]))])
+                    # Remove any trials containing Nan:
+                    data = np.array([data[i, :] for i in range(data.shape[0]) if not any(np.isinf(data[i, :]))])
+                    evk = np.mean(data, axis=0)
+                    # Find the time at % peak:
+                    ind, val = max_percentage_index(evk, 90)
+                    # Package in a dictionary:
+                    latencies.append(pd.DataFrame({
+                        "sub_id": sub,
+                        "SOA_lock": "onset",
+                        "SOA": soa,
+                        "SOA_float": float(soa),
+                        "latency": subjects_epochs[sub].times[ind],
+                        "latency_aud": subjects_epochs[sub].times[ind] - float(soa),
+                        "amplitude": val
+                    }, index=[0]))
+                    evks[soa].append(evk)
+            latencies = pd.concat(latencies).reset_index(drop=True)
+            fig = plot_pupil_latency(evks, times, latencies, ev.colors["soa_onset_locked"])
+            fig.savefig(Path(save_dir, "pupil_latency_{}-{}.svg".format(lock, duration)),
+                        transparent=True, dpi=300)
+            fig.savefig(Path(save_dir, "pupil_latency_{}-{}.png".format(lock, duration)),
+                        transparent=True, dpi=300)
+            plt.close()
+
+        # ===========================================================
+        # Separately for each durations and task relevance:
+        for task in param["task_relevance"]:
+            for duration in param["duration"]:
+                latencies = []
+                evks = {soa: [] for soa in param["soas"]}
+                for soa in param["soas"]:
+                    # Loop through each subject:
+                    for sub in subjects_epochs.keys():
+                        # Average the data across both eyes:
+                        data = np.nanmean(subjects_epochs[sub].copy()["/".join([soa, lock, duration, task])], axis=1)
+                        # Remove any trials containing Nan:
+                        data = np.array([data[i, :] for i in range(data.shape[0]) if not any(np.isnan(data[i, :]))])
+                        # Remove any trials containing Nan:
+                        data = np.array([data[i, :] for i in range(data.shape[0]) if not any(np.isinf(data[i, :]))])
+                        evk = np.mean(data, axis=0)
+                        # Find the time at % peak:
+                        ind, val = max_percentage_index(evk, 90)
+                        # Package in a dictionary:
+                        latencies.append(pd.DataFrame({
+                            "sub_id": sub,
+                            "SOA_lock": "onset",
+                            "SOA": soa,
+                            "SOA_float": float(soa),
+                            "latency": subjects_epochs[sub].times[ind],
+                            "latency_aud": subjects_epochs[sub].times[ind] - float(soa),
+                            "amplitude": val
+                        }, index=[0]))
+                        evks[soa].append(evk)
+                latencies = pd.concat(latencies).reset_index(drop=True)
+                fig = plot_pupil_latency(evks, times, latencies, ev.colors["soa_onset_locked"])
+                fig.savefig(Path(save_dir, "pupil_latency_{}-{}-{}.svg".format(lock, task, duration)),
+                            transparent=True, dpi=300)
+                fig.savefig(Path(save_dir, "pupil_latency_{}-{}-{}.png".format(lock, task, duration)),
+                            transparent=True, dpi=300)
+                plt.close()
 
 
 if __name__ == "__main__":
@@ -175,5 +230,5 @@ if __name__ == "__main__":
                      "SX114", "SX115", "SX118", "SX116", "SX119", "SX120", "SX121"]
     parameters = (
         r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker"
-        r"\03-pupil_amplitude_parameters.json ")
+        r"\04-pupil_latency_parameters.json ")
     pupil_latency(parameters, subjects_list)
