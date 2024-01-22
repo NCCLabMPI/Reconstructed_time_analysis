@@ -21,14 +21,14 @@ blinkflag = 0;
 model_window = [0, 2500]; % Time window to model
 yintflag = 0;
 slopeflag = 0;
-ampbounds = [0; 100]; % Amplitude can vary between positive and negative values
+ampbounds = [-100; 100]; % Amplitude can vary between positive and negative values
 latbounds = [0; 500]; % Allow latencies to vary to 500ms after the event of interest
 boxampbounds = [0;100]; % Box amplitude constrained to positive values, as it models cognitive load of the task
 tmaxbounds = [500;2500]; % Bound for the tmax parameter of the pupil response function
 yintval = 0;
 slopeval = 0;
-optimnum = 1; % Take the 20 best starting values for optimization
-wnum = 1; % Number of cores to use
+optimnum = 8; % Take the 20 best starting values for optimization
+wnum = 2; % Number of cores to use
 
 % Prepare variable to store the results
 res = [];
