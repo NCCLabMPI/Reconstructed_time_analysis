@@ -3,6 +3,74 @@ import numpy as np
 import pandas as pd
 from mne._fiff.pick import _picks_to_idx
 from scipy.ndimage import gaussian_filter
+from mne.stats import permutation_cluster_1samp_test
+
+
+def max_percentage_index(data, thresh_percent):
+    """
+    Find the index at which a time series reaches a certain percentage of its peak value.
+    :param data: (numpy array) containing the time series
+    :param thresh_percent: (float or int) percentage of peak value
+    :return ind: index of the first time the percentage of peak value is reached
+    """
+    if not (0 <= thresh_percent <= 100):
+        raise ValueError("Percentage threshold must be between 0 and 100.")
+
+    peak_value = np.max(data)
+    threshold_value = peak_value * (thresh_percent / 100)
+
+    # Find the first index where the value is greater than or equal to the threshold
+    ind = np.argmax(data >= threshold_value)
+
+    # If the threshold is not reached, return None or raise an exception, depending on your preference.
+    if data[ind] < threshold_value:
+        return None
+
+    return ind, threshold_value
+
+
+def cluster_1samp_across_sub(subjects_epochs, conditions, n_permutations=1024, threshold=None, tail=0):
+    """
+    This function applies the permutation_cluster_1samp_test from MNE, taking in a dictionary containing the epochs
+    of each subject. It will then average across trials within the condition of interest (i.e. create evoked) and
+    compute the within sample difference between the two conditions. It is a bit overkill to package it into 1 function
+    but because this is something we want to do over and over again, makes the code easier to navigate.
+    :param subjects_epochs:
+    :param conditions:
+    :param n_permutations:
+    :param threshold:
+    :param tail:
+    :return:
+    """
+    evks = {cond: [] for cond in conditions}
+    # Loop through each subject:
+    for sub in subjects_epochs.keys():
+        # Loop through each relevant condition:
+        for cond in conditions:
+            # Average the data across both eyes:
+            data = np.nanmean(subjects_epochs[sub].copy()[cond], axis=1)
+            # Remove any trials containing Nan:
+            data = np.array([data[i, :] for i in range(data.shape[0]) if not any(np.isnan(data[i, :]))])
+            # Remove any trials containing Nan:
+            data = np.array([data[i, :] for i in range(data.shape[0]) if not any(np.isinf(data[i, :]))])
+            evks[cond].append(np.mean(data, axis=0))
+
+    # Convert each condition data to a numpy array:
+    evks = {cond: np.array(evks[cond]) for cond in conditions}
+    # Compute the evoked difference between task relevance within each subject:
+    evks_diff = np.array([evks[conditions[0]][i, :] - evks[conditions[1]][i, :]
+                          for i in range(evks[conditions[0]].shape[0])])
+    # Perform a cluster based permutation ttest:
+    T_obs, clusters, cluster_p_values, H0 = permutation_cluster_1samp_test(
+        evks_diff,
+        n_permutations=n_permutations,
+        threshold=threshold,
+        tail=tail,
+        adjacency=None,
+        out_type="mask",
+        verbose=True,
+    )
+    return evks, evks_diff, T_obs, clusters, cluster_p_values, H0
 
 
 def generate_gaze_map(epochs, height, width, sigma=20):
@@ -40,6 +108,7 @@ def generate_gaze_map(epochs, height, width, sigma=20):
         hist = gaussian_filter(hist, sigma=sigma)
 
     return hist
+
 
 def cousineau_morey_correction(data, within_col, between_col, dependent_var):
     """
@@ -117,7 +186,6 @@ def baseline_scaling(epochs, correction_method="ratio", baseline=(None, 0), pick
     :return: none, the data are modified in place
     """
     epochs.apply_function(rescale, times=epochs.times, baseline=baseline, mode=correction_method,
-                          picks=picks, n_jobs=n_jobs, )
+                          picks=picks, n_jobs=n_jobs, verbose="WARNING")
 
     return None
-
