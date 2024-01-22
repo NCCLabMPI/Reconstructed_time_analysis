@@ -76,7 +76,7 @@ def pupil_latency(parameters_file, subjects):
                 "SOA": soa,
                 "SOA_float": float(soa),
                 "latency": subjects_epochs[sub].times[ind],
-                "latency_aud": subjects_epochs[sub].times[ind],
+                "latency_aud": subjects_epochs[sub].times[ind] - float(soa),
                 "value": val
             }, index=[0]))
             evks.append(evk)
@@ -139,7 +139,7 @@ def pupil_latency(parameters_file, subjects):
                     "SOA": soa,
                     "SOA_float": float(soa),
                     "latency": subjects_epochs[sub].times[ind],
-                    "latency_aud": subjects_epochs[sub].times[ind],
+                    "latency_aud": subjects_epochs[sub].times[ind] - float(soa),
                     "value": val
                 }, index=[0]))
                 evks.append(evk)
