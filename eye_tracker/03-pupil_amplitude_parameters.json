@@ -1,0 +1,16 @@
+{
+  "visit": "1",
+  "task": "prp",
+  "session": "1",
+  "data_type": "eyetrack",
+  "epoch_name": "visual_onset",
+  "crop": [-0.3, 3.5],
+  "baseline": "percent",
+  "baseline_window": [null, -0.05],
+  "picks": ["pupil_left", "pupil_right"],
+  "task_relevance": ["non-target", "irrelevant"],
+  "soas": ["0", "0.116", "0.232", "0.466"],
+  "duration": ["0.5", "1", "1.5"],
+  "n_permutations": 1024,
+  "threshold": null
+}
