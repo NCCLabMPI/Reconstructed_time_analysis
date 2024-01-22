@@ -6,6 +6,7 @@ import numpy as np
 from eye_tracker.general_helper_function import get_event_ts
 from eye_tracker.general_helper_function import cousineau_morey_correction
 import environment_variables as ev
+from mne.stats import bootstrap_confidence_interval
 
 font = {'size': 12}
 matplotlib.rc('font', **font)
@@ -248,3 +249,49 @@ def soa_boxplot(data_df, dependent_variable, fig_size=None):
     plt.subplots_adjust(wspace=0.05)
 
     return fig, ax
+
+
+def plot_ts_ci(data, times, color, plot_ci=True, ax=None, label="", clusters=None, clusters_pval=None,
+               clusters_alpha=0.3, sig_thresh=0.01, plot_nonsig_clusters=False, cluster_color="r"):
+    """
+
+    :param data:
+    :param times:
+    :param color:
+    :param plot_ci:
+    :param ax:
+    :param label:
+    :param clusters:
+    :param clusters_pval:
+    :param clusters_alpha:
+    :param sig_thresh:
+    :param plot_nonsig_clusters:
+    :param cluster_color:
+    :return:
+    """
+    assert len(data.shape) == 2, "The data must be time series and of shape n_obs x samples!"
+    assert data.shape[1] == times.shape[0], "The time vector and the data do not have the same length!"
+    if ax is None:
+        fig, ax = plt.subplots()
+    # Average across observation:
+    data_avg = np.mean(data, axis=0)
+    # Compute bootstrapped confidence interval for each condition:
+    data_ci = bootstrap_confidence_interval(data)
+    # Plot the evoked:
+    ax.plot(times, data_avg, label=label,
+            color=color)
+    # Plot the CI
+    if plot_ci:
+        ax.fill_between(times, data_ci[0, :], data_ci[1, :],
+                        color=color,
+                        alpha=.1)
+    if clusters is not None:
+        for i_c, c in enumerate(clusters):
+            c = c[0]
+            if clusters_pval[i_c] <= sig_thresh:
+                h = ax.axvspan(times[c.start], times[c.stop - 1], color=cluster_color, alpha=clusters_alpha)
+            else:
+                if plot_nonsig_clusters:
+                    ax.axvspan(times[c.start], times[c.stop - 1], color=(0.3, 0.3, 0.3), alpha=clusters_alpha)
+    ax.set_xlim([times[0], times[-1]])
+    return ax
