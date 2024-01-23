@@ -9,7 +9,8 @@ addpath("C:\Users\alexander.lepauvre\Documents\GitHub\PRET")
 root = fullfile(extractBidsRoot("..\environment_variables.py"), 'derivatives', 'pret');
 session = '1';
 task = 'prp';
-subjects = ["SX102"]; % List of subjects to model , "SX118"
+subjects = ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX112", "SX113", ...
+    "SX114", "SX115", "SX116", "SX119", "SX120", "SX121"]; % List of subjects to model , "SX118"
 
 % PRET parameters:
 % Preprocessing parameters:
@@ -20,7 +21,7 @@ prepro_opt.normflag = 1;
 prepro_opt.blinkflag = 0;
 % Model parameters:
 model_template = pret_model();
-model_template.window = [0, 2500]; % Time window to model
+model_template.window = [0, 3000]; % Time window to model
 model_template.yintflag = 0;
 model_template.slopeflag = 0;
 model_template.ampbounds = [0; 100]; % Amplitude can vary between positive and negative values
@@ -31,7 +32,7 @@ model_template.yintval = 0;
 model_template.slopeval = 0;
 % Estimation options:
 set_opt = pret_estimate_sj();
-set_opt.pret_estimate.optimnum = 1;
+set_opt.pret_estimate.optimnum = 20;
 wnum = 1; % Number of cores to use
 
 % Prepare variable to store the results

@@ -27,7 +27,7 @@ for cond_i = 1:length(cond_u)
     eventlabels = cellstr(eventlabels);
     eventlabels = eventlabels(I);
     % Correct the latencies to match the sampling rate:
-    sorted_evt_times = ((round(sorted_evt_times .* sfreq) .* 1/sfreq)) .* 1000;
+    sorted_evt_times = round(((round(sorted_evt_times .* sfreq) .* 1/sfreq)) .* 1000);
 
     % 3- Extract and format the box parameters:
     cond_boxes = box_times(strcmp(cond_labels,cond), :);
@@ -42,7 +42,7 @@ for cond_i = 1:length(cond_u)
     % Convert to an n by 2 matrix:
     cond_boxes = reshape(cond_boxes, 2, numel(cond_boxes) / 2)';
     % Correct the latencies to match the sampling rate:
-    cond_boxes = ((round(cond_boxes .* sfreq) .* 1/sfreq)) .* 1000;
+    cond_boxes = round(((round(cond_boxes .* sfreq) .* 1/sfreq)) .* 1000);
     cond_boxes = mat2cell(cond_boxes, ones(1, numel(cond_boxes) / 2), 2);
     bx_lbls = cellstr(box_labels);
 
