@@ -27,7 +27,7 @@ def edf2ascii(convert_exe, edf_file_name):
     return ascfile
 
 
-def ascii2mne_batch(raw_root, subjects, bids_root, session="1", convert_exe=""):
+def ascii2mne_batch(raw_root, subjects, bids_root, tasks, session="1", convert_exe=""):
     """
 
     :param subjects:
@@ -54,9 +54,14 @@ def ascii2mne_batch(raw_root, subjects, bids_root, session="1", convert_exe=""):
                 asci_stem = asci_file.stem
                 # Add leading 0 to files which are less than 10, to make sure that the files are loaded in the right
                 # order
-                if float(asci_stem.split('run-')[1].split('_task')[0]) <= 9:
-                    asci_stem = (asci_stem.split('run-')[0] + "run-0" + asci_stem.split('run-')[1].split('_task')[0] +
+                if task not in ["auditory", "visual"]:
+                    if float(asci_stem.split('run-')[1].split('_task')[0]) <= 9:
+                        asci_stem = (asci_stem.split('run-')[0] + "run-0" + asci_stem.split('run-')[1].split('_task')[0] +
+                                     '_task' + asci_stem.split('run-')[1].split('_task')[1])
+                else:
+                    asci_stem = (asci_stem.split('run-')[0] + "run-00" +
                                  '_task' + asci_stem.split('run-')[1].split('_task')[1])
+
                 print('Copying {} to {}'.format(asci_file, save_dir))
                 shutil.copyfile(asci_file, Path(save_dir, asci_stem + asci_file.suffix))
 
@@ -66,7 +71,7 @@ if __name__ == "__main__":
         "SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112", "SX113",
         "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121"
     ]
-    tasks = ["prp"]
+    tasks_list = ["auditory", "visual"]
     # data_root = r"C:\Users\alexander.lepauvre\Documents\PhD\Reconstructed_Time\raw_data"
-    ascii2mne_batch(ev.raw_root, subjects_list, ev.bids_root,
+    ascii2mne_batch(ev.raw_root, subjects_list, ev.bids_root, tasks_list,
                     convert_exe=r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker\edf2asc.exe")
