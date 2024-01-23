@@ -1,4 +1,4 @@
-import os
+import os, glob
 import re
 import mne
 import numpy as np
@@ -115,9 +115,15 @@ def load_raw_eyetracker(files_root, subject, session, task, beh_files_root, beh_
                                                                                              run_i))
                 continue
 
-            # Load the log file:
-            log_file = pd.read_csv(Path(beh_files_root, "sub-" + subject, "ses-" + session,
-                                        beh_file_name.format(subject, session, run_i, task)))
+            # Load the log file. For some subjects, there was a repetition. Always keep the last:
+            log_file = [beh_fl
+                        for beh_fl in os.listdir(Path(beh_files_root, "sub-" + subject, "ses-" + session))
+                        if beh_fl == beh_file_name.format(subject, session, run_i, task) or
+                        beh_fl == beh_file_name.format(subject, session, run_i, task).split(".")[0] +
+                        "_repetition_1.csv"]
+            if len(log_file) > 1:
+                log_file = [beh_fl for beh_fl in log_file if "repetition" in beh_fl]
+            log_file = pd.read_csv(Path(beh_files_root, "sub-" + subject, "ses-" + session, log_file[0]))
             # Extract the events of interest from the raw annotations:
             evt = [desc.split("/") for desc in raw.annotations.description[
                 np.where([event_of_interest in val for val in raw.annotations.description])[0]]]

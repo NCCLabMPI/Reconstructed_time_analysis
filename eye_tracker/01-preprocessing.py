@@ -49,7 +49,7 @@ def preprocessing(subject, parameters):
     calibs = [item for items in calibs for item in items]
     # Concatenate the log files:
     log_df = pd.concat(logs_list).reset_index(drop=True)
-
+    # raw.plot(block=True)
     # =============================================================================================
     # Loop through the preprocessing steps:
     for step in preprocessing_steps:
@@ -196,7 +196,7 @@ def preprocessing(subject, parameters):
                         print(f"Calibration: {calib_i}")
                         print(calib)
                         calib.plot(show=False)
-                        file_name = "calibration-{}.png".format(calib_i)
+                        file_name = "calibration-{}_task-{}.png".format(calib_i, task)
                         plt.savefig(Path(save_root, file_name))
                         plt.close()
 
@@ -208,14 +208,14 @@ if __name__ == "__main__":
     # SX101: differences in sampling rate due to experiment program issues
     # SX104: missing files
     # SX117: no eyetracking data
-    # "SX118": Issue with mne reader
     # , "SX103", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX112", "SX113",
     #                      "SX114", "SX115", "SX116", "SX119", "SX120", "SX121"
-    subjects_list = ["SX102"]
+    subjects_list = ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX112", "SX113",
+                     "SX114", "SX115", "SX116", "SX119", "SX120", "SX121"]
 
     parameters_file = (
         r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker"
-        r"\01-preprocessing_parameters.json ")
+        r"\01-preprocessing_parameters_task-auditory.json ")
     # Create a data frame to save the summary of all subjects:
     preprocessing_summary = []
     for sub in subjects_list:

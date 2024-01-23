@@ -1,0 +1,62 @@
+{
+  "visit": "1",
+  "task": "auditory",
+  "session": "1",
+  "data_type": "eyetrack",
+  "preprocessing_steps": [
+    "interpolate_blinks",
+    "gaze_to_dva",
+    "extract_eyelink_events",
+    "epochs",
+    "remove_bad_epochs",
+    "discard_bad_subjects"
+  ],
+  "events_of_interest": ["vis_onset*"],
+  "plot_calibration": true,
+  "beh_file_name": "sub-{}_ses-{}_run-{}_task-{}_events.csv",
+  "log_file_columns":  ["trial_response_vis", "trial_accuracy_aud", "trial_second_button_press", "RT_aud", "RT_vis"],
+  "discard_bad_subjects": {
+    "bad_trials_threshold": 0.5,
+    "nan_threshold": 0.5
+  },
+  "gaze_to_dva": {
+    "eyes": ["left", "right"]
+  },
+  "trend_line_departure": {
+    "eyes": ["left", "right"],
+    "threshold_factor": 16,
+    "window_length_s": 0.01,
+    "n_iter": 4
+  },
+  "dilation_speed_rejection": {
+    "threshold_factor": 16,
+    "eyes": ["left", "right"],
+    "window_length_s": 0.01
+  },
+  "interpolate_blinks": {
+    "buffer": [0.05, 0.2],
+    "interpolate_gaze": true
+  },
+  "extract_eyelink_events": {
+    "eyes": ["left", "right"],
+    "events": ["BAD_blink", "saccade", "fixation"]
+  },
+  "remove_bad_epochs": {
+    "channels": ["BAD_blink_left", "BAD_blink_right"],
+    "nan_proportion_thresh": 0.5
+  },
+  "epochs": {
+    "visual_onset": {
+      "picks": "all",
+      "tmin": -1,
+      "tmax": 3.5,
+      "baseline": null,
+      "events_of_interest": [
+          "vis_onset"
+      ],
+      "reject_by_annotation": false,
+      "metadata_column": ["event type", "task relevance", "duration", "category", "orientation", "identity",
+          "SOA", "lock", "pitch"]
+    }
+  }
+}
