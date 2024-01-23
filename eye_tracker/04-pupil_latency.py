@@ -88,6 +88,11 @@ def pupil_latency(parameters_file, subjects):
         # Per SOA:
         latencies = []
         evks = {soa: [] for soa in param["soas"]}
+        # Set the boxplot limits:
+        if lock == "onset":
+            boxplot_ylim = [0, 1.5]
+        else:
+            boxplot_ylim = None
         for soa in param["soas"]:
             # Loop through each subject:
             for sub in subjects_epochs.keys():
@@ -112,7 +117,7 @@ def pupil_latency(parameters_file, subjects):
                 }, index=[0]))
                 evks[soa].append(evk)
         latencies = pd.concat(latencies).reset_index(drop=True)
-        fig = plot_pupil_latency(evks, times, latencies, ev.colors["soa_onset_locked"])
+        fig = plot_pupil_latency(evks, times, latencies, ev.colors["soa_onset_locked"], boxplot_ylim=boxplot_ylim)
         fig.savefig(Path(save_dir, "pupil_latency_{}.svg".format(lock)), transparent=True, dpi=300)
         fig.savefig(Path(save_dir, "pupil_latency_{}.png".format(lock)), transparent=True, dpi=300)
         plt.close()
@@ -146,7 +151,7 @@ def pupil_latency(parameters_file, subjects):
                     }, index=[0]))
                     evks[soa].append(evk)
             latencies = pd.concat(latencies).reset_index(drop=True)
-            fig = plot_pupil_latency(evks, times, latencies, ev.colors["soa_onset_locked"])
+            fig = plot_pupil_latency(evks, times, latencies, ev.colors["soa_onset_locked"], boxplot_ylim=boxplot_ylim)
             fig.savefig(Path(save_dir, "pupil_latency_{}-{}.svg".format(lock, task)), transparent=True, dpi=300)
             fig.savefig(Path(save_dir, "pupil_latency_{}-{}.png".format(lock, task)), transparent=True, dpi=300)
             plt.close()
@@ -180,7 +185,7 @@ def pupil_latency(parameters_file, subjects):
                     }, index=[0]))
                     evks[soa].append(evk)
             latencies = pd.concat(latencies).reset_index(drop=True)
-            fig = plot_pupil_latency(evks, times, latencies, ev.colors["soa_onset_locked"])
+            fig = plot_pupil_latency(evks, times, latencies, ev.colors["soa_onset_locked"], boxplot_ylim=boxplot_ylim)
             fig.savefig(Path(save_dir, "pupil_latency_{}-{}.svg".format(lock, duration)),
                         transparent=True, dpi=300)
             fig.savefig(Path(save_dir, "pupil_latency_{}-{}.png".format(lock, duration)),
@@ -217,7 +222,8 @@ def pupil_latency(parameters_file, subjects):
                         }, index=[0]))
                         evks[soa].append(evk)
                 latencies = pd.concat(latencies).reset_index(drop=True)
-                fig = plot_pupil_latency(evks, times, latencies, ev.colors["soa_onset_locked"])
+                fig = plot_pupil_latency(evks, times, latencies, ev.colors["soa_onset_locked"],
+                                         boxplot_ylim=boxplot_ylim)
                 fig.savefig(Path(save_dir, "pupil_latency_{}-{}-{}.svg".format(lock, task, duration)),
                             transparent=True, dpi=300)
                 fig.savefig(Path(save_dir, "pupil_latency_{}-{}-{}.png".format(lock, task, duration)),

@@ -297,15 +297,16 @@ def plot_ts_ci(data, times, color, plot_ci=True, ax=None, label="", clusters=Non
     return ax
 
 
-def plot_pupil_latency(evoked_dict, times, latencies_df, colors):
+def plot_pupil_latency(evoked_dict, times, latencies_df, colors, boxplot_ylim=None):
     """
 
     :param evoked_dict:
     :param latencies_df:
+    :param times:
+    :param colors:
+    :param boxplot_ylim:
     :return:
     """
-    import pandas as pd
-
     fig = plt.figure(figsize=[10, 11.7 / 4], constrained_layout=True)
     spec = fig.add_gridspec(ncols=4, nrows=1)
     ax1 = fig.add_subplot(spec[0, 0:3])
@@ -332,7 +333,7 @@ def plot_pupil_latency(evoked_dict, times, latencies_df, colors):
                                 positions="SOA_float", ax=ax2, cousineau_correction=False, title="", xlabel="SOA",
                                 ylabel=r'$\tau_{\mathrm{audio}}$', xlim=[-0.1, 0.6], width=0.1,
                                 face_colors=[colors[soa] for soa in list(evoked_dict.keys())])
-    ax2.set_ylim([0, 1.5])
+    ax2.set_ylim(boxplot_ylim)
     plt.suptitle("Pupil peak latency")
     return fig
 
