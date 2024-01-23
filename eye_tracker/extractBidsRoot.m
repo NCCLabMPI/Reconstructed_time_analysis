@@ -25,6 +25,9 @@ function bidsRoot = extractBidsRoot(filePath)
         if bidsRoot(1) == 'r' && (bidsRoot(2) == "'" || bidsRoot(2) == '"')
             bidsRoot = bidsRoot(3:end-1);
         end
+        if (bidsRoot(1) == "'" || bidsRoot(1) == '"')
+            bidsRoot = bidsRoot(2:end-1);
+        end
     else
         error('bids_root not found');
     end
