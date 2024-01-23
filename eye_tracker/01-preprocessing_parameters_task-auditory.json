@@ -11,7 +11,7 @@
     "remove_bad_epochs",
     "discard_bad_subjects"
   ],
-  "events_of_interest": ["vis_onset*"],
+  "events_of_interest": ["audio_onset*"],
   "plot_calibration": true,
   "beh_file_name": "sub-{}_ses-{}_run-{}_task-{}_events.csv",
   "log_file_columns":  ["trial_response_vis", "trial_accuracy_aud", "trial_second_button_press", "RT_aud", "RT_vis"],
@@ -46,17 +46,15 @@
     "nan_proportion_thresh": 0.5
   },
   "epochs": {
-    "visual_onset": {
-      "picks": "all",
-      "tmin": -1,
-      "tmax": 3.5,
-      "baseline": null,
-      "events_of_interest": [
-          "vis_onset"
-      ],
-      "reject_by_annotation": false,
-      "metadata_column": ["event type", "task relevance", "duration", "category", "orientation", "identity",
-          "SOA", "lock", "pitch"]
-    }
+    "picks": "all",
+    "tmin": -1,
+    "tmax": 3.5,
+    "baseline": null,
+    "events_of_interest": [
+        "audio_onset"
+    ],
+    "reject_by_annotation": false,
+    "metadata_column": ["event type", "task relevance", "duration", "category", "orientation", "identity",
+        "SOA", "lock", "pitch"]
   }
 }

@@ -39,8 +39,8 @@ def preprocessing(subject, parameters):
     logs_list, raws_list, calibs_list, screen_size, screen_distance, screen_res = (
         load_raw_eyetracker(files_root, subject, session, task, ev.raw_root,
                             param["beh_file_name"],
-                            param["epochs"]["visual_onset"]["metadata_column"],
-                            'vis_onset', verbose=False, debug=DEBUG))
+                            param["epochs"]["metadata_column"],
+                            param["events_of_interest"][0].replace('*', ''), verbose=False, debug=DEBUG))
     # Concatenate the objects
     raw = mne.concatenate_raws(raws_list)
     # Remove the empty calibrations:
@@ -96,111 +96,107 @@ def preprocessing(subject, parameters):
         proportion_bad = compute_proportion_bad(raw, desc="BAD_", eyes=["left", "right"])
 
         if step == "epochs":
-            # Looping through each of the different epochs file to create:
-            for epoch_name in step_param.keys():
-                print(epoch_name)
-                # Convert the annotations to event for epoching:
-                print('Creating annotations')
-                events_from_annot, event_dict = mne.events_from_annotations(raw, verbose="ERROR",
-                                                                            regexp=param["events_of_interest"][0])
-                # Epoch the data:
-                epochs = epoch_data(raw, events_from_annot, event_dict, **step_param[epoch_name])
+            # Convert the annotations to event for epoching:
+            print('Creating annotations')
+            events_from_annot, event_dict = mne.events_from_annotations(raw, verbose="ERROR",
+                                                                        regexp=param["events_of_interest"][0])
+            # Epoch the data:
+            epochs = epoch_data(raw, events_from_annot, event_dict, **step_param)
 
-                # Add the log file information to the metadata
-                if len(param["log_file_columns"]) > 0:
-                    epochs = add_logfiles_info(epochs, log_df, param["log_file_columns"])
+            # Add the log file information to the metadata
+            if len(param["log_file_columns"]) > 0:
+                epochs = add_logfiles_info(epochs, log_df, param["log_file_columns"])
 
-                if "remove_bad_epochs" in preprocessing_steps:
-                    epochs, proportion_rejected_trials = remove_bad_epochs(epochs,
-                                                                           channels=param["remove_bad_epochs"][
-                                                                               "channels"],
-                                                                           bad_proportion_thresh=
-                                                                           param["remove_bad_epochs"][
-                                                                               "nan_proportion_thresh"])
+            if "remove_bad_epochs" in preprocessing_steps:
+                epochs, proportion_rejected_trials = remove_bad_epochs(epochs,
+                                                                       channels=param["remove_bad_epochs"][
+                                                                           "channels"],
+                                                                       bad_proportion_thresh=
+                                                                       param["remove_bad_epochs"][
+                                                                           "nan_proportion_thresh"])
 
-                # Plot the epochs:
-                if "discard_bad_subjects" in preprocessing_steps:
-                    if (proportion_rejected_trials > param["discard_bad_subjects"]["bad_trials_threshold"] or
-                            np.mean(proportion_bad) > param["discard_bad_subjects"]["nan_threshold"]):
-                        print("Subject {} rejected due to bad epochs".format(subject))
-                        continue
+            # Plot the epochs:
+            if "discard_bad_subjects" in preprocessing_steps:
+                if (proportion_rejected_trials > param["discard_bad_subjects"]["bad_trials_threshold"] or
+                        np.mean(proportion_bad) > param["discard_bad_subjects"]["nan_threshold"]):
+                    print("Subject {} rejected due to bad epochs".format(subject))
+                    continue
 
-                # Save this epoch to file:
-                save_root = Path(ev.bids_root, "derivatives", "preprocessing", "sub-" + subject,
-                                 "ses-" + session, data_type)
-                if not os.path.isdir(save_root):
-                    os.makedirs(save_root)
-                # Generate the file name:
-                file_name = "sub-{}_ses-{}_task-{}_{}_desc-{}-epo.fif".format(subject, session, task, data_type,
-                                                                              epoch_name)
-                # Save:
-                epochs.save(Path(save_root, file_name), overwrite=True, verbose="ERROR")
-                epochs.load_data()
-                # Depending on whehter or no the events were extracted:
-                if "extract_eyelink_events" in preprocessing_steps:
-                    # Plot the blinks rate:
-                    fig, ax = plt.subplots(2)
-                    ax[0].imshow(np.squeeze(epochs.get_data(picks="BAD_blink_left")), aspect="auto", origin="lower",
-                                 extent=[epochs.times[0], epochs.times[-1], 0, len(epochs)])
-                    ax[1].imshow(np.squeeze(epochs.get_data(picks="BAD_blink_right")), aspect="auto", origin="lower",
-                                 extent=[epochs.times[0], epochs.times[-1], 0, len(epochs)])
-                    ax[0].set_title("Left eye")
-                    ax[1].set_title("Right eye")
-                    ax[1].set_xlabel("Time (s)")
-                    ax[1].set_ylabel("Trials")
-                    file_name = "sub-{}_ses-{}_task-{}_{}_desc-{}_blinks.png".format(subject, session, task,
-                                                                                     data_type, epoch_name)
-                    plt.savefig(Path(save_root, file_name))
-                    plt.close()
-
-                    # Plot the saccades rate:
-                    fig, ax = plt.subplots(2)
-                    ax[0].imshow(np.squeeze(epochs.get_data(picks="saccade_left")), aspect="auto", origin="lower",
-                                 extent=[epochs.times[0], epochs.times[-1], 0, len(epochs)])
-                    ax[1].imshow(np.squeeze(epochs.get_data(picks="saccade_right")), aspect="auto", origin="lower",
-                                 extent=[epochs.times[0], epochs.times[-1], 0, len(epochs)])
-                    ax[0].set_title("Left eye")
-                    ax[1].set_title("Right eye")
-                    ax[1].set_xlabel("Time (s)")
-                    ax[1].set_ylabel("Trials")
-                    file_name = "sub-{}_ses-{}_task-{}_{}_desc-{}_saccades.png".format(subject, session, task,
-                                                                                       data_type, epoch_name)
-                    plt.savefig(Path(save_root, file_name))
-                    plt.close()
-
-                    # Plot the fixation rate:
-                    fig, ax = plt.subplots(2)
-                    ax[0].imshow(np.squeeze(epochs.get_data(picks="fixation_left")), aspect="auto", origin="lower",
-                                 extent=[epochs.times[0], epochs.times[-1], 0, len(epochs)])
-                    ax[1].imshow(np.squeeze(epochs.get_data(picks="fixation_right")), aspect="auto", origin="lower",
-                                 extent=[epochs.times[0], epochs.times[-1], 0, len(epochs)])
-                    ax[0].set_title("Left eye")
-                    ax[1].set_title("Right eye")
-                    ax[1].set_xlabel("Time (s)")
-                    ax[1].set_ylabel("Trials")
-                    file_name = "sub-{}_ses-{}_task-{}_{}_desc-{}_fixation.png".format(subject, session, task,
-                                                                                       data_type, epoch_name)
-                    plt.savefig(Path(save_root, file_name))
-                    plt.close()
-
-                # Finally, plot the fixation maps:
-                plot_gaze(epochs, width=1920, height=1080, show=False)
-                file_name = "sub-{}_ses-{}_task-{}_{}_desc-{}_gaze.png".format(subject, session, task,
-                                                                               data_type, epoch_name)
+            # Save this epoch to file:
+            save_root = Path(ev.bids_root, "derivatives", "preprocessing", "sub-" + subject,
+                             "ses-" + session, data_type)
+            if not os.path.isdir(save_root):
+                os.makedirs(save_root)
+            # Generate the file name:
+            file_name = "sub-{}_ses-{}_task-{}_{}_desc-epo.fif".format(subject, session, task, data_type)
+            # Save:
+            epochs.save(Path(save_root, file_name), overwrite=True, verbose="ERROR")
+            epochs.load_data()
+            # Depending on whehter or no the events were extracted:
+            if "extract_eyelink_events" in preprocessing_steps:
+                # Plot the blinks rate:
+                fig, ax = plt.subplots(2)
+                ax[0].imshow(np.squeeze(epochs.get_data(picks="BAD_blink_left")), aspect="auto", origin="lower",
+                             extent=[epochs.times[0], epochs.times[-1], 0, len(epochs)])
+                ax[1].imshow(np.squeeze(epochs.get_data(picks="BAD_blink_right")), aspect="auto", origin="lower",
+                             extent=[epochs.times[0], epochs.times[-1], 0, len(epochs)])
+                ax[0].set_title("Left eye")
+                ax[1].set_title("Right eye")
+                ax[1].set_xlabel("Time (s)")
+                ax[1].set_ylabel("Trials")
+                file_name = "sub-{}_ses-{}_task-{}_{}_desc-blinks.png".format(subject, session, task,
+                                                                              data_type)
                 plt.savefig(Path(save_root, file_name))
                 plt.close()
 
-                # Finally, plot the calibrations:
-                if param["plot_calibration"]:
-                    for calib_i, calib in enumerate(calibs):
-                        print(f"Calibration: {calib_i}")
-                        print(calib)
-                        calib.plot(show=False)
-                        file_name = "calibration-{}_task-{}.png".format(calib_i, task)
-                        plt.savefig(Path(save_root, file_name))
-                        plt.close()
+                # Plot the saccades rate:
+                fig, ax = plt.subplots(2)
+                ax[0].imshow(np.squeeze(epochs.get_data(picks="saccade_left")), aspect="auto", origin="lower",
+                             extent=[epochs.times[0], epochs.times[-1], 0, len(epochs)])
+                ax[1].imshow(np.squeeze(epochs.get_data(picks="saccade_right")), aspect="auto", origin="lower",
+                             extent=[epochs.times[0], epochs.times[-1], 0, len(epochs)])
+                ax[0].set_title("Left eye")
+                ax[1].set_title("Right eye")
+                ax[1].set_xlabel("Time (s)")
+                ax[1].set_ylabel("Trials")
+                file_name = "sub-{}_ses-{}_task-{}_{}_desc-saccades.png".format(subject, session, task,
+                                                                                data_type)
+                plt.savefig(Path(save_root, file_name))
+                plt.close()
 
-            return np.mean(proportion_bad), proportion_rejected_trials
+                # Plot the fixation rate:
+                fig, ax = plt.subplots(2)
+                ax[0].imshow(np.squeeze(epochs.get_data(picks="fixation_left")), aspect="auto", origin="lower",
+                             extent=[epochs.times[0], epochs.times[-1], 0, len(epochs)])
+                ax[1].imshow(np.squeeze(epochs.get_data(picks="fixation_right")), aspect="auto", origin="lower",
+                             extent=[epochs.times[0], epochs.times[-1], 0, len(epochs)])
+                ax[0].set_title("Left eye")
+                ax[1].set_title("Right eye")
+                ax[1].set_xlabel("Time (s)")
+                ax[1].set_ylabel("Trials")
+                file_name = "sub-{}_ses-{}_task-{}_{}_desc-fixation.png".format(subject, session, task,
+                                                                                data_type)
+                plt.savefig(Path(save_root, file_name))
+                plt.close()
+
+            # Finally, plot the fixation maps:
+            plot_gaze(epochs, width=1920, height=1080, show=False)
+            file_name = "sub-{}_ses-{}_task-{}_{}_desc-gaze.png".format(subject, session, task,
+                                                                        data_type)
+            plt.savefig(Path(save_root, file_name))
+            plt.close()
+
+            # Finally, plot the calibrations:
+            if param["plot_calibration"]:
+                for calib_i, calib in enumerate(calibs):
+                    print(f"Calibration: {calib_i}")
+                    print(calib)
+                    calib.plot(show=False)
+                    file_name = "calibration-{}_task-{}.png".format(calib_i, task)
+                    plt.savefig(Path(save_root, file_name))
+                    plt.close()
+
+    return np.mean(proportion_bad), proportion_rejected_trials
 
 
 if __name__ == "__main__":

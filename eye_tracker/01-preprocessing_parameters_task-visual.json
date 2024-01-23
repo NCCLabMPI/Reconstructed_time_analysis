@@ -46,17 +46,15 @@
     "nan_proportion_thresh": 0.5
   },
   "epochs": {
-    "visual_onset": {
-      "picks": "all",
-      "tmin": -1,
-      "tmax": 3.5,
-      "baseline": null,
-      "events_of_interest": [
-          "vis_onset"
-      ],
-      "reject_by_annotation": false,
-      "metadata_column": ["event type", "task relevance", "duration", "category", "orientation", "identity",
-          "SOA", "lock", "pitch"]
-    }
+    "picks": "all",
+    "tmin": -1,
+    "tmax": 3.5,
+    "baseline": null,
+    "events_of_interest": [
+        "vis_onset"
+    ],
+    "reject_by_annotation": false,
+    "metadata_column": ["event type", "task relevance", "duration", "category", "orientation", "identity",
+        "SOA", "lock", "pitch"]
   }
 }
