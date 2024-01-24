@@ -202,38 +202,47 @@ def plot_within_subject_boxplot(data_df, within_column, between_column, dependen
     return ax, bplot, lineplot
 
 
-def soa_boxplot(data_df, dependent_variable, fig_size=None):
+def soa_boxplot(data_df, dependent_variable, fig_size=None, lock_column="SOA_lock", subject_column="sub_id",
+                between_column="onset_SOA", ax=None, fig=None, colors_onset_locked=None, colors_offset_locked=None):
     """
     This function plots the PRP study data in a standardized format, so that it can be used across experiments and data
     types. It is not super well documented, but it is not meant to be reuused as highly specific to this design.
+    :param between_column:
+    :param subject_column:
+    :param lock_column:
+    :param dependent_variable:
     :param data_df:
     :param fig_size:
     :return:
     """
     if fig_size is None:
         fig_size = [8.3 / 3, 11.7 / 2]
-    fig, ax = plt.subplots(nrows=1, ncols=4, sharex=False, sharey=True, figsize=fig_size)
+    if ax is None or fig is None:
+        fig, ax = plt.subplots(nrows=1, ncols=4, sharex=False, sharey=True, figsize=fig_size)
+    if colors_onset_locked is None:
+        colors_onset_locked = [val for val in ev.colors["soa_onset_locked"].values()]
+    if colors_offset_locked is None:
+        colors_offset_locked = [val for val in ev.colors["soa_offset_locked_500ms"].values()]
     d = 1.5
     # Onset locked data:
-    _, _, _ = plot_within_subject_boxplot(data_df[data_df["SOA_lock"] == 'onset'],
-                                          'sub_id', 'onset_SOA', dependent_variable,
-                                          positions='onset_SOA', ax=ax[0], cousineau_correction=True,
+    _, _, _ = plot_within_subject_boxplot(data_df[data_df[lock_column] == 'onset'],
+                                          subject_column, between_column, dependent_variable,
+                                          positions=between_column, ax=ax[0], cousineau_correction=True,
                                           title="",
                                           xlabel="", ylabel="",
                                           xlim=[-0.1, 0.6], width=0.1,
-                                          face_colors=[val for val in ev.colors["soa_onset_locked"].values()])
+                                          face_colors=colors_onset_locked)
     # Loop through each duration to plot the offset locked SOA separately:
     for i, dur in enumerate(sorted(list(data_df["duration"].unique()))):
-        _, _, _ = plot_within_subject_boxplot(data_df[(data_df["SOA_lock"] == 'offset')
-                                                      & (data_df["duration"] == dur)], 'sub_id',
-                                              'onset_SOA',
+        _, _, _ = plot_within_subject_boxplot(data_df[(data_df[lock_column] == 'offset')
+                                                      & (data_df["duration"] == dur)], subject_column,
+                                              between_column,
                                               dependent_variable,
-                                              positions='onset_SOA', ax=ax[i + 1], cousineau_correction=True,
+                                              positions=between_column, ax=ax[i + 1], cousineau_correction=True,
                                               title="",
                                               xlabel="", ylabel="",
                                               xlim=[dur - 0.1, dur + 0.6], width=0.1,
-                                              face_colors=[val for val in ev.colors[
-                                                  "soa_offset_locked_{}ms".format(int(dur * 1000))].values()])
+                                              face_colors=colors_offset_locked)
         ax[i + 1].yaxis.set_visible(False)
     # Remove the spines:
     for i in [0, 1, 2]:
@@ -290,7 +299,7 @@ def plot_ts_ci(data, times, color, plot_ci=True, ax=None, label="", clusters=Non
             c = c[0]
             if clusters_pval[i_c] <= sig_thresh:
                 h = ax.axvspan(times[c.start], times[c.stop - 1], color=cluster_color, alpha=clusters_alpha)
-            else:
+            elif clusters_pval[i_c] <= 0.05:
                 if plot_nonsig_clusters:
                     ax.axvspan(times[c.start], times[c.stop - 1], color=(0.3, 0.3, 0.3), alpha=clusters_alpha)
     ax.set_xlim([times[0], times[-1]])

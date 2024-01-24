@@ -6,7 +6,11 @@ from pathlib import Path
 import os
 import mne
 import matplotlib.pyplot as plt
-from plotter_functions import plot_within_subject_boxplot
+from plotter_functions import plot_within_subject_boxplot, soa_boxplot
+
+# Set the font size:
+plt.rcParams.update({'font.size': 14})
+dpi = 300
 
 
 def plot_pret_latencies(data_dir, session="1", task="prp", conditions_mapping=None):
@@ -20,6 +24,10 @@ def plot_pret_latencies(data_dir, session="1", task="prp", conditions_mapping=No
     :param factors:
     :return:
     """
+    # Create the save directory:
+    save_dir = Path(ev.bids_root, "derivatives", "pret")
+    if not os.path.isdir(save_dir):
+        os.makedirs(save_dir)
     if conditions_mapping is None:
         conditions_mapping = {
             "SOA": {
@@ -39,78 +47,66 @@ def plot_pret_latencies(data_dir, session="1", task="prp", conditions_mapping=No
     # Convert the conditions back:
     for col in conditions_mapping.keys():
         results[col] = results[col].replace(conditions_mapping[col])
-    # Plot the results:
-    face_colors_audio = [
-        [1, 0, 0],
-        [1, 0, 0],
-        [1, 0, 0],
-        [1, 0, 0]
-    ]
-    face_color_vis = [
-        [0, 0, 1],
-        [0, 0, 1],
-        [0, 0, 1],
-        [0, 0, 1]
-    ]
-    # ===========================================================================
-    # Onset locked:
-    fig, ax_tr = plt.subplots(nrows=1, ncols=1)
-    plot_within_subject_boxplot(results[results["lock"] == "onset"],
-                                "subject", "SOA",
-                                "audOnset", positions="SOA",
-                                ax=ax_tr, cousineau_correction=False, title="", xlabel="", ylabel="", xlim=None,
-                                width=0.1, face_colors=face_colors_audio, edge_colors=None, xlabel_fontsize=9)
-    plot_within_subject_boxplot(results[results["lock"] == "onset"],
-                                "subject", "SOA",
-                                "visOnset", positions="SOA",
-                                ax=ax_tr, cousineau_correction=False, title="", xlabel="", ylabel="", xlim=None,
-                                width=0.1, face_colors=face_color_vis, edge_colors=None, xlabel_fontsize=9)
-    ax_tr.set_xlim([-0.1, 0.5])
-    ax_tr.set_xlabel("SOA (sec.)")
-    ax_tr.set_ylabel("Event latency (sec.)")
-    plt.show()
+    # Convert to seconds:
+    results["tau-audOnset"] = results["tau-audOnset"] / 1000
+    results["tau-visOnset"] = results["tau-visOnset"] / 1000
+    results["tau-visOffset"] = results["tau-visOffset"] / 1000
+    # Add the onset soa column:
+    results.loc[:, "onset_SOA"] = results["SOA"]
+    results.loc[results["lock"] == "offset", "onset_SOA"] = (results.loc[results["lock"] == "offset", "onset_SOA"] +
+                                                             results.loc[results["lock"] == "offset", "duration"])
 
-    fig, ax_ti = plt.subplots(nrows=1, ncols=1)
-    plot_within_subject_boxplot(results[(results["lock"] == "onset") & (results["task"] == "irrelevant")],
-                                "subject", "SOA",
-                                "audOnset", positions="SOA",
-                                ax=ax_ti, cousineau_correction=False, title="", xlabel="", ylabel="", xlim=None,
-                                width=0.1, face_colors=face_colors_audio, edge_colors=None, xlabel_fontsize=9)
-    plot_within_subject_boxplot(results[(results["lock"] == "onset") & (results["task"] == "irrelevant")],
-                                "subject", "SOA",
-                                "visOnset", positions="SOA",
-                                ax=ax_ti, cousineau_correction=False, title="", xlabel="", ylabel="", xlim=None,
-                                width=0.1, face_colors=face_color_vis, edge_colors=None, xlabel_fontsize=9)
-    ax_ti.set_xlim([-0.1, 0.5])
-    ax_ti.set_xlabel("SOA (sec.)")
-    ax_ti.set_ylabel("Event latency (sec.)")
-    # Uniformize the ylims:
-    ylims = [ax_tr.get_ylim()[0], ax_tr.get_ylim()[1], ax_ti.get_ylim()[0], ax_ti.get_ylim()[1]]
-    ylims_new = [min(ylims), max(ylims)]
-    ax_tr.set_ylim(ylims_new)
-    ax_ti.set_ylim(ylims_new)
-
-    # ===========================================================================
-    # Offset locked:
-    results_offset = results[results["lock"] == "onset"]
-    # Add the duration to the SOA:
-    results_offset["onset_SOA"] = results_offset["SOA"].to_numpy() + results_offset["duration"].to_numpy()
-    fig, ax_tr = plt.subplots(nrows=1, ncols=1)
-    for dur in list(results_offset["duration"].unique()):
-        plot_within_subject_boxplot(results_offset[results_offset["duration"] == dur],
-                                    "subject", "onset_SOA",
-                                    "audOnset", positions="onset_SOA",
-                                    ax=ax_tr, cousineau_correction=False, title="", xlabel="", ylabel="", xlim=None,
-                                    width=0.1, face_colors=face_colors_audio, edge_colors=None, xlabel_fontsize=9)
-        plot_within_subject_boxplot(results_offset[results_offset["duration"] == dur],
-                                    "subject", "onset_SOA",
-                                    "visOffset", positions="onset_SOA",
-                                    ax=ax_tr, cousineau_correction=False, title="", xlabel="", ylabel="", xlim=None,
-                                    width=0.1, face_colors=face_color_vis, edge_colors=None, xlabel_fontsize=9)
-    ax_tr.set_xlim([0.4, 2.1])
-    ax_tr.set_xlabel("SOA (sec.)")
-    ax_tr.set_ylabel("Event latency (sec.)")
-    plt.show()
+    # Plot the tau to the auditory stimuli:
+    fig_aud, ax_aud = soa_boxplot(results,
+                                  "tau-audOnset",
+                                  fig_size=[8.3 / 2, 11.7 / 2], lock_column="lock",
+                                  subject_column="subject",
+                                  between_column="onset_SOA", ax=None, fig=None)
+    # Plot the tau to the visual stimuli onset:
+    fig_visOnset, ax_visOnset = soa_boxplot(results,
+                                            "tau-visOnset",
+                                            fig_size=[8.3 / 2, 11.7 / 2], lock_column="lock",
+                                            subject_column="subject",
+                                            between_column="onset_SOA", ax=None, fig=None,
+                                            colors_onset_locked=[ev.colors["visOnset"][soa]
+                                                                 for soa in ev.colors["visOnset"].keys()],
+                                            colors_offset_locked=[ev.colors["visOnset"][soa]
+                                                                  for soa in ev.colors["visOnset"].keys()]
+                                            )
+    # Plot the tau to the visual stimuli offset:
+    fig_visOffset, ax_visOffset = soa_boxplot(results,
+                                              "tau-visOffset",
+                                              fig_size=[8.3 / 2, 11.7 / 2], lock_column="lock",
+                                              subject_column="subject",
+                                              between_column="onset_SOA", ax=None, fig=None,
+                                              colors_onset_locked=[ev.colors["visOffset"][soa]
+                                                                   for soa in ev.colors["visOffset"].keys()],
+                                              colors_offset_locked=[ev.colors["visOffset"][soa]
+                                                                    for soa in ev.colors["visOffset"].keys()])
+    ylims = ax_aud[0].get_ylim() + ax_visOnset[0].get_ylim() + ax_visOffset[0].get_ylim()
+    ylims = [min(ylims), max(ylims)]
+    ax_aud[0].set_ylim(ylims)
+    ax_visOnset[0].set_ylim(ylims)
+    ax_visOffset[0].set_ylim(ylims)
+    # Axes decoration:
+    fig_aud.suptitle("T2 pupil response")
+    fig_visOnset.suptitle("T1 pupil response")
+    fig_visOffset.suptitle("Offset pupil response")
+    fig_aud.text(0.5, 0, 'Time (sec.)', ha='center', va='center')
+    fig_visOnset.text(0.5, 0, 'Time (sec.)', ha='center', va='center')
+    fig_visOffset.text(0.5, 0, 'Time (sec.)', ha='center', va='center')
+    fig_aud.text(0, 0.5, r'$\tau_{\mathrm{audio}}$', ha='center', va='center', fontsize=18, rotation=90)
+    fig_visOnset.text(0, 0.5, r'$\tau_{\mathrm{Onset}}$', ha='center', va='center', fontsize=18, rotation=90)
+    fig_visOffset.text(0, 0.5, r'$\tau_{\mathrm{Offset}}$', ha='center', va='center', fontsize=18, rotation=90)
+    fig_aud.savefig(Path(save_dir, "pupil_response_audio.svg"), transparent=True, dpi=dpi)
+    fig_aud.savefig(Path(save_dir, "pupil_response_audio.png"), transparent=True, dpi=dpi)
+    fig_visOnset.savefig(Path(save_dir, "pupil_response_visOnset.svg"), transparent=True, dpi=dpi)
+    fig_visOnset.savefig(Path(save_dir, "pupil_response_visOnset.png"), transparent=True, dpi=dpi)
+    fig_visOffset.savefig(Path(save_dir, "pupil_response_visOffset.svg"), transparent=True, dpi=dpi)
+    fig_visOffset.savefig(Path(save_dir, "pupil_response_visOffset.png"), transparent=True, dpi=dpi)
+    plt.close(fig_aud)
+    plt.close(fig_visOnset)
+    plt.close(fig_visOffset)
 
 
 if __name__ == "__main__":
@@ -127,6 +123,4 @@ if __name__ == "__main__":
             "duration3": 1.5
         }
     }
-    subjects_list = ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX112", "SX113",
-                     "SX114", "SX115", "SX116"]  # "SX118", "SX119", "SX120", "SX121"]
     plot_pret_latencies(Path(ev.bids_root, "derivatives", "pret"), session="1", task="prp")

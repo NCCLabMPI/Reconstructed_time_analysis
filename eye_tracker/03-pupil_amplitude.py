@@ -57,7 +57,7 @@ def pupil_amplitude(parameters_file, subjects):
                                  threshold=param["threshold"],
                                  tail=1))
     # Plot the results:
-    fig, ax = plt.subplots(figsize=[8.3, 11.7/1.5])
+    fig, ax = plt.subplots(figsize=[8.3, 11.7/3])
     # Task relevant:
     plot_ts_ci(evks[conditions[0]], epochs.times, ev.colors["task_relevance"][param["task_relevance"][0]],
                ax=ax, label=param["task_relevance"][0])
@@ -79,7 +79,7 @@ def pupil_amplitude(parameters_file, subjects):
     # ===========================================================
     # Separately for each trial durations:
     # Prepare a figure for all the durations:
-    fig, ax = plt.subplots(3, 1, sharex=True, sharey=True, figsize=[8.3, 11.7/1.5])
+    fig, ax = plt.subplots(3, 1, sharex=True, sharey=True, figsize=[8.3, 11.7/3])
     for dur_i, dur in enumerate(param["duration"]):
         # Prepare the condition strings:
         conditions = ["/".join([task, dur, lock]) for task in param["task_relevance"]]
@@ -129,7 +129,7 @@ def pupil_amplitude(parameters_file, subjects):
                                  threshold=param["threshold"],
                                  tail=1))
     # Plot the results:
-    fig, ax = plt.subplots(figsize=[8.3, 11.7/1.5])
+    fig, ax = plt.subplots(figsize=[8.3, 11.7/3])
     # Task relevant:
     plot_ts_ci(evks[conditions[0]], epochs.times, ev.colors["task_relevance"][param["task_relevance"][0]],
                ax=ax, label=param["task_relevance"][0])
@@ -151,7 +151,7 @@ def pupil_amplitude(parameters_file, subjects):
     # ===========================================================
     # Separately for each trial durations:
     # Prepare a figure for all the durations:
-    fig, ax = plt.subplots(3, 1, sharex=True, sharey=True, figsize=[8.3, 11.7/1.5])
+    fig, ax = plt.subplots(3, 1, sharex=True, sharey=True, figsize=[8.3, 11.7/3])
     for dur_i, dur in enumerate(param["duration"]):
         # Prepare the condition strings:
         conditions = ["/".join([task, dur, lock]) for task in param["task_relevance"]]
