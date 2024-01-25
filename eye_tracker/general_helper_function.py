@@ -4,6 +4,70 @@ import pandas as pd
 from mne._fiff.pick import _picks_to_idx
 from scipy.ndimage import gaussian_filter
 from mne.stats import permutation_cluster_1samp_test
+from scipy.stats import zscore
+
+
+def reject_bad_epochs(epochs, baseline_window=None, z_thresh=2, eyes=None, remove_blinks=True, blinks_window=None):
+    """
+    This function rejects epochs based on the zscore of the baseline. For some trials, there may be artifacts
+    in the baseline, in which case baseline correction will spread the artifact. Such epochs are discarded.
+    :param epochs:
+    :param baseline_window:
+    :param z_thresh:
+    :param eyes:
+    :param remove_blinks:
+    :param blinks_window:
+    return:
+        - epochs:
+        - inds
+    """
+    print("=" * 40)
+    print("Finding epochs with artifactual baseline")
+    if eyes is None:
+        eyes = ["left", "right"]
+    if baseline_window is None:
+        baseline_window = [None, 0]
+    if blinks_window is None:
+        blinks_window = [0, 0.5]
+
+    # Extract the data:
+    if z_thresh is not None:
+        baseline_data = epochs.copy().crop(tmin=baseline_window[0],
+                                           tmax=baseline_window[1]).get_data(picks=["_".join(["pupil", eye])
+                                                                                    for eye in eyes])
+        # Compute the average across eyes and time:
+        baseline_avg = np.mean(np.mean(baseline_data, axis=1), axis=1)
+        # Z score:
+        baseline_zscore = zscore(baseline_avg, nan_policy='omit')
+        # Find the epochs indices that exceed the threshold:
+        inds = np.where(np.abs(baseline_zscore) > z_thresh)[0]
+        if len(inds) > 0:
+            # Drop these epochs:
+            epochs.drop(inds, reason="baseline_artifact")
+        # Print the proportion of dropped epochs:
+        print("{} out of {} ({:.2f}%) trials had artifact in baseline.".format(len(inds), len(baseline_zscore),
+                                                                               (len(inds) / len(
+                                                                                   baseline_zscore)) * 100))
+    if remove_blinks:
+        # Extract the blinks channels:
+        blink_data = np.squeeze(epochs.copy().crop(tmin=blinks_window[0],
+                                                   tmax=blinks_window[1]).get_data(picks=["_".join(["BAD_blink", eye])
+                                                                                          for eye in eyes]))
+        if blink_data.shape[1] == 2:
+            # Combine both eyes data:
+            blink_data = np.logical_and(blink_data[:, 0, :], blink_data[:, 1, :]).astype(float)
+        # Find the trials in which we have blinks:
+        blink_inds = np.where(np.any(blink_data, axis=1))[0]
+        if len(blink_inds) > 0:
+            # Drop these epochs:
+            epochs.drop(blink_inds, reason="blinks")
+        # Print the proportion of dropped epochs:
+        print("{} out of {} ({:.2f}%) trials had blinks within.".format(len(blink_inds), blink_data.shape[0],
+                                                                        (len(blink_inds) /
+                                                                            blink_data.shape[0]) * 100,
+                                                                        blinks_window))
+
+    return epochs
 
 
 def max_percentage_index(data, thresh_percent):
