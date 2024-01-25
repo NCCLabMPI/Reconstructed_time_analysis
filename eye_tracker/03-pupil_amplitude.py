@@ -4,7 +4,7 @@ import json
 import numpy as np
 from pathlib import Path
 import matplotlib.pyplot as plt
-from eye_tracker.general_helper_function import baseline_scaling, cluster_1samp_across_sub
+from eye_tracker.general_helper_function import baseline_scaling, cluster_1samp_across_sub, reject_bad_epochs
 from eye_tracker.plotter_functions import plot_ts_ci
 import environment_variables as ev
 
@@ -28,14 +28,18 @@ def pupil_amplitude(parameters_file, subjects):
         print("Loading sub-{}".format(sub))
         root = Path(ev.bids_root, "derivatives", "preprocessing", "sub-" + sub, "ses-" + param["session"],
                     param["data_type"])
-        file_name = "sub-{}_ses-{}_task-{}_{}_desc-{}-epo.fif".format(sub, param["session"], param["task"],
-                                                                      param["data_type"],
-                                                                      param["epoch_name"])
+        file_name = "sub-{}_ses-{}_task-{}_{}_desc-epo.fif".format(sub, param["session"], param["task"],
+                                                                   param["data_type"])
         epochs = mne.read_epochs(Path(root, file_name))
         # Extract the relevant conditions:
         epochs = epochs[param["task_relevance"]]
         # Crop if needed:
         epochs.crop(param["crop"][0], param["crop"][1])
+        # Perform trial exclusions:
+        if param["trial_rej_thresh"] is not None:
+            reject_bad_epochs(epochs, baseline_window=param["baseline_window"],
+                              z_thresh=param["trial_rej_thresh"], eyes=None, remove_blinks=True,
+                              blinks_window=[0, 0.5])
         # Extract the relevant channels:
         epochs.pick(param["picks"])
         # Baseline correction:
@@ -57,7 +61,7 @@ def pupil_amplitude(parameters_file, subjects):
                                  threshold=param["threshold"],
                                  tail=1))
     # Plot the results:
-    fig, ax = plt.subplots(figsize=[8.3, 11.7/3])
+    fig, ax = plt.subplots(figsize=[8.3, 11.7 / 3])
     # Task relevant:
     plot_ts_ci(evks[conditions[0]], epochs.times, ev.colors["task_relevance"][param["task_relevance"][0]],
                ax=ax, label=param["task_relevance"][0])
@@ -79,7 +83,7 @@ def pupil_amplitude(parameters_file, subjects):
     # ===========================================================
     # Separately for each trial durations:
     # Prepare a figure for all the durations:
-    fig, ax = plt.subplots(3, 1, sharex=True, sharey=True, figsize=[8.3, 11.7/3])
+    fig, ax = plt.subplots(3, 1, sharex=True, sharey=True, figsize=[8.3, 11.7])
     for dur_i, dur in enumerate(param["duration"]):
         # Prepare the condition strings:
         conditions = ["/".join([task, dur, lock]) for task in param["task_relevance"]]
@@ -129,7 +133,7 @@ def pupil_amplitude(parameters_file, subjects):
                                  threshold=param["threshold"],
                                  tail=1))
     # Plot the results:
-    fig, ax = plt.subplots(figsize=[8.3, 11.7/3])
+    fig, ax = plt.subplots(figsize=[8.3, 11.7 / 3])
     # Task relevant:
     plot_ts_ci(evks[conditions[0]], epochs.times, ev.colors["task_relevance"][param["task_relevance"][0]],
                ax=ax, label=param["task_relevance"][0])
@@ -151,7 +155,7 @@ def pupil_amplitude(parameters_file, subjects):
     # ===========================================================
     # Separately for each trial durations:
     # Prepare a figure for all the durations:
-    fig, ax = plt.subplots(3, 1, sharex=True, sharey=True, figsize=[8.3, 11.7/3])
+    fig, ax = plt.subplots(3, 1, sharex=True, sharey=True, figsize=[8.3, 11.7])
     for dur_i, dur in enumerate(param["duration"]):
         # Prepare the condition strings:
         conditions = ["/".join([task, dur, lock]) for task in param["task_relevance"]]
@@ -189,8 +193,8 @@ def pupil_amplitude(parameters_file, subjects):
 
 
 if __name__ == "__main__":
-    subjects_list = ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112", "SX113",
-                     "SX114", "SX115", "SX118", "SX116", "SX119", "SX120", "SX121"]
+    subjects_list = ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX112", "SX113",
+                     "SX114", "SX115", "SX116", "SX119", "SX120", "SX121"]  # "SX111", "SX118",
     parameters = (
         r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker"
         r"\03-pupil_amplitude_parameters.json ")
