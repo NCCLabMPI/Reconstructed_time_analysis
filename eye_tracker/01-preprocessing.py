@@ -2,15 +2,17 @@ import mne
 from mne.viz.eyetracking import plot_gaze
 import json
 from pathlib import Path
+from eye_tracker.general_helper_function import baseline_scaling
 from eye_tracker.preprocessing_helper_function import (extract_eyelink_events, epoch_data, dilation_speed_rejection,
                                                        trend_line_departure, remove_bad_epochs, show_bad_segments,
                                                        load_raw_eyetracker, compute_proportion_bad, add_logfiles_info,
-                                                       gaze_to_dva)
+                                                       gaze_to_dva, hershman_blinks_detection)
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import environment_variables as ev
 import os
+from scipy.stats import zscore
 
 DEBUG = False
 show_interpolated = False
@@ -49,12 +51,16 @@ def preprocessing(subject, parameters):
     calibs = [item for items in calibs for item in items]
     # Concatenate the log files:
     log_df = pd.concat(logs_list).reset_index(drop=True)
-    # raw.plot(block=True)
+
     # =============================================================================================
     # Loop through the preprocessing steps:
     for step in preprocessing_steps:
         # Extract the parameters of the current step:
         step_param = param[step]
+        # Apply the hershman blinks detection algorithm:
+        if step == "hershman_blinks":
+            raw = hershman_blinks_detection(raw, eyes=step_param["eyes"],
+                                            replace_eyelink_blinks=step_param["replace_eyelink_blinks"])
 
         # Apply dilation speed filter:
         if step == "dilation_speed_rejection":
@@ -103,6 +109,9 @@ def preprocessing(subject, parameters):
             # Epoch the data:
             epochs = epoch_data(raw, events_from_annot, event_dict, **step_param)
 
+            epochs.load_data().copy().pick(["pupil_left", "pupil_right"]).plot(block=True)
+            epochs.load_data().copy().pick(["fixdist_left", "fixdist_right"]).plot(block=True)
+
             # Add the log file information to the metadata
             if len(param["log_file_columns"]) > 0:
                 epochs = add_logfiles_info(epochs, log_df, param["log_file_columns"])
@@ -132,6 +141,10 @@ def preprocessing(subject, parameters):
             # Save:
             epochs.save(Path(save_root, file_name), overwrite=True, verbose="ERROR")
             epochs.load_data()
+
+            # ==========================================================================================================
+            # Checks plots:
+
             # Depending on whehter or no the events were extracted:
             if "extract_eyelink_events" in preprocessing_steps:
                 # Plot the blinks rate:
@@ -179,22 +192,90 @@ def preprocessing(subject, parameters):
                 plt.savefig(Path(save_root, file_name))
                 plt.close()
 
-            # Finally, plot the fixation maps:
+            # ======================================================
+            # Fixation maps:
             plot_gaze(epochs, width=1920, height=1080, show=False)
             file_name = "sub-{}_ses-{}_task-{}_{}_desc-gaze.png".format(subject, session, task,
                                                                         data_type)
             plt.savefig(Path(save_root, file_name))
             plt.close()
 
-            # Finally, plot the calibrations:
-            if param["plot_calibration"]:
-                for calib_i, calib in enumerate(calibs):
-                    print(f"Calibration: {calib_i}")
-                    print(calib)
-                    calib.plot(show=False)
-                    file_name = "calibration-{}_task-{}.png".format(calib_i, task)
-                    plt.savefig(Path(save_root, file_name))
-                    plt.close()
+            # ======================================================
+            # Baseline distributions:
+            baseline_data = epochs.copy().crop(tmin=epochs.times[0], tmax=0).get_data(picks=["pupil_left",
+                                                                                             "pupil_right"])
+            # Compute the average across eyes and time:
+            baseline_avg = np.mean(np.mean(baseline_data, axis=1), axis=1)
+            # Z score:
+            baseline_zscore = zscore(baseline_avg, nan_policy='omit')
+            fig, ax = plt.subplots()
+            ax.hist(baseline_zscore, bins=50)
+            ax.vlines(x=-2, ymin=ax.get_ylim()[0], ymax=ax.get_ylim()[1], linestyle="-", color="r", linewidth=2,
+                      zorder=10)
+            ax.vlines(x=2, ymin=ax.get_ylim()[0], ymax=ax.get_ylim()[1], linestyle="-", color="r", linewidth=2,
+                      zorder=10)
+            ax.set_title("Baseline distributions")
+            ax.set_xlabel("z-score")
+            ax.set_ylabel("Trials counts")
+            file_name = "sub-{}_ses-{}_task-{}_{}_desc-baseline_distribution.png".format(subject, session, task,
+                                                                                         data_type)
+            plt.savefig(Path(save_root, file_name))
+            plt.close()
+
+            # ======================================================
+            # Pupil size line plot:
+            # Extract the pupil sizes:
+            pupil_data = epochs.copy().get_data(picks=["pupil_left", "pupil_right"])
+            # Compute the average across eyes and time:
+            pupil_avg = np.mean(pupil_data, axis=1)
+            fig, ax = plt.subplots()
+            ax.plot(epochs.times, pupil_avg.T)
+            ax.set_title("Pupil size per trial")
+            ax.set_xlabel("Time (sec.)")
+            ax.set_ylabel("Pupil size (a.u)")
+            file_name = "sub-{}_ses-{}_task-{}_{}_desc-pupil_lines.png".format(subject, session, task,
+                                                                               data_type)
+            plt.savefig(Path(save_root, file_name))
+            plt.close()
+
+            # Plot baseline corrected data:
+            pupil_epochs = epochs.copy().pick(["pupil_left", "pupil_right"])
+            baseline_scaling(pupil_epochs, correction_method="percent", baseline=[None, -0.05])
+            pupil_data = pupil_epochs.get_data()
+            # Compute the average across eyes and time:
+            pupil_avg = np.mean(pupil_data, axis=1)
+            fig, ax = plt.subplots()
+            ax.plot(epochs.times, pupil_avg.T)
+            ax.set_title("Pupil size per trial")
+            ax.set_xlabel("Time (sec.)")
+            ax.set_ylabel("Pupil size (%change)")
+            file_name = "sub-{}_ses-{}_task-{}_{}_desc-pupil_lines_bascorr.png".format(subject, session, task,
+                                                                                       data_type)
+            plt.savefig(Path(save_root, file_name))
+            plt.close()
+
+            # Plot a heatmap of the baseline corrected pupil size:
+            fig, ax = plt.subplots()
+            ax.imshow(pupil_avg, aspect="auto", origin="lower",
+                      extent=[epochs.times[0], epochs.times[-1], 0, len(epochs)])
+            ax.set_title("Pupil size")
+            ax.set_xlabel("Time (s)")
+            ax.set_ylabel("Trials")
+            file_name = "sub-{}_ses-{}_task-{}_{}_desc-pupil_raster.png".format(subject, session, task,
+                                                                                data_type)
+            plt.savefig(Path(save_root, file_name))
+            plt.close()
+
+            # ======================================================
+            # Fixation maps:
+            # Calibrations:
+            for calib_i, calib in enumerate(calibs):
+                print(f"Calibration: {calib_i}")
+                print(calib)
+                calib.plot(show=False)
+                file_name = "calibration-{}_task-{}.png".format(calib_i, task)
+                plt.savefig(Path(save_root, file_name))
+                plt.close()
 
     return np.mean(proportion_bad), proportion_rejected_trials
 
@@ -211,7 +292,7 @@ if __name__ == "__main__":
 
     parameters_file = (
         r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker"
-        r"\01-preprocessing_parameters_task-auditory.json ")
+        r"\01-preprocessing_parameters_task-prp.json ")
     # Create a data frame to save the summary of all subjects:
     preprocessing_summary = []
     for sub in subjects_list:

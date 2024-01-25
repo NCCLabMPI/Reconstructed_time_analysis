@@ -19,6 +19,10 @@
     "bad_trials_threshold": 0.5,
     "nan_threshold": 0.5
   },
+  "hershman_blinks": {
+    "eyes": ["left", "right"],
+    "replace_eyelink_blinks": true
+  },
   "gaze_to_dva": {
     "eyes": ["left", "right"]
   },
