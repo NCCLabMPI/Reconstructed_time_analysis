@@ -16,6 +16,8 @@ from scipy.stats import zscore
 
 DEBUG = False
 show_interpolated = False
+prop_cycle = plt.rcParams['axes.prop_cycle']
+colors = prop_cycle.by_key()['color']
 
 
 def preprocessing(subject, parameters):
@@ -109,9 +111,6 @@ def preprocessing(subject, parameters):
             # Epoch the data:
             epochs = epoch_data(raw, events_from_annot, event_dict, **step_param)
 
-            epochs.load_data().copy().pick(["pupil_left", "pupil_right"]).plot(block=True)
-            epochs.load_data().copy().pick(["fixdist_left", "fixdist_right"]).plot(block=True)
-
             # Add the log file information to the metadata
             if len(param["log_file_columns"]) > 0:
                 epochs = add_logfiles_info(epochs, log_df, param["log_file_columns"])
@@ -192,6 +191,27 @@ def preprocessing(subject, parameters):
                 plt.savefig(Path(save_root, file_name))
                 plt.close()
 
+                # Plot the blinking rate separately for each condition:
+                factors = ["task relevance", "duration", "category", "SOA", "lock"]
+                for factor in factors:
+                    # Create a figure to plot the histogram:
+                    fig, ax = plt.subplots()
+                    levels = list(epochs.metadata[factor].unique())
+                    # Loop through each level:
+                    for i, lvl in enumerate(levels):
+                        blink_data = np.logical_and(epochs[lvl].get_data(copy=True,
+                                                                         picks=["BAD_blink_left",
+                                                                                "BAD_blink_right"])).astype(float)
+                        ax.hist(blink_data, color=colors[i], alpha=0.5)
+                    ax.set_xlabel("Blinks counts")
+                    ax.set_ylabel("Counts")
+                    ax.set_title(factor)
+                    file_name = "sub-{}_ses-{}_task-{}_{}_desc-blinks-{}.png".format(subject, session, task,
+                                                                                     data_type, factor)
+                    # Create a histogram of the blink counts for each level:
+                    plt.savefig(Path(save_root, file_name))
+                    plt.close()
+
             # ======================================================
             # Fixation maps:
             plot_gaze(epochs, width=1920, height=1080, show=False)
@@ -229,7 +249,7 @@ def preprocessing(subject, parameters):
             # Compute the average across eyes and time:
             pupil_avg = np.mean(pupil_data, axis=1)
             fig, ax = plt.subplots()
-            ax.plot(epochs.times, pupil_avg.T)
+            ax.plot(epochs.times, pupil_avg.T, alpha=0.5)
             ax.set_title("Pupil size per trial")
             ax.set_xlabel("Time (sec.)")
             ax.set_ylabel("Pupil size (a.u)")
@@ -245,7 +265,7 @@ def preprocessing(subject, parameters):
             # Compute the average across eyes and time:
             pupil_avg = np.mean(pupil_data, axis=1)
             fig, ax = plt.subplots()
-            ax.plot(epochs.times, pupil_avg.T)
+            ax.plot(epochs.times, pupil_avg.T, alpha=0.5)
             ax.set_title("Pupil size per trial")
             ax.set_xlabel("Time (sec.)")
             ax.set_ylabel("Pupil size (%change)")
@@ -257,7 +277,8 @@ def preprocessing(subject, parameters):
             # Plot a heatmap of the baseline corrected pupil size:
             fig, ax = plt.subplots()
             ax.imshow(pupil_avg, aspect="auto", origin="lower",
-                      extent=[epochs.times[0], epochs.times[-1], 0, len(epochs)])
+                      extent=[epochs.times[0], epochs.times[-1], 0, len(epochs)],
+                      vmin=np.nanpercentile(pupil_avg, 5), vmax=np.nanpercentile(pupil_avg, 95))
             ax.set_title("Pupil size")
             ax.set_xlabel("Time (s)")
             ax.set_ylabel("Trials")
@@ -287,8 +308,8 @@ if __name__ == "__main__":
     # SX117: no eyetracking data
     # , "SX103", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX112", "SX113",
     #                      "SX114", "SX115", "SX116", "SX119", "SX120", "SX121"
-    subjects_list = ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX112", "SX113",
-                     "SX114", "SX115", "SX116", "SX119", "SX120", "SX121"]
+    subjects_list = ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112", "SX113",
+                     "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121"]
 
     parameters_file = (
         r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker"
