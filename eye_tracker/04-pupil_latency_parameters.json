@@ -3,7 +3,6 @@
   "task": "prp",
   "session": "1",
   "data_type": "eyetrack",
-  "epoch_name": "visual_onset",
   "crop": [-0.3, 3.5],
   "baseline": "percent",
   "baseline_window": [null, -0.05],

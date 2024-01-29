@@ -29,9 +29,8 @@ def pupil_latency(parameters_file, subjects):
         print("Loading sub-{}".format(sub))
         root = Path(ev.bids_root, "derivatives", "preprocessing", "sub-" + sub, "ses-" + param["session"],
                     param["data_type"])
-        file_name = "sub-{}_ses-{}_task-{}_{}_desc-{}-epo.fif".format(sub, param["session"], param["task"],
-                                                                      param["data_type"],
-                                                                      param["epoch_name"])
+        file_name = "sub-{}_ses-{}_task-{}_{}_desc-epo.fif".format(sub, param["session"], param["task"],
+                                                                      param["data_type"])
         epochs = mne.read_epochs(Path(root, file_name))
         # Extract the relevant conditions:
         epochs = epochs[param["task_relevance"]]
@@ -165,7 +164,12 @@ def pupil_latency(parameters_file, subjects):
                 # Loop through each subject:
                 for sub in subjects_epochs.keys():
                     # Average the data across both eyes:
-                    data = np.nanmean(subjects_epochs[sub].copy()["/".join([soa, lock, duration])], axis=1)
+                    if lock == "offset":
+                        data = np.nanmean(subjects_epochs[sub].copy()["/".join([soa, lock, duration])].
+                                          crop(float(duration), subjects_epochs[sub].times[-1]),
+                                          axis=1)
+                    else:
+                        data = np.nanmean(subjects_epochs[sub].copy()["/".join([soa, lock, duration])], axis=1)
                     # Remove any trials containing Nan:
                     data = np.array([data[i, :] for i in range(data.shape[0]) if not any(np.isnan(data[i, :]))])
                     # Remove any trials containing Nan:
@@ -202,7 +206,12 @@ def pupil_latency(parameters_file, subjects):
                     # Loop through each subject:
                     for sub in subjects_epochs.keys():
                         # Average the data across both eyes:
-                        data = np.nanmean(subjects_epochs[sub].copy()["/".join([soa, lock, duration, task])], axis=1)
+                        if lock == "offset":
+                            data = np.nanmean(subjects_epochs[sub].copy()["/".join([soa, lock, duration, task])].
+                                              crop(float(duration), subjects_epochs[sub].times[-1]), axis=1)
+                        else:
+                            data = np.nanmean(subjects_epochs[sub].copy()["/".join([soa, lock, duration, task])],
+                                              axis=1)
                         # Remove any trials containing Nan:
                         data = np.array([data[i, :] for i in range(data.shape[0]) if not any(np.isnan(data[i, :]))])
                         # Remove any trials containing Nan:
