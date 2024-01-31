@@ -64,11 +64,11 @@ def pupil_amplitude(parameters_file, subjects):
     fig, ax = plt.subplots(figsize=[8.3, 11.7 / 3])
     # Task relevant:
     plot_ts_ci(evks[conditions[0]], epochs.times, ev.colors["task_relevance"][param["task_relevance"][0]],
-               ax=ax, label=param["task_relevance"][0])
+               ax=ax, label=param["task_relevance"][0], sig_thresh=0.05)
     # Task irrelevant (plot the cluster only on one to avoid incremental plotting):
     plot_ts_ci(evks[conditions[1]], epochs.times, ev.colors["task_relevance"][param["task_relevance"][1]],
                ax=ax, label=param["task_relevance"][1], clusters=clusters,
-               clusters_pval=cluster_p_values, clusters_alpha=0.1)
+               clusters_pval=cluster_p_values, clusters_alpha=0.1, sig_thresh=0.05)
     # Decorate the axes:
     ax.set_xlabel("Time (sec.)")
     ax.set_ylabel("Pupil dilation (norm.)")
@@ -97,12 +97,12 @@ def pupil_amplitude(parameters_file, subjects):
         # Task relevant:
         plot_ts_ci(evks_dur[conditions[0]], epochs.times,
                    ev.colors["task_relevance"][param["task_relevance"][0]], ax=ax[dur_i],
-                   label=param["task_relevance"][0])
+                   label=param["task_relevance"][0], sig_thresh=0.05)
         # Task irrelevant:
         plot_ts_ci(evks_dur[conditions[1]], epochs.times,
                    ev.colors["task_relevance"][param["task_relevance"][1]], ax=ax[dur_i], clusters=clusters,
                    clusters_pval=cluster_p_values, clusters_alpha=0.1,
-                   label=param["task_relevance"][1])
+                   label=param["task_relevance"][1], sig_thresh=0.05)
 
     # Decorate the axes:
     ax[0].spines[['right', 'top']].set_visible(False)
@@ -118,6 +118,44 @@ def pupil_amplitude(parameters_file, subjects):
     plt.tight_layout()
     fig.savefig(Path(save_dir, "pupil_evoked_titr_{}_perdur.svg".format(lock)), transparent=True, dpi=300)
     fig.savefig(Path(save_dir, "pupil_evoked_titr_{}_perdur.png".format(lock)), transparent=True, dpi=300)
+    plt.close()
+
+    # ===========================================================
+    # Separately for each SOAs:
+    # Prepare a figure for all the durations:
+    fig, ax = plt.subplots(4, 1, sharex=True, sharey=True, figsize=[8.3, 11.7])
+    for dur_i, dur in enumerate(param["soas"]):
+        # Prepare the condition strings:
+        conditions = ["/".join([task, dur, lock]) for task in param["task_relevance"]]
+        # Run cluster based permutation test:
+        evks_dur, evks_diff_dur, _, clusters, cluster_p_values, _ = (
+            cluster_1samp_across_sub(subjects_epochs, conditions,
+                                     n_permutations=param["n_permutations"],
+                                     threshold=param["threshold"],
+                                     tail=1))
+        # Plot the results:
+        # Task relevant:
+        plot_ts_ci(evks_dur[conditions[0]], epochs.times,
+                   ev.colors["task_relevance"][param["task_relevance"][0]], ax=ax[dur_i],
+                   label=param["task_relevance"][0], sig_thresh=0.05)
+        # Task irrelevant:
+        plot_ts_ci(evks_dur[conditions[1]], epochs.times,
+                   ev.colors["task_relevance"][param["task_relevance"][1]], ax=ax[dur_i], clusters=clusters,
+                   clusters_pval=cluster_p_values, clusters_alpha=0.1,
+                   label=param["task_relevance"][1], sig_thresh=0.05)
+        ax[dur_i].set_title(dur)
+
+    # Decorate the axes:
+    ax[0].spines[['right', 'top']].set_visible(False)
+    ax[1].set_ylabel("Pupil dilation (norm.)")
+    ax[1].spines[['right', 'top']].set_visible(False)
+    ax[2].set_xlabel("Time (sec.)")
+    ax[2].spines[['right', 'top']].set_visible(False)
+    ax[2].legend()
+    plt.suptitle("{} locked pupil size (N={})".format(lock, len(subjects)))
+    plt.tight_layout()
+    fig.savefig(Path(save_dir, "pupil_evoked_titr_{}_persoa.svg".format(lock)), transparent=True, dpi=300)
+    fig.savefig(Path(save_dir, "pupil_evoked_titr_{}_persoa.png".format(lock)), transparent=True, dpi=300)
     plt.close()
 
     # ==================================================================================================================
@@ -140,7 +178,7 @@ def pupil_amplitude(parameters_file, subjects):
     # Task irrelevant (plot the cluster only on one to avoid incremental plotting):
     plot_ts_ci(evks[conditions[1]], epochs.times, ev.colors["task_relevance"][param["task_relevance"][1]],
                ax=ax, label=param["task_relevance"][1], clusters=clusters,
-               clusters_pval=cluster_p_values, clusters_alpha=0.1)
+               clusters_pval=cluster_p_values, clusters_alpha=0.1, sig_thresh=0.05)
     # Decorate the axes:
     ax.set_xlabel("Time (sec.)")
     ax.set_ylabel("Pupil dilation (norm.)")
@@ -174,7 +212,7 @@ def pupil_amplitude(parameters_file, subjects):
         plot_ts_ci(evks_dur[conditions[1]], epochs.times,
                    ev.colors["task_relevance"][param["task_relevance"][1]], ax=ax[dur_i], clusters=clusters,
                    clusters_pval=cluster_p_values, clusters_alpha=0.1,
-                   label=param["task_relevance"][1])
+                   label=param["task_relevance"][1], sig_thresh=0.05)
     # Decorate the axes:
     ax[0].spines[['right', 'top']].set_visible(False)
     ax[0].set_title("Short")
@@ -191,10 +229,50 @@ def pupil_amplitude(parameters_file, subjects):
     fig.savefig(Path(save_dir, "pupil_evoked_titr_{}_perdur.png".format(lock)), transparent=True, dpi=300)
     plt.close()
 
+    # ===========================================================
+    # Separately for each SOAs:
+    # Prepare a figure for all the durations:
+    fig, ax = plt.subplots(4, 1, sharex=True, sharey=True, figsize=[8.3, 11.7])
+    for dur_i, dur in enumerate(param["soas"]):
+        # Prepare the condition strings:
+        conditions = ["/".join([task, dur, lock]) for task in param["task_relevance"]]
+        # Run cluster based permutation test:
+        evks_dur, evks_diff_dur, _, clusters, cluster_p_values, _ = (
+            cluster_1samp_across_sub(subjects_epochs, conditions,
+                                     n_permutations=param["n_permutations"],
+                                     threshold=param["threshold"],
+                                     tail=1))
+        # Plot the results:
+        # Task relevant:
+        plot_ts_ci(evks_dur[conditions[0]], epochs.times,
+                   ev.colors["task_relevance"][param["task_relevance"][0]], ax=ax[dur_i],
+                   label=param["task_relevance"][0])
+        # Task irrelevant:
+        plot_ts_ci(evks_dur[conditions[1]], epochs.times,
+                   ev.colors["task_relevance"][param["task_relevance"][1]], ax=ax[dur_i], clusters=clusters,
+                   clusters_pval=cluster_p_values, clusters_alpha=0.1,
+                   label=param["task_relevance"][1], sig_thresh=0.05)
+
+    # Decorate the axes:
+    ax[0].spines[['right', 'top']].set_visible(False)
+    ax[0].set_title("Short")
+    ax[1].set_ylabel("Pupil dilation (norm.)")
+    ax[1].spines[['right', 'top']].set_visible(False)
+    ax[1].set_title("Intermediate")
+    ax[2].set_xlabel("Time (sec.)")
+    ax[2].set_title("Long")
+    ax[2].spines[['right', 'top']].set_visible(False)
+    ax[2].legend()
+    plt.suptitle("{} locked pupil size (N={})".format(lock, len(subjects)))
+    plt.tight_layout()
+    fig.savefig(Path(save_dir, "pupil_evoked_titr_{}_persoas.svg".format(lock)), transparent=True, dpi=300)
+    fig.savefig(Path(save_dir, "pupil_evoked_titr_{}_persoas.png".format(lock)), transparent=True, dpi=300)
+    plt.close()
+
 
 if __name__ == "__main__":
-    subjects_list = ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX112", "SX113",
-                     "SX114", "SX115", "SX116", "SX119", "SX120", "SX121"]  # "SX111", "SX118",
+    subjects_list = ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112", "SX113",
+                     "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121"]
     parameters = (
         r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker"
         r"\03-pupil_amplitude_parameters.json ")
