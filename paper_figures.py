@@ -306,7 +306,7 @@ for soa in list(subject_data_corrected["SOA"].unique()):
                          & (subjects_data["duration"] == 0.5)]["RT_aud"].to_numpy()
     # Remove the nans:
     data = data[~np.isnan(data)]
-    ax_offset_short.ecdf(data, label=str(soa), color=ev.colors["soa_offset_locked_500ms"][str(soa)])
+    ax_offset_short.ecdf(data, label=str(soa), color=ev.colors["soa_offset_locked"][str(soa)])
 
 # Offset 1000:
 fig_offset_int, ax_offset_int = plt.subplots(nrows=1, ncols=1, figsize=[8.3 / 3, 8.3 / 4])
@@ -317,7 +317,7 @@ for soa in list(subject_data_corrected["SOA"].unique()):
                          & (subjects_data["duration"] == 1.0)]["RT_aud"].to_numpy()
     # Remove the nans:
     data = data[~np.isnan(data)]
-    ax_offset_int.ecdf(data, label=str(soa), color=ev.colors["soa_offset_locked_1000ms"][str(soa)])
+    ax_offset_int.ecdf(data, label=str(soa), color=ev.colors["soa_offset_locked"][str(soa)])
 
 # Offset 1500:
 fig_offset_long, ax_offset_long = plt.subplots(nrows=1, ncols=1, figsize=[8.3 / 3, 8.3 / 4])
@@ -328,7 +328,7 @@ for soa in list(subject_data_corrected["SOA"].unique()):
                          & (subjects_data["duration"] == 1.5)]["RT_aud"].to_numpy()
     # Remove the nans:
     data = data[~np.isnan(data)]
-    ax_offset_long.ecdf(data, label=str(soa), color=ev.colors["soa_offset_locked_1500ms"][str(soa)])
+    ax_offset_long.ecdf(data, label=str(soa), color=ev.colors["soa_offset_locked"][str(soa)])
 
 # Add axes decorations:
 ax_tr_onset.set_ylabel("Cumulative Probability")
