@@ -199,12 +199,18 @@ def preprocessing(subject, parameters):
                     levels = list(epochs.metadata[factor].unique())
                     # Loop through each level:
                     for i, lvl in enumerate(levels):
-                        blink_data = np.logical_and(epochs[lvl].get_data(copy=True,
-                                                                         picks=["BAD_blink_left",
-                                                                                "BAD_blink_right"])).astype(float)
-                        ax.hist(blink_data, color=colors[i], alpha=0.5)
+                        blink_data = (np.logical_and(np.squeeze(epochs[lvl].get_data(copy=True,
+                                                                                     picks=["BAD_blink_left"])),
+                                                     np.squeeze(epochs[lvl].get_data(copy=True,
+                                                                                     picks=["BAD_blink_right"]))).
+                                      astype(float))
+                        blink_counts = np.sum(np.diff(blink_data, axis=1) == 1, axis=1)
+                        # Plot the blinks counts as a histogram, adding jitters to each condition to see them
+                        # distinctively
+                        ax.hist(blink_counts + 0.2 * i, color=colors[i], alpha=0.3, label=lvl, rwidth=0.2)
                     ax.set_xlabel("Blinks counts")
                     ax.set_ylabel("Counts")
+                    ax.legend()
                     ax.set_title(factor)
                     file_name = "sub-{}_ses-{}_task-{}_{}_desc-blinks-{}.png".format(subject, session, task,
                                                                                      data_type, factor)
