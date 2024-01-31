@@ -327,7 +327,8 @@ def plot_pupil_latency(evoked_dict, times, latencies_df, colors, boxplot_ylim=No
         # Extract the mean latencies:
         lat = np.mean(latencies_df[latencies_df["SOA"] == soa]["latency"].to_numpy())
         # Plot the latency:
-        ax1.vlines(x=float(soa), ymin=-0.02, ymax=-0.01, linestyle="-",
+        ax1.vlines(x=latencies_df[latencies_df["SOA"] == soa]["SOA_locked"].to_numpy()[0],
+                   ymin=-0.02, ymax=-0.01, linestyle="-",
                    color=ev.colors["soa_onset_locked"][soa], linewidth=2, zorder=10)
         ax1.vlines(x=lat, ymin=-0.02,
                    ymax=np.mean(np.array(evoked_dict[soa]), axis=0)[np.argmin(np.abs(times - lat))],
@@ -338,8 +339,8 @@ def plot_pupil_latency(evoked_dict, times, latencies_df, colors, boxplot_ylim=No
     ax1.set_xlabel("Time (sec.)")
     ax1.set_ylabel("Pupil size (norm.)")
     # Plot the latency as a function of SOA:
-    plot_within_subject_boxplot(latencies_df, "sub_id", "SOA_float", "latency_aud",
-                                positions="SOA_float", ax=ax2, cousineau_correction=False, title="", xlabel="SOA",
+    plot_within_subject_boxplot(latencies_df, "sub_id", "SOA", "latency_aud",
+                                positions="SOA", ax=ax2, cousineau_correction=False, title="", xlabel="SOA",
                                 ylabel=r'$\tau_{\mathrm{audio}}$', xlim=[-0.1, 0.6], width=0.1,
                                 face_colors=[colors[soa] for soa in list(evoked_dict.keys())])
     ax2.set_ylim(boxplot_ylim)

@@ -1,13 +1,75 @@
 from mne.baseline import rescale
 import numpy as np
 import pandas as pd
+import mne
 from mne._fiff.pick import _picks_to_idx
 from scipy.ndimage import gaussian_filter
 from mne.stats import permutation_cluster_1samp_test
 from scipy.stats import zscore
 
 
-def reject_bad_epochs(epochs, baseline_window=None, z_thresh=2, eyes=None, remove_blinks=True, blinks_window=None):
+def moving_average(data, window_size, axis=-1, overlapping=False):
+    """
+    This function performs moving average of multidimensional arrays. Shouthout to
+    https://github.com/NGeorgescu/python-moving-average and
+    https://stackoverflow.com/questions/13728392/moving-average-or-running-mean/43200476#43200476 for the inspiration
+    :param data: (numpy array) data on which to perform the moving average
+    :param window_size: (int) number of samples in the moving average
+    :param axis: (int) axis along which to perform the moving average
+    :param overlapping: (boolean) whether or not to perform the moving average in an overlapping fashion or not. If
+    true, fully overlapping, if false, none overelapping (i.e. moving from window size to window size)
+    data = [1, 2, 3, 4, 5, 6]
+    overlapping:
+    mean(1, 2, 3), mean(2, 3, 4), mean(3, 4, 5)...
+    non-overlapping:
+    mean(1, 2, 3), mean(4, 5, 6)...
+    :return:
+    mvavg: (np array) data following moving average. Note that the dimension will have changed compared to the original
+    matrix
+    """
+    if overlapping:
+        # Bringing the axis over which to average to first position to have everything happening on first dim thereafter
+        data_swap = data.swapaxes(0, axis)
+        # Compute cumsum and divide by the window size:
+        data_cum_sum = np.cumsum(data_swap, axis=0) / window_size
+        # Adding a row of zeros to the first dimension:
+        if data_cum_sum.ndim > 1:
+            # Add zeros in the first dim:
+            data_cum_sum = np.vstack([[0 * data_cum_sum[0]], data_cum_sum])
+        else:  # if array is only 1 dim:
+            data_cum_sum = np.array([0, *data_cum_sum])
+        # Compute the moving average by subtracting the every second row of the data by every other second:
+        mvavg = data_cum_sum[window_size:] - data_cum_sum[:-window_size]
+        # Bringing back the axes to the original dimension:
+        return np.swapaxes(mvavg, 0, axis)
+    else:
+        # Bringing the axis over which to average to first position to have everything happening on first dim thereafter
+        data_swap = data.swapaxes(0, axis)
+        # Handling higher dimensions:
+        data_dim = data_swap[:int(len(data_swap) / window_size) * window_size]
+        # Reshape the data, such that along the 1st dimension, we have the n samples of the independent bins:
+        data_reshape = data_dim.reshape(int(len(data_swap) / window_size), window_size, *data_swap.shape[1:])
+        # Compute the moving avereage along the 1dim (this is how it should be done based on the reshape above:
+        mvavg = data_reshape.mean(axis=1)
+        return mvavg.swapaxes(0, axis)
+
+
+def mvavg(data, window_ms, sfreq):
+    """
+    This function computes a non-overlapping moving average on mne epochs object.
+    :param data: (mne epochs object) epochs to smooth
+    :param window_ms: (int) window size in milliseconds
+    :param sfreq: (int)
+    :return:
+    epochs: the smoothed mne epochs object
+    """
+    n_samples = int(np.floor(window_ms * sfreq / 1000))
+    mvavg_data = moving_average(data, n_samples, axis=-1, overlapping=False)
+    return mvavg_data
+
+
+def reject_bad_epochs(epochs, baseline_window=None, z_thresh=2, eyes=None, remove_blinks=True, blinks_window=None,
+                      remove_nan=False):
     """
     This function rejects epochs based on the zscore of the baseline. For some trials, there may be artifacts
     in the baseline, in which case baseline correction will spread the artifact. Such epochs are discarded.
@@ -17,6 +79,7 @@ def reject_bad_epochs(epochs, baseline_window=None, z_thresh=2, eyes=None, remov
     :param eyes:
     :param remove_blinks:
     :param blinks_window:
+    :param remove_nan:
     return:
         - epochs:
         - inds
@@ -43,7 +106,7 @@ def reject_bad_epochs(epochs, baseline_window=None, z_thresh=2, eyes=None, remov
         inds = np.where(np.abs(baseline_zscore) > z_thresh)[0]
         if len(inds) > 0:
             # Drop these epochs:
-            epochs.drop(inds, reason="baseline_artifact")
+            epochs.drop(inds, reason="baseline_artifact", verbose="ERROR")
         # Print the proportion of dropped epochs:
         print("{} out of {} ({:.2f}%) trials had artifact in baseline.".format(len(inds), len(baseline_zscore),
                                                                                (len(inds) / len(
@@ -60,11 +123,22 @@ def reject_bad_epochs(epochs, baseline_window=None, z_thresh=2, eyes=None, remov
         blink_inds = np.where(np.any(blink_data, axis=1))[0]
         if len(blink_inds) > 0:
             # Drop these epochs:
-            epochs.drop(blink_inds, reason="blinks")
+            epochs.drop(blink_inds, reason="blinks", verbose="ERROR")
         # Print the proportion of dropped epochs:
         print("{} out of {} ({:.2f}%) trials had blinks within.".format(len(blink_inds), blink_data.shape[0],
                                                                         (len(blink_inds) /
                                                                             blink_data.shape[0]) * 100,
+                                                                        blinks_window))
+    if remove_nan:
+        data = epochs.get_data(copy=True)
+        nan_inds = np.unique(np.where(np.isnan(data))[0])
+        if len(nan_inds) > 0:
+            # Drop these epochs:
+            epochs.drop(nan_inds, reason="NaN", verbose="ERROR")
+        # Print the proportion of dropped epochs:
+        print("{} out of {} ({:.2f}%) trials had NaN.".format(len(nan_inds), data.shape[0],
+                                                                        (len(nan_inds) /
+                                                                            data.shape[0]) * 100,
                                                                         blinks_window))
 
     return epochs
@@ -80,8 +154,12 @@ def max_percentage_index(data, thresh_percent):
     if not (0 <= thresh_percent <= 100):
         raise ValueError("Percentage threshold must be between 0 and 100.")
 
-    peak_value = np.max(data)
-    threshold_value = peak_value * (thresh_percent / 100)
+    # If all the data are negative, correct by adding the minimum:
+    if np.max(data) < 0:
+        data = data + np.abs(np.min(data))
+        threshold_value = np.max(data) * (thresh_percent / 100)
+    else:
+        threshold_value = np.max(data) * (thresh_percent / 100)
 
     # Find the first index where the value is greater than or equal to the threshold
     ind = np.argmax(data >= threshold_value)
@@ -137,7 +215,7 @@ def cluster_1samp_across_sub(subjects_epochs, conditions, n_permutations=1024, t
     return evks, evks_diff, T_obs, clusters, cluster_p_values, H0
 
 
-def generate_gaze_map(epochs, height, width, sigma=20):
+def generate_gaze_map(epochs, height, width, sigma=20, eyes=None):
     """
     This function takes in the eyetracker data in the mne epochs object and generates gaze maps. This is highly inspired
     from this code https://github.com/mne-tools/mne-python/blob/main/mne/viz/eyetracking/heatmap.py#L13-L104
@@ -145,14 +223,18 @@ def generate_gaze_map(epochs, height, width, sigma=20):
     :param height:
     :param width:
     :param sigma:
+    :param eyes:
     :return:
     """
-
-    pos_picks = _picks_to_idx(epochs.info, "eyegaze")
-    gaze_data = epochs.get_data(picks=pos_picks)
-    gaze_ch_loc = np.array([epochs.info["chs"][idx]["loc"] for idx in pos_picks])
-    x_data = gaze_data[:, np.where(gaze_ch_loc[:, 4] == -1)[0], :]
-    y_data = gaze_data[:, np.where(gaze_ch_loc[:, 4] == 1)[0], :]
+    if eyes is None:
+        eyes = ["left", "right"]
+    xpicks = []
+    ypicks = []
+    for eye in eyes:
+        xpicks.append("xpos_{}".format(eye))
+        ypicks.append("ypos_{}".format(eye))
+    x_data = epochs.get_data(picks=xpicks, copy=True)
+    y_data = epochs.get_data(picks=ypicks, copy=True)
     if x_data.shape[1] > 1:  # binocular recording. Average across eyes
         x_data = np.nanmean(x_data, axis=1)  # shape (n_epochs, n_samples)
         y_data = np.nanmean(y_data, axis=1)
