@@ -1,0 +1,20 @@
+{
+  "visit": "1",
+  "task": "prp",
+  "session": "1",
+  "data_type": "eyetrack",
+  "crop": [-0.3, 3.5],
+  "baseline_window": [null, -0.05],
+  "check_window": [0, 2.0],
+  "reject_bad_trials": true,
+  "trial_rej_thresh": 2,
+  "remove_blinks": true,
+  "blinks_window": [0, 0.5],
+  "remove_nan": true,
+  "fixdist_thresh_deg": 6,
+  "picks": ["fixdist_left", "fixdist_right", "BAD_blink_left", "BAD_blink_right"],
+  "task_relevance": ["non-target", "irrelevant"],
+  "durations": ["0.5", "1", "1.5"],
+  "soas": ["0", "0.116", "0.232", "0.466"],
+  "locks": ["onset", "offset"]
+}
