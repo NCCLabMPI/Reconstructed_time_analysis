@@ -88,7 +88,7 @@ def check_plots(parameters_file, subjects):
                                                                index=[0])])
     check_values = check_values.reset_index(drop=True)
     # Create the save directory:
-    save_dir = Path(ev.bids_root, "derivatives", "fixation", "group_level", "data")
+    save_dir = Path(ev.bids_root, "derivatives", "check_plots", "data")
     if not os.path.isdir(save_dir):
         os.makedirs(save_dir)
     # Save the peak latencies:
@@ -97,7 +97,7 @@ def check_plots(parameters_file, subjects):
     # =========================================================================
     # Plot the results:
     # Create the save directory:
-    save_dir = Path(ev.bids_root, "derivatives", "fixation", "group_level", "figures")
+    save_dir = Path(ev.bids_root, "derivatives", "check_plots", "figures")
     if not os.path.isdir(save_dir):
         os.makedirs(save_dir)
 

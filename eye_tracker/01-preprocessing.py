@@ -204,10 +204,11 @@ def preprocessing(subject, parameters):
                                                      np.squeeze(epochs[lvl].get_data(copy=True,
                                                                                      picks=["BAD_blink_right"]))).
                                       astype(float))
-                        blink_counts = np.sum(np.diff(blink_data, axis=1) == 1, axis=1)
-                        # Plot the blinks counts as a histogram, adding jitters to each condition to see them
-                        # distinctively
-                        ax.hist(blink_counts + 0.2 * i, color=colors[i], alpha=0.3, label=lvl, rwidth=0.2)
+                        if len(blink_data.shape) > 1:
+                            blink_counts = np.sum(np.diff(blink_data, axis=1) == 1, axis=1)
+                            # Plot the blinks counts as a histogram, adding jitters to each condition to see them
+                            # distinctively
+                            ax.hist(blink_counts + 0.2 * i, color=colors[i], alpha=0.3, label=lvl, rwidth=0.2)
                     ax.set_xlabel("Blinks counts")
                     ax.set_ylabel("Counts")
                     ax.legend()
@@ -267,7 +268,7 @@ def preprocessing(subject, parameters):
             # Plot baseline corrected data:
             pupil_epochs = epochs.copy().pick(["pupil_left", "pupil_right"])
             baseline_scaling(pupil_epochs, correction_method="percent", baseline=[None, -0.05])
-            pupil_data = pupil_epochs.get_data()
+            pupil_data = pupil_epochs.get_data(copy=True)
             # Compute the average across eyes and time:
             pupil_avg = np.mean(pupil_data, axis=1)
             fig, ax = plt.subplots()
@@ -312,14 +313,14 @@ if __name__ == "__main__":
     # SX101: differences in sampling rate due to experiment program issues
     # SX104: missing files
     # SX117: no eyetracking data
-    # , "SX103", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX112", "SX113",
-    #                      "SX114", "SX115", "SX116", "SX119", "SX120", "SX121"
+    # ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112", "SX113",
+    # "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121"]
     subjects_list = ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112", "SX113",
                      "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121"]
 
     parameters_file = (
         r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker"
-        r"\01-preprocessing_parameters_task-prp.json ")
+        r"\01-preprocessing_parameters_task-visual.json ")
     # Create a data frame to save the summary of all subjects:
     preprocessing_summary = []
     for sub in subjects_list:

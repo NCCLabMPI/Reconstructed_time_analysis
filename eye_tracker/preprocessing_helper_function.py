@@ -70,7 +70,6 @@ def hershman_blinks_detection(raw, eyes=None, replace_eyelink_blinks=True):
     return raw
 
 
-
 def pix_to_deg(x_pix, y_pix, screen_size_mm, screen_res, screen_dist_mm):
     """
     This function converts the gaze coordinates to degree of visual angle from center of the screen.
