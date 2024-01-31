@@ -261,7 +261,8 @@ def soa_boxplot(data_df, dependent_variable, fig_size=None, lock_column="SOA_loc
 
 
 def plot_ts_ci(data, times, color, plot_ci=True, ax=None, label="", clusters=None, clusters_pval=None,
-               clusters_alpha=0.3, sig_thresh=0.01, plot_nonsig_clusters=False, cluster_color="r"):
+               clusters_alpha=0.3, sig_thresh=0.01, plot_nonsig_clusters=False, cluster_color="r",
+               plot_single_subjects=False):
     """
 
     :param data:
@@ -276,6 +277,7 @@ def plot_ts_ci(data, times, color, plot_ci=True, ax=None, label="", clusters=Non
     :param sig_thresh:
     :param plot_nonsig_clusters:
     :param cluster_color:
+    :param plot_single_subjects:
     :return:
     """
     assert len(data.shape) == 2, "The data must be time series and of shape n_obs x samples!"
@@ -289,6 +291,8 @@ def plot_ts_ci(data, times, color, plot_ci=True, ax=None, label="", clusters=Non
     # Plot the evoked:
     ax.plot(times, data_avg, label=label,
             color=color)
+    if plot_single_subjects:
+        ax.plot(times, data.T, color=color, alpha=0.3)
     # Plot the CI
     if plot_ci:
         ax.fill_between(times, data_ci[0, :], data_ci[1, :],
@@ -329,7 +333,7 @@ def plot_pupil_latency(evoked_dict, times, latencies_df, colors, boxplot_ylim=No
         # Plot the latency:
         ax1.vlines(x=latencies_df[latencies_df["SOA"] == soa]["SOA_locked"].to_numpy()[0],
                    ymin=-0.02, ymax=-0.01, linestyle="-",
-                   color=ev.colors["soa_onset_locked"][soa], linewidth=2, zorder=10)
+                   color=colors[soa], linewidth=2, zorder=10)
         ax1.vlines(x=lat, ymin=-0.02,
                    ymax=np.mean(np.array(evoked_dict[soa]), axis=0)[np.argmin(np.abs(times - lat))],
                    linestyle="--",
