@@ -3,15 +3,14 @@ import json
 from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
-from eye_tracker.general_helper_function import baseline_scaling
-import seaborn as sns
+from eye_tracker.general_helper_function import generate_gaze_map
 import pandas as pd
 import os
 import environment_variables as ev
 from plotter_functions import soa_boxplot
 
 # Set the font size:
-plt.rcParams.update({'font.size': 22})
+plt.rcParams.update({'font.size': 14})
 dpi = 300
 
 
@@ -19,8 +18,10 @@ def fixation_analysis(parameters_file, subjects):
     # First, load the parameters:
     with open(parameters_file) as json_file:
         param = json.load(json_file)
-
+    # Prepare a dataframe to store the fixation proportion:
     fixation_proportion = pd.DataFrame()
+    # Prepare a list to store the fixation heatmaps:
+    fixation_heatmaps = []
     # Loop through each subject:
     for sub in subjects:
         print(sub)
@@ -29,12 +30,13 @@ def fixation_analysis(parameters_file, subjects):
         # Load the epochs:
         root = Path(ev.bids_root, "derivatives", "preprocessing", "sub-" + sub, "ses-" + param["session"],
                     param["data_type"])
-        file_name = "sub-{}_ses-{}_task-{}_{}_desc-{}-epo.fif".format(sub, param["session"], param["task"],
-                                                                      param["data_type"],
-                                                                      param["epoch_name"])
+        file_name = "sub-{}_ses-{}_task-{}_{}_desc-epo.fif".format(sub, param["session"], param["task"],
+                                                                   param["data_type"])
         epochs = mne.read_epochs(Path(root, file_name))
         # Extract the relevant conditions:
         epochs = epochs[param["task_relevance"]]
+        # Compute the gaze map for this subject:
+        fixation_heatmaps.append(generate_gaze_map(epochs, 1080, 1920, sigma=20))
         # Extract the relevant channels:
         epochs.pick(param["picks"])
 
@@ -143,6 +145,32 @@ def fixation_analysis(parameters_file, subjects):
     fig_ti.savefig(Path(save_dir, "fixation_ti_vislock.png"), transparent=True, dpi=dpi)
     plt.close(fig_tr)
     plt.close(fig_ti)
+
+    # Plot the dwell time image:
+    hists = np.nanmean(np.array(fixation_heatmaps), axis=0)
+    fig3, ax3 = plt.subplots(nrows=1, ncols=1, sharex=False, sharey=True, figsize=[8.3, 8.3 * 1080 / 1920])
+    vmin = np.nanmin(hists)
+    vmax = np.nanmax(hists)
+    extent = [0, 1920, 1080, 0]  # origin is the top left of the screen
+    # Plot heatmap
+    im = ax3.imshow(
+        hists,
+        aspect="equal",
+        cmap="RdYlBu_r",
+        alpha=1,
+        extent=extent,
+        origin="upper",
+        vmin=vmin,
+        vmax=vmax,
+    )
+    ax3.set_title("Gaze heatmap")
+    ax3.set_xlabel("X position")
+    ax3.set_ylabel("Y position")
+    fig3.colorbar(im, ax=ax3, shrink=0.8, label="Dwell time (seconds)")
+    fig3.savefig(Path(save_dir, "fixation_map.svg"), transparent=True, dpi=dpi)
+    fig3.savefig(Path(save_dir, "fixation_map.png"), transparent=True, dpi=dpi)
+    plt.close(fig3)
+    plt.show()
 
     return None
 
