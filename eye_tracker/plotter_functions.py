@@ -222,7 +222,7 @@ def soa_boxplot(data_df, dependent_variable, fig_size=None, lock_column="SOA_loc
     if colors_onset_locked is None:
         colors_onset_locked = [val for val in ev.colors["soa_onset_locked"].values()]
     if colors_offset_locked is None:
-        colors_offset_locked = [val for val in ev.colors["soa_offset_locked_500ms"].values()]
+        colors_offset_locked = [val for val in ev.colors["soa_offset_locked"].values()]
     d = 1.5
     # Onset locked data:
     _, _, _ = plot_within_subject_boxplot(data_df[data_df[lock_column] == 'onset'],
