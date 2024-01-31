@@ -53,7 +53,6 @@ def pupil_latency(parameters_file, subjects):
             for duration in param["duration"]:
                 for lock in param["lock"]:
                     for sub in subjects_epochs.keys():
-                        print(sub)
                         # Average the data across both eyes:
                         if lock == "offset":
                             # Extract the data of the particular condition and crop the data:
