@@ -70,7 +70,7 @@ def check_plots(parameters_file, subjects):
                                 copy=False),
                             axis=1)
                         # Compute the fixation proportion:
-                        fix_prop = np.mean(fixation_data < param["fixdist_thresh_deg"])
+                        fix_prop = np.mean(np.mean(fixation_data < param["fixdist_thresh_deg"], axis=1))
                         # Compute the blink rate:
                         blink_rate = np.mean(np.sum(np.diff(blinks_data, axis=1) == 1, axis=1))
 
