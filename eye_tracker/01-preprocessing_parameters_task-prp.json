@@ -3,7 +3,10 @@
   "task": "prp",
   "session": "1",
   "data_type": "eyetrack",
+  "plot_factors": ["task relevance", "duration", "category", "SOA", "lock"],
+  "plot_blinks": false,
   "preprocessing_steps": [
+    "hershman_blinks",
     "interpolate_blinks",
     "gaze_to_dva",
     "extract_eyelink_events",

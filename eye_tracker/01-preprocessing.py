@@ -6,7 +6,7 @@ from eye_tracker.general_helper_function import baseline_scaling
 from eye_tracker.preprocessing_helper_function import (extract_eyelink_events, epoch_data, dilation_speed_rejection,
                                                        trend_line_departure, remove_bad_epochs, show_bad_segments,
                                                        load_raw_eyetracker, compute_proportion_bad, add_logfiles_info,
-                                                       gaze_to_dva, hershman_blinks_detection)
+                                                       gaze_to_dva, hershman_blinks_detection, plot_blinks)
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -49,8 +49,6 @@ def preprocessing(subject, parameters):
     raw = mne.concatenate_raws(raws_list)
     # Remove the empty calibrations:
     calibs = list(filter(None, calibs_list))
-    # Flatten the list:
-    calibs = [item for items in calibs for item in items]
     # Concatenate the log files:
     log_df = pd.concat(logs_list).reset_index(drop=True)
 
@@ -63,17 +61,24 @@ def preprocessing(subject, parameters):
         if step == "hershman_blinks":
             raw = hershman_blinks_detection(raw, eyes=step_param["eyes"],
                                             replace_eyelink_blinks=step_param["replace_eyelink_blinks"])
+            if param["plot_blinks"]:
+                plot_blinks(raw)
 
         # Apply dilation speed filter:
         if step == "dilation_speed_rejection":
             raw = dilation_speed_rejection(raw, threshold_factor=step_param["threshold_factor"],
                                            eyes=step_param["eyes"],
                                            window_length_s=step_param["window_length_s"])
+            if param["plot_blinks"]:
+                plot_blinks(raw)
         # Apply trend line departure filter:
         if step == "trend_line_departure":
             raw = trend_line_departure(raw, threshold_factor=step_param["threshold_factor"],
                                        eyes=step_param["eyes"], window_length_s=step_param["window_length_s"],
                                        n_iter=step_param["n_iter"])
+            if param["plot_blinks"]:
+                plot_blinks(raw)
+
         # Interpolate the data:
         if step == "interpolate_blinks":
             # Extract the annotations:
@@ -87,9 +92,8 @@ def preprocessing(subject, parameters):
             # Add the annotations back in as we still want to keep track what was interpolated and what wasn't:
             raw.set_annotations(annotations)
             # Show where the data were interpolated:
-            if show_interpolated:
-                show_bad_segments(raw, "left", pad_sec=1)
-                show_bad_segments(raw, "right", pad_sec=1)
+            if param["plot_blinks"]:
+                plot_blinks(raw)
         # Extract the eyelink events as channels (to keep them after the epoching):
         if step == "extract_eyelink_events":
             print("Extracting the {} from the annotation".format(step_param["events"]))
@@ -190,10 +194,7 @@ def preprocessing(subject, parameters):
                                                                                 data_type)
                 plt.savefig(Path(save_root, file_name))
                 plt.close()
-
-                # Plot the blinking rate separately for each condition:
-                factors = ["task relevance", "duration", "category", "SOA", "lock"]
-                for factor in factors:
+                for factor in param["plot_factors"]:
                     # Create a figure to plot the histogram:
                     fig, ax = plt.subplots()
                     levels = list(epochs.metadata[factor].unique())
@@ -281,6 +282,35 @@ def preprocessing(subject, parameters):
             plt.savefig(Path(save_root, file_name))
             plt.close()
 
+            # Loop through each factor:
+            for factor in param["plot_factors"]:
+                # Create a figure to plot the histogram:
+                fig, ax = plt.subplots()
+                levels = list(pupil_epochs.metadata[factor].unique())
+                # Loop through each level:
+                evks = []
+                for i, lvl in enumerate(levels):
+                    pupil_data = pupil_epochs[lvl].get_data(copy=True)
+                    # Compute the average across eyes and time:
+                    pupil_avg = np.mean(pupil_data, axis=1)
+                    # Plot Single trials:
+                    ax.plot(pupil_epochs.times, pupil_avg.T, color=colors[i], alpha=0.3, label=lvl, linewidth=0.2)
+                    # Plot evoked:
+                    evk = np.mean(pupil_avg, axis=0)
+                    ax.plot(pupil_epochs.times, evk, color=colors[i], alpha=0.8, label=lvl, linewidth=0.5)
+                    evks.append(evk)
+                if len(evks) == 2:
+                    ax.plot(pupil_epochs.times, evks[0] - evks[1], color="r", alpha=0.8, label="diff",
+                            linewidth=0.5)
+                ax.set_xlabel("Times (sec.)")
+                ax.set_ylabel("Pupil size")
+                ax.legend()
+                ax.set_title(factor)
+                file_name = "sub-{}_ses-{}_task-{}_{}_desc-pupil_{}.png".format(subject, session, task,
+                                                                                data_type, factor)
+                plt.savefig(Path(save_root, file_name))
+                plt.close()
+
             # Plot a heatmap of the baseline corrected pupil size:
             fig, ax = plt.subplots()
             ax.imshow(pupil_avg, aspect="auto", origin="lower",
@@ -300,10 +330,11 @@ def preprocessing(subject, parameters):
             for calib_i, calib in enumerate(calibs):
                 print(f"Calibration: {calib_i}")
                 print(calib)
-                calib.plot(show=False)
-                file_name = "calibration-{}_task-{}.png".format(calib_i, task)
-                plt.savefig(Path(save_root, file_name))
-                plt.close()
+                for calib_eye in calib:
+                    calib[calib_eye].plot(show=False)
+                    file_name = "calibration-{}_task-{}_eye-{}.png".format(calib_i, task, calib[calib_eye].eye)
+                    plt.savefig(Path(save_root, file_name))
+                    plt.close()
 
     return np.mean(proportion_bad), proportion_rejected_trials
 
@@ -320,7 +351,7 @@ if __name__ == "__main__":
 
     parameters_file = (
         r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker"
-        r"\01-preprocessing_parameters_task-visual.json ")
+        r"\01-preprocessing_parameters_task-prp.json ")
     # Create a data frame to save the summary of all subjects:
     preprocessing_summary = []
     for sub in subjects_list:

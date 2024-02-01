@@ -3,6 +3,7 @@
   "task": "auditory",
   "session": "1",
   "data_type": "eyetrack",
+  "plot_factors": ["task relevance", "duration", "category", "SOA", "lock"],
   "preprocessing_steps": [
     "interpolate_blinks",
     "gaze_to_dva",
