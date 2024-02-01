@@ -13,6 +13,22 @@ from eye_tracker.based_noise_blinks_detection import based_noise_blinks_detectio
 show_checks = False
 
 
+def plot_blinks(raw, blinks_annotations=None):
+
+    # Create a copy of the raw object:
+    if blinks_annotations is None:
+        blinks_annotations = ["BAD_blink"]
+    raw_copy = raw.copy()
+
+    # Keep only the blinks annotations:
+    raw_copy.annotations.delete(np.where(~np.isin(raw_copy.annotations.description, blinks_annotations))[0])
+
+    # Plot:
+    raw_copy.plot(scalings=dict(eyegaze=1e3), block=True)
+
+    return None
+
+
 def hershman_blinks_detection(raw, eyes=None, replace_eyelink_blinks=True):
     """
     This function applies the blink detection algorithm described here: https://osf.io/jyz43/?view_only= to mne raw
@@ -38,14 +54,14 @@ def hershman_blinks_detection(raw, eyes=None, replace_eyelink_blinks=True):
         # Extract the pupil data of this eye:
         data = np.squeeze(raw.copy().get_data(picks='pupil_' + eye))
         # Remove the nans and transpose:
-        data = np.transpose(data[~np.isnan(data)])
+        data_nonnan = data[~np.isnan(data)]
         # Remove nan samples from the times vector:
         times_nonan = times[~np.isnan(data)]
         # Create a continuous time vector after removing the nans:
         times_continuous = np.linspace(0, (1 / raw.info["sfreq"]) * times_nonan.shape[0],
                                        num=times_nonan.shape[0], endpoint=False)
         # Apply the hershman algorithm:
-        blinks = based_noise_blinks_detection(data, int(raw.info["sfreq"]))
+        blinks = based_noise_blinks_detection(data_nonnan, int(raw.info["sfreq"]))
 
         # Correct the blinks times stamps
         # Find the index of blinks onsets and offsets on the continuous time vector:
@@ -315,6 +331,8 @@ def read_calib(fname):
                                                                    screen_size=[screen_size[1], screen_size[0]],
                                                                    screen_distance=screen_distance,
                                                                    screen_resolution=[screen_res[2], screen_res[3]])
+    if len(calib) > 2:
+        print("A")
     return calib, screen_distance, screen_size, screen_res
 
 
