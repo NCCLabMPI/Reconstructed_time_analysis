@@ -42,47 +42,44 @@ def hershman_blinks_detection(raw, eyes=None, replace_eyelink_blinks=True):
     print("Applying hershman algorithm for blinks detection!")
     if eyes is None:
         eyes = ["left", "right"]
-
-    # Extract the times vector
-    times = raw.times
+    # Copy annotations:
+    new_annotations = raw.annotations.copy()
     # Remove the eyelink blinks:
     if replace_eyelink_blinks:
-        raw.annotations.delete(np.where(raw.annotations.description == "BAD_blink")[0])
-
+        new_annotations.delete(np.where(raw.annotations.description == "BAD_blink")[0])
     # Loop through each eye:
     for eye in eyes:
         # Extract the pupil data of this eye:
         data = np.squeeze(raw.copy().get_data(picks='pupil_' + eye))
-        # Remove the nans and transpose:
-        data_nonnan = data[~np.isnan(data)]
-        # Remove nan samples from the times vector:
-        times_nonan = times[~np.isnan(data)]
-        # Create a continuous time vector after removing the nans:
-        times_continuous = np.linspace(0, (1 / raw.info["sfreq"]) * times_nonan.shape[0],
-                                       num=times_nonan.shape[0], endpoint=False)
+        # Indices from the eyelink:
+        blinks_inds = np.where(raw.annotations.description == "BAD_blink")[0]
+        # Get the blinks time stamps:
+        blink_onsets = raw.annotations.onset[blinks_inds]
+        blink_durations = raw.annotations.duration[blinks_inds]
+        # Set the blinks periods to 0:
+        for i, blink_onset in enumerate(blink_onsets):
+            # Get the start and end indices:
+            start = np.argmin(np.abs(raw.times - blink_onset))
+            end = np.argmin(np.abs(raw.times - (blink_onset + blink_durations[i])))
+            data[start:end] = 0
+        # Replace the nans by 0s:
+        data[np.isnan(data)] = 0
         # Apply the hershman algorithm:
-        blinks = based_noise_blinks_detection(data_nonnan, int(raw.info["sfreq"]))
-
-        # Correct the blinks times stamps
-        # Find the index of blinks onsets and offsets on the continuous time vector:
-        blinks_onsets_inds = [np.argmin(np.abs(times_continuous - (onset / 1000))) for onset in blinks["blink_onset"]]
-        blinks_offsets_inds = [np.argmin(np.abs(times_continuous - (offset / 1000))) for offset in
-                               blinks["blink_offset"]]
-        # Extract the matching sample from the original times vector:
-        blinks_onsets_times = [times_nonan[ind] for ind in blinks_onsets_inds]
-        blinks_offsets_times = [times_nonan[ind] for ind in blinks_offsets_inds]
+        blinks = based_noise_blinks_detection(data, int(raw.info["sfreq"]))
 
         # Create annotations accordingly:
         blinks_annotations = mne.Annotations(
-            onset=blinks_onsets_times,
-            duration=[blinks_offsets_times[i] - onset for i, onset in enumerate(blinks_onsets_times)],
-            description=["BAD_blink"] * len(blinks_onsets_times),
-            ch_names=[('xpos_' + eye, 'ypos_' + eye, 'pupil_' + eye)] * len(blinks_onsets_times),
+            onset=blinks["blink_onset"] * 1/1000,
+            duration=(blinks["blink_offset"] - blinks["blink_onset"]) * 1/1000,
+            description=["BAD_blink"] * len(blinks["blink_onset"]),
+            ch_names=[('xpos_' + eye, 'ypos_' + eye, 'pupil_' + eye)] * len(blinks["blink_onset"]),
             orig_time=raw.annotations.orig_time
         )
-        # Add the annotations to the raw:
-        all_annotations = raw.annotations.__add__(blinks_annotations)
-        raw.set_annotations(all_annotations)
+        # Add the newly detected blinks:
+        new_annotations = new_annotations.__add__(blinks_annotations)
+    # Add the new annotations:
+    raw.set_annotations(new_annotations)
+
     return raw
 
 
