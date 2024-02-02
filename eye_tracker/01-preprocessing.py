@@ -3,8 +3,8 @@ from mne.viz.eyetracking import plot_gaze
 import json
 from pathlib import Path
 from eye_tracker.general_helper_function import baseline_scaling
-from eye_tracker.preprocessing_helper_function import (extract_eyelink_events, epoch_data, dilation_speed_rejection,
-                                                       trend_line_departure, remove_bad_epochs, show_bad_segments,
+from eye_tracker.preprocessing_helper_function import (extract_eyelink_events, epoch_data,
+                                                       remove_bad_epochs,
                                                        load_raw_eyetracker, compute_proportion_bad, add_logfiles_info,
                                                        gaze_to_dva, hershman_blinks_detection, plot_blinks)
 import matplotlib.pyplot as plt
@@ -44,11 +44,15 @@ def preprocessing(subject, parameters):
         load_raw_eyetracker(files_root, subject, session, task, ev.raw_root,
                             param["beh_file_name"],
                             param["epochs"]["metadata_column"],
-                            param["events_of_interest"][0].replace('*', ''), verbose=False, debug=DEBUG))
+                            param["events_of_interest"][0].replace('*', ''),
+                            verbose=False, debug=DEBUG))
     # Concatenate the objects
     raw = mne.concatenate_raws(raws_list)
+    if param["plot_blinks"]:
+        plot_blinks(raw)
     # Remove the empty calibrations:
     calibs = list(filter(None, calibs_list))
+    calibs = [item for items in calibs for item in items]
     # Concatenate the log files:
     log_df = pd.concat(logs_list).reset_index(drop=True)
 
@@ -61,21 +65,6 @@ def preprocessing(subject, parameters):
         if step == "hershman_blinks":
             raw = hershman_blinks_detection(raw, eyes=step_param["eyes"],
                                             replace_eyelink_blinks=step_param["replace_eyelink_blinks"])
-            if param["plot_blinks"]:
-                plot_blinks(raw)
-
-        # Apply dilation speed filter:
-        if step == "dilation_speed_rejection":
-            raw = dilation_speed_rejection(raw, threshold_factor=step_param["threshold_factor"],
-                                           eyes=step_param["eyes"],
-                                           window_length_s=step_param["window_length_s"])
-            if param["plot_blinks"]:
-                plot_blinks(raw)
-        # Apply trend line departure filter:
-        if step == "trend_line_departure":
-            raw = trend_line_departure(raw, threshold_factor=step_param["threshold_factor"],
-                                       eyes=step_param["eyes"], window_length_s=step_param["window_length_s"],
-                                       n_iter=step_param["n_iter"])
             if param["plot_blinks"]:
                 plot_blinks(raw)
 
@@ -119,13 +108,13 @@ def preprocessing(subject, parameters):
             if len(param["log_file_columns"]) > 0:
                 epochs = add_logfiles_info(epochs, log_df, param["log_file_columns"])
 
-            if "remove_bad_epochs" in preprocessing_steps:
-                epochs, proportion_rejected_trials = remove_bad_epochs(epochs,
-                                                                       channels=param["remove_bad_epochs"][
-                                                                           "channels"],
-                                                                       bad_proportion_thresh=
-                                                                       param["remove_bad_epochs"][
-                                                                           "nan_proportion_thresh"])
+
+            epochs, proportion_rejected_trials = remove_bad_epochs(epochs,
+                                                                   channels=param["remove_bad_epochs"][
+                                                                       "channels"],
+                                                                   bad_proportion_thresh=
+                                                                   param["remove_bad_epochs"][
+                                                                       "nan_proportion_thresh"])
 
             # Plot the epochs:
             if "discard_bad_subjects" in preprocessing_steps:
@@ -294,10 +283,10 @@ def preprocessing(subject, parameters):
                     # Compute the average across eyes and time:
                     pupil_avg = np.mean(pupil_data, axis=1)
                     # Plot Single trials:
-                    ax.plot(pupil_epochs.times, pupil_avg.T, color=colors[i], alpha=0.3, label=lvl, linewidth=0.2)
+                    ax.plot(pupil_epochs.times, pupil_avg.T, color=colors[i], alpha=0.3, linewidth=0.2)
                     # Plot evoked:
                     evk = np.mean(pupil_avg, axis=0)
-                    ax.plot(pupil_epochs.times, evk, color=colors[i], alpha=0.8, label=lvl, linewidth=0.5)
+                    ax.plot(pupil_epochs.times, evk, color=colors[i], alpha=0.8, label=lvl, linewidth=0.5, zorder=10000)
                     evks.append(evk)
                 if len(evks) == 2:
                     ax.plot(pupil_epochs.times, evks[0] - evks[1], color="r", alpha=0.8, label="diff",
@@ -328,13 +317,10 @@ def preprocessing(subject, parameters):
             # Fixation maps:
             # Calibrations:
             for calib_i, calib in enumerate(calibs):
-                print(f"Calibration: {calib_i}")
-                print(calib)
-                for calib_eye in calib:
-                    calib[calib_eye].plot(show=False)
-                    file_name = "calibration-{}_task-{}_eye-{}.png".format(calib_i, task, calib[calib_eye].eye)
-                    plt.savefig(Path(save_root, file_name))
-                    plt.close()
+                calib.plot(show=False)
+                file_name = "calibration-{}_task-{}_eye-{}.png".format(calib_i, task, calib.eye)
+                plt.savefig(Path(save_root, file_name))
+                plt.close()
 
     return np.mean(proportion_bad), proportion_rejected_trials
 
@@ -346,8 +332,7 @@ if __name__ == "__main__":
     # SX117: no eyetracking data
     # ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112", "SX113",
     # "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121"]
-    subjects_list = ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112", "SX113",
-                     "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121"]
+    subjects_list = ["SX103"]
 
     parameters_file = (
         r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker"
