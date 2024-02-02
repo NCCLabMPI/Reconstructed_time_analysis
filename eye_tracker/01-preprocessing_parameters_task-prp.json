@@ -4,9 +4,10 @@
   "session": "1",
   "data_type": "eyetrack",
   "plot_factors": ["task relevance", "duration", "category", "SOA", "lock"],
-  "plot_blinks": false,
+  "plot_blinks": true,
   "preprocessing_steps": [
     "hershman_blinks",
+    "remove_long_blinks",
     "interpolate_blinks",
     "gaze_to_dva",
     "extract_eyelink_events",
@@ -25,6 +26,10 @@
   "hershman_blinks": {
     "eyes": ["left", "right"],
     "replace_eyelink_blinks": true
+  },
+  "remove_long_blinks": {
+    "max_blinks_dur": 1.0,
+    "new_description": "BAD_lost_tracking"
   },
   "gaze_to_dva": {
     "eyes": ["left", "right"]
@@ -60,7 +65,7 @@
     "events_of_interest": [
         "vis_onset"
     ],
-    "reject_by_annotation": false,
+    "reject_by_annotation": true,
     "metadata_column": ["event type", "task relevance", "duration", "category", "orientation", "identity",
         "SOA", "lock", "pitch"]
   }

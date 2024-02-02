@@ -13,7 +13,7 @@ import environment_variables as ev
 import os
 from scipy.stats import zscore
 
-DEBUG = False
+DEBUG = True
 show_interpolated = False
 prop_cycle = plt.rcParams['axes.prop_cycle']
 colors = prop_cycle.by_key()['color']
@@ -69,21 +69,28 @@ def preprocessing(subject, parameters):
             if param["plot_blinks"]:
                 plot_blinks(raw)
 
+        # Detect chunks mark as blinks but which are too long to be blinks:
+        if step == "remove_long_blinks":
+            # Extract the index of the blinks that are too long:
+            long_blinks_ind = np.where((raw.annotations.description == "BAD_blink") &
+                                       (raw.annotations.duration > step_param["max_blinks_dur"]))[0]
+            print("{} out of {} blinks duration exceeded {}sec and were categorized as bad segments!".format(
+                len(long_blinks_ind), np.sum(raw.annotations.description == "BAD_blink"),
+                step_param["max_blinks_dur"]))
+            # Change the description to BAD:
+            if len(long_blinks_ind) > 0:
+                raw.annotations.description[long_blinks_ind] = step_param["new_description"]
+
         # Interpolate the data:
         if step == "interpolate_blinks":
-            # Extract the annotations:
-            annotations = raw.annotations.copy()
-            # Extract the bad descriptions:
-            bad_descriptions = list(set([val for val in raw.annotations.description if "BAD_" in val]))
             # Interpolate
             mne.preprocessing.eyetracking.interpolate_blinks(raw, buffer=step_param["buffer"],
-                                                             match=bad_descriptions,
+                                                             match="BAD_blink",
                                                              interpolate_gaze=step_param["interpolate_gaze"])
-            # Add the annotations back in as we still want to keep track what was interpolated and what wasn't:
-            raw.set_annotations(annotations)
             # Show where the data were interpolated:
             if param["plot_blinks"]:
-                plot_blinks(raw)
+                plot_blinks(raw, blinks_annotations=["blink", param["remove_long_blinks"]["new_description"]])
+
         # Extract the eyelink events as channels (to keep them after the epoching):
         if step == "extract_eyelink_events":
             print("Extracting the {} from the annotation".format(step_param["events"]))
@@ -318,7 +325,7 @@ if __name__ == "__main__":
     # SX117: no eyetracking data
     # ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112", "SX113",
     # "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121"]
-    subjects_list = ["SX103"]
+    subjects_list = ["SX102"]
 
     parameters_file = (
         r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker"
