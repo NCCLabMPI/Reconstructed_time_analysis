@@ -3,11 +3,13 @@ import json
 from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
-from eye_tracker.general_helper_function import generate_gaze_map, reject_bad_epochs
+from eye_tracker.general_helper_function import generate_gaze_map, reject_bad_epochs, deg_to_pix
 import pandas as pd
 import os
 import environment_variables as ev
 from plotter_functions import soa_boxplot
+import matplotlib.image as mpimg
+import matplotlib.patches as patches
 
 # Set the font size:
 plt.rcParams.update({'font.size': 14})
@@ -186,24 +188,40 @@ def check_plots(parameters_file, subjects):
     # Plot the dwell time image:
     hists = np.nanmean(np.array(fixation_heatmaps), axis=0)
     fig3, ax3 = plt.subplots(nrows=1, ncols=1, sharex=False, sharey=True, figsize=[8.3, 8.3 * 1080 / 1920])
-    vmin = np.nanmin(hists)
+    vmin = np.nanpercentile(hists, 5)
     vmax = np.nanmax(hists)
-    extent = [0, 1920, 1080, 0]  # origin is the top left of the screen
+    extent = [0, param["screen_res"][0], param["screen_res"][1], 0]  # origin is the top left of the screen
     # Plot heatmap
+    cmap = plt.get_cmap("RdYlBu_r")
     im = ax3.imshow(
         hists,
         aspect="equal",
-        cmap="RdYlBu_r",
+        cmap=cmap,
         alpha=1,
         extent=extent,
         origin="upper",
         vmin=vmin,
         vmax=vmax,
     )
+    # Calculate the sizes in pixels:
+    center = [param["screen_res"][0] / 2, param["screen_res"][1] / 2]
+    fixation_radius = deg_to_pix(param["fixdist_thresh_deg"], param["screen_distance_cm"],
+                                 param["screen_size_cm"], param["screen_res"])
+    stim_size = deg_to_pix(param["stim_size_deg"], param["screen_distance_cm"],
+                           param["screen_size_cm"], param["screen_res"])
+    stim_img = mpimg.imread('FACE01.png')
+    stim_extent = [center[0] - stim_size / 2, center[0] + stim_size / 2,
+                   center[1] - stim_size / 2, center[1] + stim_size / 2]
+    ax3.imshow(stim_img, extent=stim_extent, alpha=0.25)
+    circle = patches.Circle(center, fixation_radius, edgecolor='red', facecolor='none', linewidth=2)
+    # Add the circle to the plot
+    ax3.add_patch(circle)
     ax3.set_title("Gaze heatmap")
-    ax3.set_xlabel("X position")
-    ax3.set_ylabel("Y position")
+    ax3.set_xlabel("X position (pix.)")
+    ax3.set_ylabel("Y position (pix.)")
     fig3.colorbar(im, ax=ax3, shrink=0.8, label="Dwell time (seconds)")
+    ax3.set_xlim(0, param["screen_res"][0])
+    ax3.set_ylim(0, param["screen_res"][1])
     fig3.savefig(Path(save_dir, "fixation_map.svg"), transparent=True, dpi=dpi)
     fig3.savefig(Path(save_dir, "fixation_map.png"), transparent=True, dpi=dpi)
     plt.close(fig3)
@@ -212,7 +230,7 @@ def check_plots(parameters_file, subjects):
 
 
 if __name__ == "__main__":
-    subjects_list = ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX112", "SX113",
+    subjects_list = ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112", "SX113",
                      "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121"]
     parameters = (
         r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker"
