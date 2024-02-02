@@ -4,9 +4,6 @@ import mne
 import numpy as np
 import pandas as pd
 from pathlib import Path
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-from scipy.ndimage import gaussian_filter1d
 from math import atan2, degrees
 from eye_tracker.based_noise_blinks_detection import based_noise_blinks_detection
 
@@ -377,37 +374,6 @@ def compute_proportion_bad(raw, desc="BAD_", eyes=None):
         print("{} eye:       {:2f}%".format(eye, bad_proportion * 100))
         bad_proportions.append(bad_dur / (raw.times[-1] - raw.times[0]))
     return bad_proportions
-
-
-def remove_bad_epochs(epochs, channels=None, bad_proportion_thresh=0.2):
-    """
-    This function identifies any epochs in which there is more than X% in any channel
-    :param epochs: (mne epochs data) contains the epoched eyelink data
-    :param channels: (list of strings) name of the channels on which to base the epochs removal
-    :param bad_proportion_thresh: (float) proportion of bad segments beyond which to remove an epoch
-    :return:
-        - epochs: (mne epochs data) with bad epoched dropped
-        - proportion_rejected: (float) proportion of dropped epochs
-    """
-    print("=" * 40)
-    print("Removing bad epochs (more than {}% nan)".format(bad_proportion_thresh * 100))
-    if channels is None:
-        channels = ["BAD_blink_left", "BAD_blink_right"]
-    # Extract the data:
-    data = epochs.get_data(channels)
-    data_combined = np.logical_and(data[:, 0, :], data[:, 0, :])
-    # Compute the proportion of nan:
-    nan_proportion = np.sum(data_combined, axis=1) / data.shape[2]
-    # Extract the epochs that have more than X% nan:
-    bad_epochs = np.where(np.max(nan_proportion, axis=0) > bad_proportion_thresh)[0]
-    # Remove the bad epochs:
-    epochs.drop(bad_epochs, reason='TOO_MANY_NANS')
-    proportion_rejected = len(bad_epochs) / len(epochs)
-    # Print the number of removed epochs:
-    print("Removed {:2f}% epochs".format(100 * proportion_rejected))
-    # Dropping the bad epochs if there were any:
-    epochs.drop_bad()
-    return epochs, proportion_rejected
 
 
 def create_metadata_from_events(epochs, metadata_column):

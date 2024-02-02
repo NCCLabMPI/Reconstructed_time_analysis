@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 from eye_tracker.general_helper_function import baseline_scaling
 from eye_tracker.preprocessing_helper_function import (extract_eyelink_events, epoch_data,
-                                                       remove_bad_epochs,
                                                        load_raw_eyetracker, compute_proportion_bad, add_logfiles_info,
                                                        gaze_to_dva, hershman_blinks_detection, plot_blinks)
 import matplotlib.pyplot as plt
@@ -55,6 +54,8 @@ def preprocessing(subject, parameters):
     calibs = [item for items in calibs for item in items]
     # Concatenate the log files:
     log_df = pd.concat(logs_list).reset_index(drop=True)
+    # Prepare the proportion of bad data:
+    proportion_bad = 0
 
     # =============================================================================================
     # Loop through the preprocessing steps:
@@ -107,21 +108,6 @@ def preprocessing(subject, parameters):
             # Add the log file information to the metadata
             if len(param["log_file_columns"]) > 0:
                 epochs = add_logfiles_info(epochs, log_df, param["log_file_columns"])
-
-
-            epochs, proportion_rejected_trials = remove_bad_epochs(epochs,
-                                                                   channels=param["remove_bad_epochs"][
-                                                                       "channels"],
-                                                                   bad_proportion_thresh=
-                                                                   param["remove_bad_epochs"][
-                                                                       "nan_proportion_thresh"])
-
-            # Plot the epochs:
-            if "discard_bad_subjects" in preprocessing_steps:
-                if (proportion_rejected_trials > param["discard_bad_subjects"]["bad_trials_threshold"] or
-                        np.mean(proportion_bad) > param["discard_bad_subjects"]["nan_threshold"]):
-                    print("Subject {} rejected due to bad epochs".format(subject))
-                    continue
 
             # Save this epoch to file:
             save_root = Path(ev.bids_root, "derivatives", "preprocessing", "sub-" + subject,
@@ -286,11 +272,11 @@ def preprocessing(subject, parameters):
                     ax.plot(pupil_epochs.times, pupil_avg.T, color=colors[i], alpha=0.3, linewidth=0.2)
                     # Plot evoked:
                     evk = np.mean(pupil_avg, axis=0)
-                    ax.plot(pupil_epochs.times, evk, color=colors[i], alpha=0.8, label=lvl, linewidth=0.5, zorder=10000)
+                    ax.plot(pupil_epochs.times, evk, color=colors[i], label=lvl, linewidth=2, zorder=10000)
                     evks.append(evk)
                 if len(evks) == 2:
-                    ax.plot(pupil_epochs.times, evks[0] - evks[1], color="r", alpha=0.8, label="diff",
-                            linewidth=0.5)
+                    ax.plot(pupil_epochs.times, evks[0] - evks[1], color="r", label="diff",
+                            linewidth=2)
                 ax.set_xlabel("Times (sec.)")
                 ax.set_ylabel("Pupil size")
                 ax.legend()
@@ -318,11 +304,11 @@ def preprocessing(subject, parameters):
             # Calibrations:
             for calib_i, calib in enumerate(calibs):
                 calib.plot(show=False)
-                file_name = "calibration-{}_task-{}_eye-{}.png".format(calib_i, task, calib.eye)
+                file_name = "calibration-{}_task-{}_eye-{}.png".format(calib_i, task, calib['eye'])
                 plt.savefig(Path(save_root, file_name))
                 plt.close()
 
-    return np.mean(proportion_bad), proportion_rejected_trials
+    return np.mean(proportion_bad)
 
 
 if __name__ == "__main__":
@@ -341,13 +327,12 @@ if __name__ == "__main__":
     preprocessing_summary = []
     for sub in subjects_list:
         print("Preprocessing subject {}".format(sub))
-        total_nan, rejected_trials = preprocessing(sub, parameters_file)
+        continuous_bad = preprocessing(sub, parameters_file)
         # Append to the summary:
         preprocessing_summary.append(pd.DataFrame({
             "subject": sub,
-            "total_bad": total_nan,
-            "rejected_trials": rejected_trials,
-            "valid_flag": True if rejected_trials < 0.5 and np.min(total_nan) < 0.5 else False
+            "total_bad": continuous_bad,
+            "valid_flag": True if np.min(continuous_bad) < 0.5 else False
         }, index=[0]))
     # Concatenate the data frame:
     preprocessing_summary = pd.concat(preprocessing_summary)
