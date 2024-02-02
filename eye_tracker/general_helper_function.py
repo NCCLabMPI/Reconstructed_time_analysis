@@ -1,11 +1,22 @@
 from mne.baseline import rescale
 import numpy as np
-import pandas as pd
-import mne
-from mne._fiff.pick import _picks_to_idx
 from scipy.ndimage import gaussian_filter
 from mne.stats import permutation_cluster_1samp_test
 from scipy.stats import zscore
+from math import atan2, degrees
+
+
+def deg_to_pix(size_deg, distance_cm, screen_size_cm, screen_res):
+    """
+    This function converts a given degrees of visual angle to pixels
+    """
+    # Compute conversion factor by calculating how many degrees of visual angle a pixel is:
+    deg_per_pixel = np.mean([degrees(atan2(.5 * screen_size_cm[0], distance_cm)) / (.5 * screen_res[0]),
+                             degrees(atan2(.5 * screen_size_cm[1], distance_cm)) / (.5 * screen_res[1])])
+    # Convert the size in degrees to size in centimeters:
+    size_pix = size_deg / deg_per_pixel
+
+    return size_pix
 
 
 def moving_average(data, window_size, axis=-1, overlapping=False):
@@ -68,8 +79,32 @@ def mvavg(data, window_ms, sfreq):
     return mvavg_data
 
 
+def beh_exclusion(data_df):
+    """
+    This function performs the exclusion criterion reported in the paper. Packaged in a function such that we can use
+    it in various places:
+    :param data_df:
+    :return:
+    """
+    trial_orig = list(data_df.index)
+    # 1. Remove the trials with wrong visual responses:
+    data_df_clean = data_df[data_df["trial_response_vis"] != "fa"]
+    # 2. Remove the trials with wrong auditory responses:
+    data_df_clean = data_df_clean[data_df_clean["trial_accuracy_aud"] != 0]
+    # 3. Remove trials where the visual stimuli were responded second:
+    data_df_clean = data_df_clean[data_df_clean["trial_second_button_press"] != 1]
+    # 4. Remove trials in which the participants responded to the auditory stimulus in less than 100ms and more than
+    # 1260ms:
+    data_df_clean = data_df_clean[(data_df_clean["RT_aud"] >= 0.1) & (data_df_clean["RT_aud"] <= 1.260)]
+    # Fetch the removed indices:
+    trial_final = list(data_df_clean.index)
+    rejected_trials = [trial for trial in trial_orig if trial not in trial_final]
+
+    return rejected_trials
+
+
 def reject_bad_epochs(epochs, baseline_window=None, z_thresh=2, eyes=None, remove_blinks=True, blinks_window=None,
-                      remove_nan=False):
+                      remove_nan=False, exlude_beh=True):
     """
     This function rejects epochs based on the zscore of the baseline. For some trials, there may be artifacts
     in the baseline, in which case baseline correction will spread the artifact. Such epochs are discarded.
@@ -80,6 +115,7 @@ def reject_bad_epochs(epochs, baseline_window=None, z_thresh=2, eyes=None, remov
     :param remove_blinks:
     :param blinks_window:
     :param remove_nan:
+    :param exlude_beh:
     return:
         - epochs:
         - inds
@@ -92,7 +128,16 @@ def reject_bad_epochs(epochs, baseline_window=None, z_thresh=2, eyes=None, remov
         baseline_window = [None, 0]
     if blinks_window is None:
         blinks_window = [0, 0.5]
+    # Get the initial number of trials:
+    ntrials_orig = len(epochs)
 
+    if exlude_beh:
+        inds = beh_exclusion(epochs.metadata.copy().reset_index(drop=True))
+        if len(inds) > 0:
+            # Drop these epochs:
+            epochs.drop(inds, reason="baseline_artifact", verbose="ERROR")
+        print("{} out of {} ({:.2f}%) trials were rejected based on behavior.".format(len(inds), ntrials_orig,
+                                                                               (len(inds) / ntrials_orig) * 100))
     # Extract the data:
     if z_thresh is not None:
         baseline_data = epochs.copy().crop(tmin=baseline_window[0],
@@ -140,8 +185,9 @@ def reject_bad_epochs(epochs, baseline_window=None, z_thresh=2, eyes=None, remov
                                                                         (len(nan_inds) /
                                                                             data.shape[0]) * 100,
                                                                         blinks_window))
+    ntrials_final = len(epochs)
 
-    return epochs
+    return epochs, 1 - ntrials_final/ntrials_orig
 
 
 def max_percentage_index(data, thresh_percent):
@@ -171,7 +217,8 @@ def max_percentage_index(data, thresh_percent):
     return ind, threshold_value
 
 
-def cluster_1samp_across_sub(subjects_epochs, conditions, n_permutations=1024, threshold=None, tail=0):
+def cluster_1samp_across_sub(subjects_epochs, conditions, n_permutations=1024, threshold=None, tail=0,
+                             downsample=False):
     """
     This function applies the permutation_cluster_1samp_test from MNE, taking in a dictionary containing the epochs
     of each subject. It will then average across trials within the condition of interest (i.e. create evoked) and
@@ -182,20 +229,33 @@ def cluster_1samp_across_sub(subjects_epochs, conditions, n_permutations=1024, t
     :param n_permutations:
     :param threshold:
     :param tail:
+    :param downsample:
     :return:
     """
+
     evks = {cond: [] for cond in conditions}
     # Loop through each subject:
     for sub in subjects_epochs.keys():
         # Loop through each relevant condition:
+        cond_data = {cond: [] for cond in conditions}
+        conditions_counts = []
         for cond in conditions:
             # Average the data across both eyes:
             data = np.nanmean(subjects_epochs[sub].copy()[cond], axis=1)
             # Remove any trials containing Nan:
             data = np.array([data[i, :] for i in range(data.shape[0]) if not any(np.isnan(data[i, :]))])
             # Remove any trials containing Nan:
-            data = np.array([data[i, :] for i in range(data.shape[0]) if not any(np.isinf(data[i, :]))])
-            evks[cond].append(np.mean(data, axis=0))
+            cond_data[cond] = np.array([data[i, :] for i in range(data.shape[0]) if not any(np.isinf(data[i, :]))])
+            conditions_counts.append(cond_data[cond].shape[0])
+        # Check the counts of each condition:
+        if conditions_counts[0] != conditions_counts[1] and downsample:
+            min_counts = min(conditions_counts)
+            for cond in conditions:
+                evks[cond].append(np.mean(cond_data[cond][np.random.choice(cond_data[cond].shape[0], min_counts), :],
+                                          axis=0))
+        else:
+            for cond in conditions:
+                evks[cond].append(np.mean(cond_data[cond], axis=0))
 
     # Convert each condition data to a numpy array:
     evks = {cond: np.array(evks[cond]) for cond in conditions}
