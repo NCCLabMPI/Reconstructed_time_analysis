@@ -12,8 +12,21 @@ import matplotlib.image as mpimg
 import matplotlib.patches as patches
 
 # Set the font size:
+SMALL_SIZE = 12
+MEDIUM_SIZE = 12
+BIGGER_SIZE = 12
+dpi = 300
+plt.rcParams['svg.fonttype'] = 'none'
+plt.rc('font', size=SMALL_SIZE)  # controls default text sizes
+plt.rc('axes', titlesize=SMALL_SIZE)  # fontsize of the axes title
+plt.rc('axes', labelsize=MEDIUM_SIZE)  # fontsize of the x and y labels
+plt.rc('xtick', labelsize=SMALL_SIZE)  # fontsize of the tick labels
+plt.rc('ytick', labelsize=SMALL_SIZE)  # fontsize of the tick labels
+plt.rc('legend', fontsize=SMALL_SIZE)  # legend fontsize
+plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 plt.rcParams.update({'font.size': 14})
 dpi = 300
+figure_height = 8.3
 
 
 def check_plots(parameters_file, subjects):
@@ -67,8 +80,8 @@ def check_plots(parameters_file, subjects):
                                 copy=False),
                             axis=1)
                         blinks_data = np.mean(
-                            epochs_cropped.copy()["/".join([task_rel, duration, lock, soa])].pick(["BAD_blink_left",
-                                                                                                   "BAD_blink_right"]).get_data(
+                            epochs_cropped.copy()["/".join([task_rel, duration, lock, soa])].pick(["blink_left",
+                                                                                                   "blink_right"]).get_data(
                                 copy=False),
                             axis=1)
                         # Compute the fixation proportion:
@@ -108,15 +121,18 @@ def check_plots(parameters_file, subjects):
     # Across task relevances:
     fig_all, ax_all = soa_boxplot(check_values,
                                   "fixation_proportion",
-                                  fig_size=[8.3 / 2, 11.7 / 2])
+                                  fig_size=[figure_height, figure_height * param["screen_res"][1] /
+                                            param["screen_res"][0]])
     # Task relevant:
     fig_tr, ax_tr = soa_boxplot(check_values[check_values["task_relevance"] == 'non-target'],
                                 "fixation_proportion",
-                                fig_size=[8.3 / 2, 11.7 / 2])
+                                fig_size=[figure_height, figure_height * param["screen_res"][1] /
+                                            param["screen_res"][0]])
     # Task irrelevant:
     fig_ti, ax_ti = soa_boxplot(check_values[check_values["task_relevance"] == 'irrelevant'],
                                 "fixation_proportion",
-                                fig_size=[8.3 / 2, 11.7 / 2])
+                                fig_size=[figure_height, figure_height * param["screen_res"][1] /
+                                            param["screen_res"][0]])
     # Set the y limit to be the same for both plots:
     lims = [[ax_all[0].get_ylim()[0], ax_tr[0].get_ylim()[0], ax_ti[0].get_ylim()[0]],
             [ax_all[0].get_ylim()[1], ax_tr[0].get_ylim()[1], ax_ti[0].get_ylim()[1]]]
@@ -149,15 +165,18 @@ def check_plots(parameters_file, subjects):
     # Across task relevances:
     fig_all, ax_all = soa_boxplot(check_values,
                                   "blink_rate",
-                                  fig_size=[8.3 / 2, 11.7 / 2])
+                                  fig_size=[figure_height, figure_height * param["screen_res"][1] /
+                                            param["screen_res"][0]])
     # Task relevant:
     fig_tr, ax_tr = soa_boxplot(check_values[check_values["task_relevance"] == 'non-target'],
                                 "blink_rate",
-                                fig_size=[8.3 / 2, 11.7 / 2])
+                                fig_size=[figure_height, figure_height * param["screen_res"][1] /
+                                          param["screen_res"][0]])
     # Task irrelevant:
     fig_ti, ax_ti = soa_boxplot(check_values[check_values["task_relevance"] == 'irrelevant'],
                                 "blink_rate",
-                                fig_size=[8.3 / 2, 11.7 / 2])
+                                fig_size=[figure_height, figure_height * param["screen_res"][1] /
+                                          param["screen_res"][0]])
     # Set the y limit to be the same for both plots:
     lims = [[ax_all[0].get_ylim()[0], ax_tr[0].get_ylim()[0], ax_ti[0].get_ylim()[0]],
             [ax_all[0].get_ylim()[1], ax_tr[0].get_ylim()[1], ax_ti[0].get_ylim()[1]]]
@@ -187,7 +206,10 @@ def check_plots(parameters_file, subjects):
 
     # Plot the dwell time image:
     hists = np.nanmean(np.array(fixation_heatmaps), axis=0)
-    fig3, ax3 = plt.subplots(nrows=1, ncols=1, sharex=False, sharey=True, figsize=[8.3, 8.3 * 1080 / 1920])
+    fig3, ax3 = plt.subplots(nrows=1, ncols=1, sharex=False, sharey=True, figsize=[figure_height,
+                                                                                   figure_height *
+                                                                                   param["screen_res"][1] /
+                                                                                   param["screen_res"][0]])
     vmin = np.nanpercentile(hists, 5)
     vmax = np.nanmax(hists)
     extent = [0, param["screen_res"][0], param["screen_res"][1], 0]  # origin is the top left of the screen
@@ -212,7 +234,7 @@ def check_plots(parameters_file, subjects):
     stim_img = mpimg.imread('FACE01.png')
     stim_extent = [center[0] - stim_size / 2, center[0] + stim_size / 2,
                    center[1] - stim_size / 2, center[1] + stim_size / 2]
-    ax3.imshow(stim_img, extent=stim_extent, alpha=0.25)
+    ax3.imshow(stim_img, extent=stim_extent, alpha=0.5)
     circle = patches.Circle(center, fixation_radius, edgecolor='red', facecolor='none', linewidth=2)
     # Add the circle to the plot
     ax3.add_patch(circle)

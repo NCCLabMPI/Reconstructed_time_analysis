@@ -159,7 +159,7 @@ def reject_bad_epochs(epochs, baseline_window=None, z_thresh=2, eyes=None, remov
     if remove_blinks:
         # Extract the blinks channels:
         blink_data = np.squeeze(epochs.copy().crop(tmin=blinks_window[0],
-                                                   tmax=blinks_window[1]).get_data(picks=["_".join(["BAD_blink", eye])
+                                                   tmax=blinks_window[1]).get_data(picks=["_".join(["blink", eye])
                                                                                           for eye in eyes]))
         if blink_data.shape[1] == 2:
             # Combine both eyes data:
