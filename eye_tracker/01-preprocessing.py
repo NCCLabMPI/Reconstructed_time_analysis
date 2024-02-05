@@ -13,8 +13,7 @@ import environment_variables as ev
 import os
 from scipy.stats import zscore
 
-DEBUG = True
-show_interpolated = False
+DEBUG = False
 prop_cycle = plt.rcParams['axes.prop_cycle']
 colors = prop_cycle.by_key()['color']
 
@@ -97,6 +96,7 @@ def preprocessing(subject, parameters):
             # Loop through each event to extract:
             for evt in step_param["events"]:
                 raw = extract_eyelink_events(raw, evt, eyes=step_param["eyes"])
+            print("A")
 
         if step == "gaze_to_dva":
             raw = gaze_to_dva(raw, screen_size, screen_res, screen_distance, eyes=step_param["eyes"])
@@ -134,9 +134,9 @@ def preprocessing(subject, parameters):
             if "extract_eyelink_events" in preprocessing_steps:
                 # Plot the blinks rate:
                 fig, ax = plt.subplots(2)
-                ax[0].imshow(np.squeeze(epochs.get_data(picks="BAD_blink_left")), aspect="auto", origin="lower",
+                ax[0].imshow(np.squeeze(epochs.get_data(picks="blink_left")), aspect="auto", origin="lower",
                              extent=[epochs.times[0], epochs.times[-1], 0, len(epochs)])
-                ax[1].imshow(np.squeeze(epochs.get_data(picks="BAD_blink_right")), aspect="auto", origin="lower",
+                ax[1].imshow(np.squeeze(epochs.get_data(picks="blink_right")), aspect="auto", origin="lower",
                              extent=[epochs.times[0], epochs.times[-1], 0, len(epochs)])
                 ax[0].set_title("Left eye")
                 ax[1].set_title("Right eye")
@@ -183,9 +183,9 @@ def preprocessing(subject, parameters):
                     # Loop through each level:
                     for i, lvl in enumerate(levels):
                         blink_data = (np.logical_and(np.squeeze(epochs[lvl].get_data(copy=True,
-                                                                                     picks=["BAD_blink_left"])),
+                                                                                     picks=["blink_left"])),
                                                      np.squeeze(epochs[lvl].get_data(copy=True,
-                                                                                     picks=["BAD_blink_right"]))).
+                                                                                     picks=["blink_right"]))).
                                       astype(float))
                         if len(blink_data.shape) > 1:
                             blink_counts = np.sum(np.diff(blink_data, axis=1) == 1, axis=1)
@@ -325,7 +325,8 @@ if __name__ == "__main__":
     # SX117: no eyetracking data
     # ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112", "SX113",
     # "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121"]
-    subjects_list = ["SX102"]
+    subjects_list = ["SX108", "SX109", "SX110", "SX111", "SX112", "SX113",
+                     "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121"]
 
     parameters_file = (
         r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker"

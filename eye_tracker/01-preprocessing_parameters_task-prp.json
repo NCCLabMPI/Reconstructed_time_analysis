@@ -4,7 +4,7 @@
   "session": "1",
   "data_type": "eyetrack",
   "plot_factors": ["task relevance", "duration", "category", "SOA", "lock"],
-  "plot_blinks": true,
+  "plot_blinks": false,
   "preprocessing_steps": [
     "hershman_blinks",
     "remove_long_blinks",
@@ -51,7 +51,7 @@
   },
   "extract_eyelink_events": {
     "eyes": ["left", "right"],
-    "events": ["BAD_blink", "saccade", "fixation"]
+    "events": ["blink", "saccade", "fixation"]
   },
   "remove_bad_epochs": {
     "channels": ["BAD_blink_left", "BAD_blink_right"],

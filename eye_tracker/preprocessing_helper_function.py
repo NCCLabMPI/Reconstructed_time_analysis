@@ -367,7 +367,10 @@ def compute_proportion_bad(raw, desc="BAD_", eyes=None):
                                                  if eye in raw.annotations.ch_names[ind][0]])
                                        )
         # Compute the sum of the duration:
-        bad_dur = np.sum(raw.annotations.duration[bad_annot_ind])
+        if len(bad_annot_ind) > 0:
+            bad_dur = np.sum(raw.annotations.duration[bad_annot_ind])
+        else:
+            bad_dur = 0
 
         # Compute the proportion:
         bad_proportion = bad_dur / (raw.times[-1] - raw.times[0])
