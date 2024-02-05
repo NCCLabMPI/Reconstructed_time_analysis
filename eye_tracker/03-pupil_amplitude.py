@@ -17,7 +17,7 @@ def pupil_amplitude(parameters_file, subjects):
     with open(parameters_file) as json_file:
         param = json.load(json_file)
     # Load all subjects data:
-    subjects_epochs = {sub: None for sub in subjects}
+    subjects_epochs = {}
     # Create the directory to save the results in:
     save_dir = Path(ev.bids_root, "derivatives", "pupil_amplitude")
     if not os.path.isdir(save_dir):
@@ -31,15 +31,24 @@ def pupil_amplitude(parameters_file, subjects):
         file_name = "sub-{}_ses-{}_task-{}_{}_desc-epo.fif".format(sub, param["session"], param["task"],
                                                                    param["data_type"])
         epochs = mne.read_epochs(Path(root, file_name))
+        # Decimate
+        epochs.decimate(int(epochs.info["sfreq"] / param["decim_freq"]))
         # Extract the relevant conditions:
         epochs = epochs[param["task_relevance"]]
         # Crop if needed:
         epochs.crop(param["crop"][0], param["crop"][1])
         # Perform trial exclusions:
         if param["trial_rej_thresh"] is not None:
-            reject_bad_epochs(epochs, baseline_window=param["baseline_window"],
-                              z_thresh=param["trial_rej_thresh"], eyes=None, remove_blinks=True,
-                              blinks_window=[0, 0.5])
+            epochs, rejected_trials = reject_bad_epochs(epochs, baseline_window=param["baseline_window"],
+                                                        z_thresh=param["trial_rej_thresh"], eyes=None,
+                                                        remove_blinks=False,
+                                                        blinks_window=[0, 2], remove_nan=True)
+            if rejected_trials > param["max_trial_rejection"]:
+                print("WARNING: sub-{} had more than {}% rejected trials and will not be used for this analysis".format(
+                    sub, param["max_trial_rejection"]*100
+                ))
+                continue
+
         # Extract the relevant channels:
         epochs.pick(param["picks"])
         # Baseline correction:
@@ -59,22 +68,22 @@ def pupil_amplitude(parameters_file, subjects):
         cluster_1samp_across_sub(subjects_epochs, conditions,
                                  n_permutations=param["n_permutations"],
                                  threshold=param["threshold"],
-                                 tail=1))
+                                 tail=1, downsample=True))
     # Plot the results:
     fig, ax = plt.subplots(figsize=[8.3, 11.7 / 3])
     # Task relevant:
     plot_ts_ci(evks[conditions[0]], epochs.times, ev.colors["task_relevance"][param["task_relevance"][0]],
-               ax=ax, label=param["task_relevance"][0], sig_thresh=0.05)
+               ax=ax, label=param["task_relevance"][0], sig_thresh=0.05, plot_nonsig_clusters=True)
     # Task irrelevant (plot the cluster only on one to avoid incremental plotting):
     plot_ts_ci(evks[conditions[1]], epochs.times, ev.colors["task_relevance"][param["task_relevance"][1]],
                ax=ax, label=param["task_relevance"][1], clusters=clusters,
-               clusters_pval=cluster_p_values, clusters_alpha=0.1, sig_thresh=0.05)
+               clusters_pval=cluster_p_values, clusters_alpha=0.1, sig_thresh=0.05, plot_nonsig_clusters=True)
     # Decorate the axes:
     ax.set_xlabel("Time (sec.)")
     ax.set_ylabel("Pupil dilation (norm.)")
     ax.spines[['right', 'top']].set_visible(False)
     plt.legend()
-    plt.title("{} locked pupil size across durations (N={})".format(lock, len(subjects)))
+    plt.title("{} locked pupil size across durations (N={})".format(lock, len(subjects_epochs)))
     plt.tight_layout()
     fig.savefig(Path(save_dir, "pupil_evoked_titr_{}.svg".format(lock)), transparent=True, dpi=300)
     fig.savefig(Path(save_dir, "pupil_evoked_titr_{}.png".format(lock)), transparent=True, dpi=300)
@@ -92,17 +101,19 @@ def pupil_amplitude(parameters_file, subjects):
             cluster_1samp_across_sub(subjects_epochs, conditions,
                                      n_permutations=param["n_permutations"],
                                      threshold=param["threshold"],
-                                     tail=1))
+                                     tail=1, downsample=True))
         # Plot the results:
         # Task relevant:
         plot_ts_ci(evks_dur[conditions[0]], epochs.times,
                    ev.colors["task_relevance"][param["task_relevance"][0]], ax=ax[dur_i],
-                   label=param["task_relevance"][0], sig_thresh=0.05)
+                   label=param["task_relevance"][0], sig_thresh=0.05 / len(param["duration"]),
+                   plot_single_subjects=False, plot_nonsig_clusters=True)
         # Task irrelevant:
         plot_ts_ci(evks_dur[conditions[1]], epochs.times,
                    ev.colors["task_relevance"][param["task_relevance"][1]], ax=ax[dur_i], clusters=clusters,
                    clusters_pval=cluster_p_values, clusters_alpha=0.1,
-                   label=param["task_relevance"][1], sig_thresh=0.05)
+                   label=param["task_relevance"][1], sig_thresh=0.05 / len(param["duration"]),
+                   plot_single_subjects=False, plot_nonsig_clusters=True)
 
     # Decorate the axes:
     ax[0].spines[['right', 'top']].set_visible(False)
@@ -114,7 +125,7 @@ def pupil_amplitude(parameters_file, subjects):
     ax[2].set_title("Long")
     ax[2].spines[['right', 'top']].set_visible(False)
     ax[2].legend()
-    plt.suptitle("{} locked pupil size (N={})".format(lock, len(subjects)))
+    plt.suptitle("{} locked pupil size (N={})".format(lock, len(subjects_epochs)))
     plt.tight_layout()
     fig.savefig(Path(save_dir, "pupil_evoked_titr_{}_perdur.svg".format(lock)), transparent=True, dpi=300)
     fig.savefig(Path(save_dir, "pupil_evoked_titr_{}_perdur.png".format(lock)), transparent=True, dpi=300)
@@ -132,27 +143,34 @@ def pupil_amplitude(parameters_file, subjects):
             cluster_1samp_across_sub(subjects_epochs, conditions,
                                      n_permutations=param["n_permutations"],
                                      threshold=param["threshold"],
-                                     tail=1))
+                                     tail=1, downsample=True))
         # Plot the results:
         # Task relevant:
         plot_ts_ci(evks_dur[conditions[0]], epochs.times,
                    ev.colors["task_relevance"][param["task_relevance"][0]], ax=ax[dur_i],
-                   label=param["task_relevance"][0], sig_thresh=0.05)
+                   label=param["task_relevance"][0], sig_thresh=0.05 / len(param["soas"]),
+                   plot_single_subjects=False, plot_nonsig_clusters=True)
         # Task irrelevant:
         plot_ts_ci(evks_dur[conditions[1]], epochs.times,
                    ev.colors["task_relevance"][param["task_relevance"][1]], ax=ax[dur_i], clusters=clusters,
                    clusters_pval=cluster_p_values, clusters_alpha=0.1,
-                   label=param["task_relevance"][1], sig_thresh=0.05)
+                   label=param["task_relevance"][1], sig_thresh=0.05 / len(param["soas"]),
+                   plot_single_subjects=False, plot_nonsig_clusters=True)
         ax[dur_i].set_title(dur)
 
     # Decorate the axes:
     ax[0].spines[['right', 'top']].set_visible(False)
-    ax[1].set_ylabel("Pupil dilation (norm.)")
+    ax[0].set_title(param["soas"][0])
     ax[1].spines[['right', 'top']].set_visible(False)
-    ax[2].set_xlabel("Time (sec.)")
+    ax[1].set_title(param["soas"][1])
     ax[2].spines[['right', 'top']].set_visible(False)
-    ax[2].legend()
-    plt.suptitle("{} locked pupil size (N={})".format(lock, len(subjects)))
+    ax[2].set_title(param["soas"][2])
+    ax[3].spines[['right', 'top']].set_visible(False)
+    ax[3].set_title(param["soas"][3])
+    ax[2].set_ylabel("Pupil dilation (norm.)")
+    ax[3].set_xlabel("Time (sec.)")
+    ax[3].legend()
+    plt.suptitle("{} locked pupil size (N={})".format(lock, len(subjects_epochs)))
     plt.tight_layout()
     fig.savefig(Path(save_dir, "pupil_evoked_titr_{}_persoa.svg".format(lock)), transparent=True, dpi=300)
     fig.savefig(Path(save_dir, "pupil_evoked_titr_{}_persoa.png".format(lock)), transparent=True, dpi=300)
@@ -169,22 +187,23 @@ def pupil_amplitude(parameters_file, subjects):
         cluster_1samp_across_sub(subjects_epochs, conditions,
                                  n_permutations=param["n_permutations"],
                                  threshold=param["threshold"],
-                                 tail=1))
+                                 tail=1, downsample=True))
     # Plot the results:
     fig, ax = plt.subplots(figsize=[8.3, 11.7 / 3])
     # Task relevant:
     plot_ts_ci(evks[conditions[0]], epochs.times, ev.colors["task_relevance"][param["task_relevance"][0]],
-               ax=ax, label=param["task_relevance"][0])
+               ax=ax, label=param["task_relevance"][0], plot_single_subjects=False, plot_nonsig_clusters=True)
     # Task irrelevant (plot the cluster only on one to avoid incremental plotting):
     plot_ts_ci(evks[conditions[1]], epochs.times, ev.colors["task_relevance"][param["task_relevance"][1]],
                ax=ax, label=param["task_relevance"][1], clusters=clusters,
-               clusters_pval=cluster_p_values, clusters_alpha=0.1, sig_thresh=0.05)
+               clusters_pval=cluster_p_values, clusters_alpha=0.1, sig_thresh=0.05, plot_single_subjects=False,
+               plot_nonsig_clusters=True)
     # Decorate the axes:
     ax.set_xlabel("Time (sec.)")
     ax.set_ylabel("Pupil dilation (norm.)")
     ax.spines[['right', 'top']].set_visible(False)
     plt.legend()
-    plt.title("{} locked pupil size across durations (N={})".format(lock, len(subjects)))
+    plt.title("{} locked pupil size across durations (N={})".format(lock, len(subjects_epochs)))
     plt.tight_layout()
     fig.savefig(Path(save_dir, "pupil_evoked_titr_{}.svg".format(lock)), transparent=True, dpi=300)
     fig.savefig(Path(save_dir, "pupil_evoked_titr_{}.png".format(lock)), transparent=True, dpi=300)
@@ -202,17 +221,18 @@ def pupil_amplitude(parameters_file, subjects):
             cluster_1samp_across_sub(subjects_epochs, conditions,
                                      n_permutations=param["n_permutations"],
                                      threshold=param["threshold"],
-                                     tail=1))
+                                     tail=1, downsample=True))
         # Plot the results:
         # Task relevant:
         plot_ts_ci(evks_dur[conditions[0]], epochs.times,
                    ev.colors["task_relevance"][param["task_relevance"][0]], ax=ax[dur_i],
-                   label=param["task_relevance"][0])
+                   label=param["task_relevance"][0], plot_single_subjects=False)
         # Task irrelevant:
         plot_ts_ci(evks_dur[conditions[1]], epochs.times,
                    ev.colors["task_relevance"][param["task_relevance"][1]], ax=ax[dur_i], clusters=clusters,
                    clusters_pval=cluster_p_values, clusters_alpha=0.1,
-                   label=param["task_relevance"][1], sig_thresh=0.05)
+                   label=param["task_relevance"][1], sig_thresh=0.05 / len(param["duration"]),
+                   plot_single_subjects=False, plot_nonsig_clusters=True)
     # Decorate the axes:
     ax[0].spines[['right', 'top']].set_visible(False)
     ax[0].set_title("Short")
@@ -223,7 +243,7 @@ def pupil_amplitude(parameters_file, subjects):
     ax[2].set_title("Long")
     ax[2].spines[['right', 'top']].set_visible(False)
     ax[2].legend()
-    plt.suptitle("{} locked pupil size (N={})".format(lock, len(subjects)))
+    plt.suptitle("{} locked pupil size (N={})".format(lock, len(subjects_epochs)))
     plt.tight_layout()
     fig.savefig(Path(save_dir, "pupil_evoked_titr_{}_perdur.svg".format(lock)), transparent=True, dpi=300)
     fig.savefig(Path(save_dir, "pupil_evoked_titr_{}_perdur.png".format(lock)), transparent=True, dpi=300)
@@ -241,29 +261,32 @@ def pupil_amplitude(parameters_file, subjects):
             cluster_1samp_across_sub(subjects_epochs, conditions,
                                      n_permutations=param["n_permutations"],
                                      threshold=param["threshold"],
-                                     tail=1))
+                                     tail=1, downsample=True))
         # Plot the results:
         # Task relevant:
         plot_ts_ci(evks_dur[conditions[0]], epochs.times,
                    ev.colors["task_relevance"][param["task_relevance"][0]], ax=ax[dur_i],
-                   label=param["task_relevance"][0])
+                   label=param["task_relevance"][0], plot_single_subjects=False)
         # Task irrelevant:
         plot_ts_ci(evks_dur[conditions[1]], epochs.times,
                    ev.colors["task_relevance"][param["task_relevance"][1]], ax=ax[dur_i], clusters=clusters,
                    clusters_pval=cluster_p_values, clusters_alpha=0.1,
-                   label=param["task_relevance"][1], sig_thresh=0.05)
+                   label=param["task_relevance"][1], sig_thresh=0.05 / len(param["soas"]),
+                   plot_single_subjects=False, plot_nonsig_clusters=True)
 
     # Decorate the axes:
     ax[0].spines[['right', 'top']].set_visible(False)
-    ax[0].set_title("Short")
-    ax[1].set_ylabel("Pupil dilation (norm.)")
+    ax[0].set_title(param["soas"][0])
     ax[1].spines[['right', 'top']].set_visible(False)
-    ax[1].set_title("Intermediate")
-    ax[2].set_xlabel("Time (sec.)")
-    ax[2].set_title("Long")
+    ax[1].set_title(param["soas"][1])
     ax[2].spines[['right', 'top']].set_visible(False)
-    ax[2].legend()
-    plt.suptitle("{} locked pupil size (N={})".format(lock, len(subjects)))
+    ax[2].set_title(param["soas"][2])
+    ax[3].spines[['right', 'top']].set_visible(False)
+    ax[3].set_title(param["soas"][3])
+    ax[2].set_ylabel("Pupil dilation (norm.)")
+    ax[3].set_xlabel("Time (sec.)")
+    ax[3].legend()
+    plt.suptitle("{} locked pupil size (N={})".format(lock, len(subjects_epochs)))
     plt.tight_layout()
     fig.savefig(Path(save_dir, "pupil_evoked_titr_{}_persoas.svg".format(lock)), transparent=True, dpi=300)
     fig.savefig(Path(save_dir, "pupil_evoked_titr_{}_persoas.png".format(lock)), transparent=True, dpi=300)
