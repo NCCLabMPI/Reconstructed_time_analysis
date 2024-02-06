@@ -325,12 +325,12 @@ if __name__ == "__main__":
     # SX117: no eyetracking data
     # ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112", "SX113",
     # "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121"]
-    subjects_list = ["SX108", "SX109", "SX110", "SX111", "SX112", "SX113",
+    subjects_list = ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112", "SX113",
                      "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121"]
 
     parameters_file = (
         r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker"
-        r"\01-preprocessing_parameters_task-prp.json ")
+        r"\01-preprocessing_parameters_task-auditory.json ")
     # Create a data frame to save the summary of all subjects:
     preprocessing_summary = []
     for sub in subjects_list:
