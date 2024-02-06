@@ -48,6 +48,8 @@ def check_plots(parameters_file, subjects):
         file_name = "sub-{}_ses-{}_task-{}_{}_desc-epo.fif".format(sub, param["session"], param["task"],
                                                                    param["data_type"])
         epochs = mne.read_epochs(Path(root, file_name))
+        # Decimate
+        epochs.decimate(int(epochs.info["sfreq"] / param["decim_freq"]))
 
         # Extract the relevant conditions:
         epochs = epochs[param["task_relevance"]]
