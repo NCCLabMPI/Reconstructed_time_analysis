@@ -1,0 +1,636 @@
+---
+title: "ReconTime_INTRO"
+output: html_document
+date: "2023-06-01"
+---
+
+# housekeeping
+
+```{r huosekeeping}
+# clear workspace
+rm(list = ls())
+
+wd = 'C:/Users/micha.engeser/Documents/GitHub/Reconstructed_time_analysis'
+setwd(wd)
+dir()
+
+# get package manager package
+if (!('pacman' %in% installed.packages()))
+{install.packages("pacman")}
+library(pacman)
+
+# install all needed packages 
+
+pacman::p_load('dplyr', 'ggdist', 'ggeffects', 'ggpubr', 'lme4', 'emmeans', 'rstatix', 'car', 'rsq', 'sjPlot', 'brms')
+
+```
+
+
+# loading files
+
+```{r loading}
+# details of subjects  
+subNums = c(105, 106, 108, 109, 110, 113, 114, 115, 116, 118, 122) # 116 and 122 are the same person
+# subNums = 101:123 # all subjects
+sessions = c(1,2,3)
+Lab_ID = 'SX'
+count = 0
+sub_ids = NaN
+
+# loading the files 
+
+for (subNum in subNums ){
+  for (ses in sessions ){
+    count = count + 1
+    sub_ids[count] = paste0(Lab_ID, subNum)
+    task = ifelse(ses == 1,'prp','introspection') 
+    
+    sub_folder = paste0('sub-', Lab_ID, subNum)
+    ses_folder = paste0('ses-', ses)
+    file_name = paste0(sub_folder, '_', ses_folder, '_run-all_task-', task,'_events.csv')
+    
+    setwd("..")
+    parent_dir = getwd()
+    setwd(wd)
+    file = file.path(parent_dir, 'Reconstructed_time_experiment', 'data', sub_folder, ses_folder, file_name)
+    
+    # if file for subject and session exists load it
+    if (file.exists(file)){
+    event_table = read.csv(file)
+    
+    # make format consistent
+    if ('X' %in% colnames(event_table))
+    {event_table$X <- NULL}
+    if ('iRT_aud' %in% colnames(event_table))
+    {event_table$iRT_aud <- NULL}
+    if ('iRT_vis' %in% colnames(event_table))
+    {event_table$iRT_vis <- NULL}    
+    if ('intro_jit' %in% colnames(event_table))
+    {event_table$intro_jit <- NULL}
+    
+    colnames(event_table)[which(names(event_table) == "has_repsonse_vis")] <- "has_response_vis"
+    colnames(event_table)[which(names(event_table) == "trial_repsonse_vis")] <- "trial_response_vis"
+    
+    # add subject number and session column 
+    event_table = event_table %>% mutate(sub_num = subNum)
+    event_table = event_table %>% mutate(ses = ses)
+
+    # z-score of RT_vis and RTaud
+    event_table = event_table %>% mutate(z_RT_vis = (RT_vis-mean(RT_vis, na.rm = TRUE))/sd(RT_vis, na.rm = TRUE))
+    event_table = event_table %>% mutate(z_RT_aud = (RT_aud-mean(RT_aud, na.rm = TRUE))/sd(RT_aud, na.rm = TRUE))
+    
+    # concatanate the tables
+    if ( exists('all_event_table')){
+      all_event_table = rbind(all_event_table, event_table)
+    } else {
+      all_event_table = event_table
+    }
+  }}}
+
+# 116 and 122 are the same person - should have the same id
+all_event_table = all_event_table %>% mutate(sub_num = ifelse(sub_num == 122, 116, sub_num))
+all_event_table = all_event_table %>% mutate(sub_id = ifelse(sub_id == 'SX122','SX116', sub_id))
+
+```
+
+# apply trial exclusion
+
+```{r trial_exclusion}
+
+# without exclusion
+raw_event_table = all_event_table
+
+# # remove false alarm
+all_event_table = all_event_table[all_event_table$trial_response_vis != 'fa', ]
+
+# # remove RT < 100 ms
+all_event_table = all_event_table[all_event_table$RT_aud > 0.1, ]
+
+# add response window column
+all_event_table = all_event_table %>% mutate(resp_window = (2-onset_SOA)+stim_jit )
+
+# remove RT > mean response window for offset, long duration adn long SOA
+max_RT = mean(all_event_table$resp_window[all_event_table$SOA == 0.466 & all_event_table$SOA_lock == 'offset' & all_event_table$duration == 1.5], na.rm = TRUE)
+all_event_table = all_event_table[all_event_table$RT_aud < max_RT, ]
+
+# remove incorrect auditory responses
+all_event_table = all_event_table[all_event_table$trial_accuracy_aud == 1, ]
+
+# remove NaNs from auditory responses
+all_event_table = all_event_table[!is.na(all_event_table$RT_aud), ]
+
+# with targets
+target_event_table = all_event_table
+
+# remove target trials
+all_event_table = all_event_table[all_event_table$task_relevance != 'target', ]
+
+# # check if any combination of condition (cell) has less than 30 trials
+# 
+# task_relevance_lvl = c('non-target', 'irrelevant')
+# SOA_lock_lvl = c('onset', 'offset')
+# SOA_lvl = c(0,0.232,0.466)
+# duration_lvl = c(0.5,1,1.5)
+# sub_id_lvl = sub_ids
+# 
+# 
+# for (o in sub_id_lvl){
+#   for (i in SOA_lvl){
+#     for (ii in SOA_lock_lvl) {
+#       for (iii in task_relevance_lvl) {
+#         for (iv in duration_lvl) {
+# 
+#           cell_trials = sum(all_event_table$sub_id == o & all_event_table$SOA == i & all_event_table$SOA_lock == ii & all_event_table$task_relevance == iii & all_event_table$duration == iv, na.rm = TRUE)
+# 
+# 
+#           if(cell_trials < 30){
+#             cell_name = paste(i,ii,iii,iv,sep= '-')
+#             warning(paste0('Subject ',o,' has only ', cell_trials,' trials for cell: ', cell_name, '\n'))
+#           }
+#         }}}}}
+
+```
+
+# transfrom data
+
+``` {r transform_data}
+
+# add log transformed column
+all_event_table = all_event_table %>% mutate(log_RT_aud = log(RT_aud))
+
+# make task relevance and SOA lock numeric
+all_event_table = all_event_table %>% mutate(is_task_relevant = ifelse(task_relevance == 'non-target',1,0)) 
+all_event_table = all_event_table %>% mutate(is_onset = ifelse(SOA_lock == 'onset',1,0))
+
+# make SOA and duration factors 
+all_event_table = all_event_table %>% mutate(f_SOA = factor(SOA, ordered = TRUE, levels = c("0", "0.232", "0.466")))
+all_event_table = all_event_table %>% mutate(f_duration = factor(duration, ordered = TRUE, levels = c("0.5", "1", "1.5")))
+
+# center variables 
+all_event_table = all_event_table %>% mutate(c_task_relevant = is_task_relevant - mean(is_task_relevant))
+all_event_table = all_event_table %>% mutate(c_is_onset = is_onset - mean(is_onset))
+all_event_table = all_event_table %>% mutate(c_SOA = SOA - mean(SOA))
+all_event_table = all_event_table %>% mutate(c_duration = duration - mean(duration))
+all_event_table = all_event_table %>% mutate(c_pitch = (pitch-1050)/100) # makes pitches 0.5 for high and -0.5 for low
+
+```
+
+# plotting - objective RT like in exp1
+
+```{R plotting_RT}
+
+# make duration a string
+event_table2 = all_event_table
+event_table2$duration = as.character(event_table2$duration)
+n = length(subNums)
+
+# RT and SOA by duration, extended time - by task relevance
+
+plot_data1 = target_event_table %>% group_by(onset_SOA,SOA_lock, duration, sub_id, task_relevance) %>%
+                                      summarise(RT_mean = mean(RT_aud, na.rm = TRUE))
+
+plot_data1 = plot_data1 %>%  group_by(onset_SOA, SOA_lock,duration, task_relevance) %>%
+                                      summarise(mean_RT = mean(RT_mean, na.rm = TRUE),
+                                                         sd_RT = sd(RT_mean, na.rm = TRUE),
+                                                         sem_RT = sd_RT / sqrt(n))
+
+
+vis_data1 = target_event_table %>% group_by(onset_SOA,SOA_lock, sub_id, task_relevance, duration) %>%
+                                      summarise(RT_mean_vis = mean(RT_vis, na.rm = TRUE))
+
+# modify duration to show only one duration at the onset 
+vis_data1= vis_data1 %>% mutate(duration = ifelse(SOA_lock == 'onset',0,duration))
+
+vis_data1 = vis_data1 %>%  group_by(onset_SOA, SOA_lock, task_relevance, duration) %>%
+                                      summarise(mean_RT_vis = mean(RT_mean_vis, na.rm = TRUE),
+                                                         sd_RT_vis = sd(RT_mean_vis, na.rm = TRUE),
+                                                         sem_RT_vis = sd_RT_vis / sqrt(n))
+
+
+# remove NaNs from auditory responses
+plot_data1 = plot_data1[!is.na(plot_data1$mean_RT), ]
+vis_data1 = vis_data1[!is.na(vis_data1$mean_RT_vis), ]
+
+# define order
+plot_data1$task_relevance = factor(plot_data1$task_relevance,
+                                   levels = c('target', 'non-target', 'irrelevant'),
+                                   labels = c('Target', 'Relevant non-target', 'Irrelevant non-target'))
+vis_data1$task_relevance = factor(vis_data1$task_relevance,
+                                   levels = c('target'),
+                                   labels = c('Target'))
+
+# modify duration to show only one duration at the onset 
+vis_data1= vis_data1 %>% mutate(duration = ifelse(SOA_lock == 'onset',0,duration))
+
+
+p24 = ggplot(data = plot_data1, aes(x = onset_SOA * 1000, y = mean_RT * 1000, group = interaction(as.character(duration), SOA_lock), color = as.character(duration), linetype = SOA_lock)) +
+  geom_line(data = vis_data1, aes(x = onset_SOA * 1000, y = mean_RT_vis * 1000, color = 'darkgrey', group = interaction(as.character(duration), SOA_lock))) +
+  geom_errorbar(data = vis_data1, aes(x = onset_SOA * 1000, y = mean_RT_vis * 1000, ymin = (mean_RT_vis - sem_RT_vis) * 1000, ymax = (mean_RT_vis + sem_RT_vis) * 1000, group = interaction(as.character(duration), SOA_lock), color = 'darkgrey', width = 20)) +
+  geom_point(data = vis_data1, aes(x = onset_SOA * 1000, y = mean_RT_vis * 1000, color = 'darkgrey', group = interaction(as.character(duration), SOA_lock)), size = 1) +
+  geom_line() +
+  geom_errorbar(aes(ymin = (mean_RT - sem_RT) * 1000, ymax = (mean_RT + sem_RT) * 1000), width = 20) +
+  geom_point(size = 1) +
+  facet_grid(. ~ task_relevance) +
+  labs(title = "Objective reaction time by task-relevance", tag = "A") +
+  ylab("Reaction time [ms]") +
+  xlab('SOA to visual onset [ms]') +
+  scale_color_manual(values = c('darkviolet', 'darkorange', 'darkred', 'darkgrey'),
+                     name = 'Measure',
+                     labels = c(expression("RT"[aud]~" [500 ms duration]  "),
+                                expression("RT"[aud]~" [1000 ms duration]"),
+                                expression("RT"[aud]~" [1500 ms duration]"),
+                                expression("RT"[vis]~" [all durations]          "))) +
+  scale_linetype_manual(values = c("solid", "dashed"),
+                        name = 'SOA time-locked to',
+                        breaks = c('onset', 'offset')) +
+  theme_bw() +
+  theme(axis.line = element_line(colour = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(linetype = "solid"),
+        panel.background = element_blank(),
+        axis.text = element_text(color = "black", size = 10),
+        legend.text = element_text(size = 15),
+        legend.title = element_text(size = 15, face="bold"),
+        axis.title = element_text(size = 15, face="bold"),
+        plot.title = element_text(size = 15, face="bold"),
+        strip.text = element_text(size = 15))
+p24
+
+```
+
+# plotting - experiment comparison block
+
+```{R plotting_comparison}
+
+# RT and SOA, extended time - by task relevance (collapse duration)
+
+plot_data2 = all_event_table 
+
+# modify duration to show only one duration at the onset 
+plot_data2 = plot_data2 %>% mutate(duration = ifelse(SOA_lock == 'onset',0,duration))
+
+plot_data2 = plot_data2 %>%  group_by(onset_SOA, SOA_lock, duration, sub_id, task) %>%
+                                      summarise(mean_RT = mean(RT_aud, na.rm = TRUE),
+                                                         sd_RT = sd(RT_aud, na.rm = TRUE),
+                                                         sem_RT = sd_RT / sqrt(n))
+
+# remove NaNs from auditory responses
+plot_data2 = plot_data2[!is.na(plot_data2$mean_RT), ]
+
+# # define order
+# plot_data2$task_relevance = factor(plot_data2$task_relevance,
+#                                    levels = c('target', 'non-target', 'irrelevant'),
+#                                    labels = c('Target', 'Relevant non-target', 'Irrelevant non-target'))
+
+
+p25 = ggplot(data = plot_data2 %>% filter(task == 'prp'), aes(x = onset_SOA * 1000, y = mean_RT * 1000, color = 'prp' , group = interaction(as.character(duration), SOA_lock), linetype = SOA_lock)) +
+  geom_line() +
+  geom_errorbar(aes(ymin = (mean_RT - sem_RT) * 1000, ymax = (mean_RT + sem_RT) * 1000), width = 20) +
+  geom_point(size = 1) +
+  geom_line(data = plot_data2 %>% filter(task == 'introspection'), aes(x = onset_SOA * 1000, y = mean_RT * 1000, color = 'intro' , group = interaction(as.character(duration), SOA_lock), linetype = SOA_lock)) +
+  geom_errorbar(data = plot_data2 %>% filter(task == 'introspection'), aes(x = onset_SOA * 1000, y = mean_RT * 1000, color = 'intro' , group = interaction(as.character(duration), SOA_lock), linetype = SOA_lock, ymin = (mean_RT - sem_RT) * 1000, ymax = (mean_RT + sem_RT) * 1000), width = 20) +
+  geom_point(data = plot_data2 %>% filter(task == 'introspection'), aes(x = onset_SOA * 1000, y = mean_RT * 1000, color = 'intro' , group = interaction(as.character(duration), SOA_lock), linetype = SOA_lock),size = 1) +
+  facet_wrap(~ sub_id, nrow = 7, ncol = 3, scales = "free")+
+  labs(title = "Objective reaction time by task-relevance", tag = "A") +
+  ylab("Reaction time [ms]") +
+  xlab('SOA to visual onset [ms]') +
+  ylim(c(300, 900))+
+  scale_color_manual(values = c('blue','red'),
+                     name = 'Experiment',
+                     breaks = c('prp','intro'),
+                     labels = c('Experiment 1','Experiment 2')) +
+  scale_linetype_manual(values = c("solid", "dashed"),
+                        name = 'SOA time-locked to',
+                        breaks = c('onset', 'offset')) +
+  theme_bw() +
+  theme(axis.line = element_line(colour = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(linetype = "solid"),
+        panel.background = element_blank(),
+        axis.text = element_text(color = "black", size = 10),
+        legend.text = element_text(size = 15),
+        legend.title = element_text(size = 15, face="bold"),
+        axis.title = element_text(size = 15, face="bold"),
+        plot.title = element_text(size = 15, face="bold"),
+        strip.text = element_text(size = 15))
+p25
+
+```
+
+# box plot - introspective RT aud
+
+```{r boxplot}
+
+box_plot_data = all_event_table %>%  group_by(sub_id, SOA, SOA_lock, task_relevance, duration) %>% summarise(mean_RT = mean(RT_aud, na.rm = TRUE), sd_RT = sd(RT_aud, na.rm = TRUE))
+
+colors = c(rep("red",3),rep("darkred",3),rep("green",3),rep("darkgreen",3),rep("blue",3),rep("darkblue",3),rep("yellow",3), rep("orange",3))
+
+ggplot(box_plot_data, aes(SOA_lock, mean_RT, fill=interaction(duration, task_relevance, SOA))) +
+  stat_boxplot(geom ='errorbar')+
+  geom_boxplot() +
+  scale_fill_manual(values=colors)
+
+```
+
+# main analysis from experiment 1 
+
+```{r model_exp1}
+
+## general linear mixed effect model from experiment 1
+
+# fixed effects: SOA (ordinal), SOA-Lock (as c_is_onset,  numeric, centered), Task-relevance (as is relevant, numeric, centered)
+# random effects: Subject ID, Duration (ordinal)
+
+model_exp1 = glmer(RT_aud ~ f_SOA*c_is_onset*c_task_relevant +
+                     (1*f_SOA*c_is_onset*c_task_relevant | sub_id)+
+                     (1*f_SOA*c_is_onset*c_task_relevant | f_duration),
+               family=Gamma(link="identity"), data=all_event_table)
+
+summary(model_exp1)
+Anova(model_exp1)
+plot(fitted(model_exp1),residuals(model_exp1))
+qqnorm(residuals(model_exp1))
+rsq.glmm(model_exp1)
+```
+
+# main analysis from experiment 1 
+
+```{r model_exp1}
+
+## general linear mixed effect model from experiment 1
+
+# fixed effects: SOA (ordinal), SOA-Lock (as c_is_onset,  numeric, centered), Task-relevance (as is relevant, numeric, centered)
+# random effects: Subject ID, Duration (ordinal)
+
+model_exp1 = glmer(RT_aud ~ f_SOA*c_is_onset*c_task_relevant +
+                     (1*f_SOA*c_is_onset*c_task_relevant | sub_id)+
+                     (1*f_SOA*c_is_onset*c_task_relevant | f_duration),
+               family=Gamma(link="identity"), data=all_event_table)
+
+summary(model_exp1)
+Anova(model_exp1)
+plot(fitted(model_exp1),residuals(model_exp1))
+qqnorm(residuals(model_exp1))
+rsq.glmm(model_exp1)
+```
+
+# task analysis
+
+```{r task_model}
+
+## general linear mixed effect model from experiment 1
+
+# fixed effects: SOA (ordinal), SOA-Lock (as c_is_onset,  numeric, centered), Task-relevance (as is relevant, numeric, centered), task (nominal, prp or intropesction)
+# random effects: Subject ID, Duration (ordinal)
+
+task_model = glmer(RT_aud ~ f_SOA*c_is_onset*c_task_relevant*task +
+                     (1*f_SOA*c_is_onset*c_task_relevant*task | sub_id)+
+                     (1*f_SOA*c_is_onset*c_task_relevant*task | f_duration),
+               family=Gamma(link="identity"), data=all_event_table)
+
+summary(task_model)
+Anova(task_model)
+plot(fitted(task_model),residuals(task_model))
+qqnorm(residuals(task_model))
+rsq.glmm(task_model)
+
+
+em1 <- emmeans(task_model, "task")
+contrast(em1, "pairwise", adjust = "bonferroni")
+
+```
+
+
+# overall effect size of PRP
+
+```{r effect size}
+
+# RT AUD -----------------------------------------#
+
+RT_aud_effect_size_table = matrix(ncol = 6, nrow = 5)
+rownames(RT_aud_effect_size_table) = c("Mean_SOA0", "Mean_SOA466", "PRP_size", "joined_SD", "Cohensd")
+colnames(RT_aud_effect_size_table) = c("target", "non_target_onset", "irrelevant_onset", "offset_short", "offset_intermediate", "offset_long")
+
+# mean of SOA = 0
+RT_aud_effect_size_table[1, ] = c(mean(target_event_table %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'target') %>% pull(RT_aud), na.rm = TRUE),
+                           mean(target_event_table %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(RT_aud), na.rm = TRUE), 
+                           mean(target_event_table %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(RT_aud), na.rm = TRUE), 
+                           mean(all_event_table %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 0.5) %>% pull(RT_aud), na.rm = TRUE), 
+                           mean(all_event_table %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1) %>% pull(RT_aud), na.rm = TRUE), 
+                           mean(all_event_table %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1.5) %>% pull(RT_aud), na.rm = TRUE))
+
+# mean of SOA = 466
+RT_aud_effect_size_table[2, ] = c(mean(target_event_table %>% filter(SOA == 0.466 & SOA_lock == 'offset' & task_relevance == 'target' & duration == 1.5) %>% pull(RT_aud), na.rm = TRUE),
+                           mean(target_event_table %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(RT_aud), na.rm = TRUE),
+                           mean(target_event_table %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(RT_aud), na.rm = TRUE),
+                           mean(all_event_table %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 0.5) %>% pull(RT_aud), na.rm = TRUE),
+                           mean(all_event_table %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1) %>% pull(RT_aud), na.rm = TRUE),
+                           mean(all_event_table %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1.5) %>% pull(RT_aud), na.rm = TRUE))
+
+# PRP size
+RT_aud_effect_size_table[3, ] = RT_aud_effect_size_table[1, ] - RT_aud_effect_size_table[2, ] 
+
+# joined SD
+RT_aud_effect_size_table[4, ] = c(sd(c(target_event_table %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'target') %>% pull(RT_aud),target_event_table %>% filter(SOA == 0.466 & SOA_lock == 'offset' & task_relevance == 'target' & duration == 1.5) %>% pull(RT_aud))),
+                           sd(c(target_event_table %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(RT_aud), target_event_table %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(RT_aud))),
+                           sd(c(target_event_table %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(RT_aud), target_event_table %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(RT_aud))),
+                           sd(c(all_event_table %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 0.5) %>% pull(RT_aud), all_event_table %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 0.5) %>% pull(RT_aud))),
+                           sd(c(all_event_table %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1) %>% pull(RT_aud), all_event_table %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1) %>% pull(RT_aud))),
+                           sd(c(all_event_table %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1.5) %>% pull(RT_aud), all_event_table %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1.5) %>% pull(RT_aud))))
+
+# cohens d 
+RT_aud_effect_size_table[5, ] = (RT_aud_effect_size_table[1, ] - RT_aud_effect_size_table[2, ])/RT_aud_effect_size_table[4, ]
+
+```
+
+# effect size of PRP by subject and task
+
+```{r subject effect size}
+sub_effect_size_table = data.frame(matrix(ncol = 0, nrow = 1))
+sub_effect_size_table$sub_num = NaN
+sub_effect_size_table$task = 'NaN'
+sub_effect_size_table$target_mag = NaN
+sub_effect_size_table$non_target_onset_mag = NaN
+sub_effect_size_table$irrelevant_onset_mag = NaN 
+sub_effect_size_table$offset_short_mag = NaN
+sub_effect_size_table$offset_intermediate_mag = NaN 
+sub_effect_size_table$offset_long_mag = NaN
+sub_effect_size_table$target_cd = NaN
+sub_effect_size_table$non_target_onset_cd = NaN
+sub_effect_size_table$irrelevant_onset_cd = NaN 
+sub_effect_size_table$offset_short_cd = NaN
+sub_effect_size_table$offset_intermediate_cd = NaN 
+sub_effect_size_table$offset_long_cd = NaN
+sub_effect_size_table = sub_effect_size_table[-c(1), ]
+
+
+for (sub in subNums[subNums != 122]){
+  for (exp_task in c('prp', 'introspection')){
+
+RT_aud_effect_size_table = matrix(ncol = 6, nrow = 5)
+rownames(RT_aud_effect_size_table) = c("Mean_SOA0", "Mean_SOA466", "PRP_size", "joined_SD", "Cohensd")
+colnames(RT_aud_effect_size_table) = c("target", "non_target_onset", "irrelevant_onset", "offset_short", "offset_intermediate", "offset_long")
+
+sub_task_table = target_event_table %>% filter(sub_num == sub & task == exp_task)
+
+# mean of SOA = 0
+RT_aud_effect_size_table[1, ] = c(mean(sub_task_table %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'target') %>% pull(RT_aud), na.rm = TRUE),
+                           mean(sub_task_table %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(RT_aud), na.rm = TRUE), 
+                           mean(sub_task_table %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(RT_aud), na.rm = TRUE), 
+                           mean(sub_task_table %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 0.5 & task_relevance != 'target') %>% pull(RT_aud), na.rm = TRUE), 
+                           mean(sub_task_table %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1 & task_relevance != 'target') %>% pull(RT_aud), na.rm = TRUE), 
+                           mean(sub_task_table %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1.5 & task_relevance != 'target') %>% pull(RT_aud), na.rm = TRUE))
+
+# mean of SOA = 466
+RT_aud_effect_size_table[2, ] = c(mean(sub_task_table %>% filter(SOA == 0.466 & SOA_lock == 'offset' & task_relevance == 'target' & duration == 1.5) %>% pull(RT_aud), na.rm = TRUE),
+                           mean(sub_task_table %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(RT_aud), na.rm = TRUE),
+                           mean(sub_task_table %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(RT_aud), na.rm = TRUE),
+                           mean(sub_task_table %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 0.5 & task_relevance != 'target') %>% pull(RT_aud), na.rm = TRUE),
+                           mean(sub_task_table %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1 & task_relevance != 'target') %>% pull(RT_aud), na.rm = TRUE),
+                           mean(sub_task_table %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1.5 & task_relevance != 'target') %>% pull(RT_aud), na.rm = TRUE))
+
+# PRP size
+RT_aud_effect_size_table[3, ] = RT_aud_effect_size_table[1, ] - RT_aud_effect_size_table[2, ] 
+
+# joined SD
+RT_aud_effect_size_table[4, ] = c(sd(c(sub_task_table %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'target') %>% pull(RT_aud),sub_task_table %>% filter(SOA == 0.466 & SOA_lock == 'offset' & task_relevance == 'target' & duration == 1.5) %>% pull(RT_aud))),
+                           sd(c(sub_task_table %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(RT_aud), sub_task_table %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(RT_aud))),
+                           sd(c(sub_task_table %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(RT_aud), sub_task_table %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(RT_aud))),
+                           sd(c(sub_task_table %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 0.5 & task_relevance != 'target') %>% pull(RT_aud), sub_task_table %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 0.5) %>% pull(RT_aud))),
+                           sd(c(sub_task_table %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1 & task_relevance != 'target') %>% pull(RT_aud), sub_task_table %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1) %>% pull(RT_aud))),
+                           sd(c(sub_task_table %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1.5 & task_relevance != 'target') %>% pull(RT_aud), sub_task_table %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1.5) %>% pull(RT_aud))))
+
+# cohens d 
+RT_aud_effect_size_table[5, ] = (RT_aud_effect_size_table[1, ] - RT_aud_effect_size_table[2, ])/RT_aud_effect_size_table[4, ]
+
+sub_effect_size_table = sub_effect_size_table %>% add_row(sub_num = sub,
+                                                          task = exp_task,
+                                                          target_mag = RT_aud_effect_size_table[3,1],
+                                                          non_target_onset_mag = RT_aud_effect_size_table[3,2],
+                                                          irrelevant_onset_mag = RT_aud_effect_size_table[3,3],
+                                                          offset_short_mag = RT_aud_effect_size_table[3,4],
+                                                          offset_intermediate_mag = RT_aud_effect_size_table[3,5], 
+                                                          offset_long_mag = RT_aud_effect_size_table[3,6],
+                                                          target_cd = RT_aud_effect_size_table[4,1],
+                                                          non_target_onset_cd = RT_aud_effect_size_table[4,2],
+                                                          irrelevant_onset_cd = RT_aud_effect_size_table[4,3], 
+                                                          offset_short_cd = RT_aud_effect_size_table[4,4],
+                                                          offset_intermediate_cd = RT_aud_effect_size_table[4,5], 
+                                                          offset_long_cd = RT_aud_effect_size_table[4,6])
+
+  
+  }}
+
+```
+
+# correlation of effect size
+
+```{r correlation1}
+
+effect_sizes_non_target_onset_cd <- sub_effect_size_table %>% pivot_wider(id_cols = sub_num, names_from = task, values_from = non_target_onset_cd)
+
+# correlation
+cor1 = ggplot(effect_sizes_non_target_onset_cd, aes(x = prp, y = introspection))+
+  geom_point() +
+  geom_smooth(method = "lm", se = TRUE)+
+  xlab("prp")+
+  ylab("intro")+
+  #ylim(c(0,0.5))+
+  theme_bw() +
+  theme(axis.line = element_line(colour = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(linetype = "solid"),
+        panel.background = element_blank())+
+  stat_cor(color = 'black', method = "pearson", show.legend = FALSE)
+cor1
+
+```
+
+# correlation of time series
+
+```{r correlation2}
+p_values_cor = 1:length(subNums[subNums != 122])
+p_values_permutation = 1:length(subNums[subNums != 122])
+estimates = 1:length(subNums[subNums != 122])
+significance = 1:length(subNums[subNums != 122])
+null_p_values = 1:length(subNums[subNums != 122])
+null_estimates = 1:length(subNums[subNums != 122])
+null_significance = 1:length(subNums[subNums != 122])
+count = 0
+
+# for each subject correlate time-series of experiment one and two
+for (sub in subNums[subNums != 122]){
+count = count + 1
+
+# subset the data
+time_series = all_event_table %>% filter(SOA != 0.116 & sub_num == sub) %>% group_by(SOA, SOA_lock, duration, task_relevance, task) %>%
+                                      summarise(mean_RT = mean(RT_aud, na.rm = TRUE))
+
+# split by experiment (task)
+RT_prp = time_series %>% filter(task == 'prp') %>% pull(mean_RT)
+RT_intro = time_series %>% filter(task == 'introspection') %>% pull(mean_RT)
+
+# ran correlation and store variables
+correlation = cor.test(RT_prp,RT_intro, method = "pearson")
+estimates[count] = correlation$estimate
+p_values_cor[count] = correlation$p.value
+significance[count] = correlation$p.value < 0.05
+
+# Number of permutations
+num_permutations = 100000
+
+# Initialize an empty vector to store shuffled correlations
+shuffled_correlations = numeric(num_permutations)
+
+# Permutation testing loop
+for (i in 1:num_permutations) {
+  # Combine the two arrays
+  combined_data = c(RT_prp, RT_intro)
+  
+  # Shuffle the combined data
+  shuffled_data = sample(combined_data)
+  
+  # Split the shuffled data back into two arrays
+  shuffled_exp_1 = shuffled_data[1:length(RT_prp)]
+  shuffled_exp_2 = shuffled_data[(length(RT_prp) + 1):(length(RT_prp) + length(RT_prp))]
+  
+  # Calculate the correlation for shuffled arrays
+  shuffled_correlation = cor.test(shuffled_exp_1, shuffled_exp_2, method = "pearson")
+  
+  # Store the shuffled correlation value
+  shuffled_correlations[i] = shuffled_correlation$estimate
+}
+
+# Calculate the p-value
+p_values_permutation[count] = sum(shuffled_correlations >= estimates[count]) / num_permutations
+
+# Print the results
+cat("For subject: ", sub, "\n")
+cat("Observed Correlation: ", estimates[count], "\n")
+cat("p-value: ", p_values_permutation[count], "\n")
+
+}
+
+# create a data frame with the observed correlation and the p values 
+corrleation_df <- data.frame(Column1 = estimates, Column2 = p_values_cor, Column3 = p_values_permutation)
+colnames(corrleation_df) = c("Observed_cor", "p_cor", "p_perm")
+
+
+# Create a boxplot with individual data points
+p = ggplot(corrleation_df, aes(x = factor(1), y = Observed_cor)) +
+  geom_boxplot(fill = "blue", width = 0.2, outlier.shape = NA) + 
+  geom_jitter(data = corrleation_df, aes(x = factor(1), y = Observed_cor), color = "black", width = 0.1) +
+  geom_boxplot(aes(x = factor(2), y = p_perm), fill = "green", width = 0.2, outlier.shape = NA) +
+  geom_jitter(data = corrleation_df, aes(x = factor(2), y = p_perm), color = "black", width = 0.1) +
+  labs(title = "Boxplot with Individual Data Points",
+       x = "Columns",
+       y = "Values") +
+  scale_x_discrete(labels = c("Observed correlation", "p-value from permutation"))
+
+# Display the plot
+print(p)
+```
+
