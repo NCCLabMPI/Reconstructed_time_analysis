@@ -10,6 +10,42 @@ from eye_tracker.based_noise_blinks_detection import based_noise_blinks_detectio
 show_checks = False
 
 
+def annotate_nan(raw, nan_annotation="BAD_nan", eyes=None):
+    """
+    This function identitfies nan samples in the data and annotate them as BAD samples for later discarding.
+    """
+    if eyes is None:
+        eyes = ["left", "right"]
+    # Loop through each eye:
+    for eye in eyes:
+        # Extract the data:
+        data = np.squeeze(raw.copy().pick("pupil_{}".format(eye)).get_data())
+        # Get the nan:
+        nan_mask = np.isnan(data).astype(float)
+        # Compute the diff to get the onset and offsets:
+        nan_diff = np.diff(nan_mask)
+        # Extract the onsets and offsets:
+        onsets = raw.times[np.where(nan_diff == 1)[0]]
+        offsets = raw.times[np.where(nan_diff == -1)[0]]
+        # Compute duration:
+        if onsets.shape[0] > 0:
+            assert onsets.shape[0] == offsets.shape[0], "Different numbers of onsets and offsets!"
+            duration = offsets - onsets
+            # Create annotations accordingly:
+            nan_annotations = mne.Annotations(
+                onset=onsets,
+                duration=duration,
+                description=[nan_annotation] * len(onsets),
+                ch_names=[('xpos_' + eye, 'ypos_' + eye, 'pupil_' + eye)] * len(onsets),
+                orig_time=raw.annotations.orig_time
+            )
+            # Combine the annotations with the raw:
+            raw.set_annotations(raw.annotation + nan_annotations)
+
+    # Return the raw:
+    return raw
+
+
 def load_raw_eyetracker(files_root, subject, session, task, beh_files_root, beh_file_name,
                         annotations_col_names, event_of_interest, verbose=False, debug=False):
     """

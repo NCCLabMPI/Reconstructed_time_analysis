@@ -6,6 +6,7 @@
   "plot_factors": ["task relevance", "duration", "category", "SOA", "lock"],
   "plot_blinks": false,
   "preprocessing_steps": [
+    "annotate_nan",
     "hershman_blinks",
     "remove_long_blinks",
     "interpolate_blinks",
@@ -20,6 +21,10 @@
   "discard_bad_subjects": {
     "bad_trials_threshold": 0.5,
     "nan_threshold": 0.5
+  },
+  "annotate_nan": {
+    "eyes": ["left", "right"],
+    "nan_annotation": "BAD_nan"
   },
   "hershman_blinks": {
     "eyes": ["left", "right"],

@@ -5,7 +5,8 @@ from pathlib import Path
 from eye_tracker.general_helper_function import baseline_scaling
 from eye_tracker.preprocessing_helper_function import (extract_eyelink_events, epoch_data,
                                                        load_raw_eyetracker, compute_proportion_bad, add_logfiles_info,
-                                                       gaze_to_dva, hershman_blinks_detection, plot_blinks)
+                                                       gaze_to_dva, hershman_blinks_detection, plot_blinks,
+                                                       annotate_nan)
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -61,6 +62,11 @@ def preprocessing(subject, parameters):
     for step in preprocessing_steps:
         # Extract the parameters of the current step:
         step_param = param[step]
+
+        # Mark nan samples as bad:
+        if step == "annotate_nan":
+            raw = annotate_nan(raw, eyes=step_param["eyes"], nan_annotation=step_param["nan_annotation"])
+
         # Apply the hershman blinks detection algorithm:
         if step == "hershman_blinks":
             raw = hershman_blinks_detection(raw, eyes=step_param["eyes"],
@@ -324,13 +330,12 @@ if __name__ == "__main__":
     # SX104: missing files
     # SX117: no eyetracking data
     # ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112", "SX113",
-    # "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121"]
+    # "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121", "SX123"]
     subjects_list = ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112", "SX113",
-                     "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121"]
-
+                     "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121", "SX123"]
     parameters_file = (
         r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker"
-        r"\01-preprocessing_parameters_task-auditory.json ")
+        r"\01-preprocessing_parameters_task-prp.json ")
     # Create a data frame to save the summary of all subjects:
     preprocessing_summary = []
     for sub in subjects_list:
