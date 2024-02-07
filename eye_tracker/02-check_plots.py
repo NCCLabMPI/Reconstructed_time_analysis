@@ -123,12 +123,12 @@ def check_plots(parameters_file, subjects):
     fig_tr, ax_tr = soa_boxplot(check_values[check_values["task_relevance"] == 'non-target'],
                                 "fixation_proportion",
                                 fig_size=[figure_height, figure_height * param["screen_res"][1] /
-                                            param["screen_res"][0]])
+                                          param["screen_res"][0]])
     # Task irrelevant:
     fig_ti, ax_ti = soa_boxplot(check_values[check_values["task_relevance"] == 'irrelevant'],
                                 "fixation_proportion",
                                 fig_size=[figure_height, figure_height * param["screen_res"][1] /
-                                            param["screen_res"][0]])
+                                          param["screen_res"][0]])
     # Set the y limit to be the same for both plots:
     lims = [[ax_all[0].get_ylim()[0], ax_tr[0].get_ylim()[0], ax_ti[0].get_ylim()[0]],
             [ax_all[0].get_ylim()[1], ax_tr[0].get_ylim()[1], ax_ti[0].get_ylim()[1]]]

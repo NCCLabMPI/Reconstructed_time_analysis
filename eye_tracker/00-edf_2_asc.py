@@ -71,23 +71,25 @@ def ascii2mne_batch(raw_root, subjects, bids_root, tasks, session="1", convert_e
 
 
 if __name__ == "__main__":
-    # subjects_list = [
-    #      "SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112", "SX113",
-    #      "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121", "SX123"
-    #  ]
+    subjects_list = [
+         "SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112", "SX113",
+         "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121", "SX123"
+     ]
     tasks_list = ["prp"]
-    # ascii2mne_batch(ev.raw_root, subjects_list, ev.bids_root, tasks_list,
-    #                 convert_exe=r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker\edf2asc.exe")
+    ascii2mne_batch(ev.raw_root, subjects_list, ev.bids_root, tasks_list,
+                    convert_exe=r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker\edf2asc.exe")
 
     subjects_list = [
-        "SX101", "SX105", "SX106", "SX108", "SX109", "SX110", "SX113", "SX114", "SX115", "SX116", "SX118", "SX122"
+        "SX101", "SX105", "SX106", "SX108", "SX109", "SX110", "SX113", "SX114", "SX115", "SX118", "SX122"
+        "SX118", "SX122"
     ]
     tasks_list = ["introspection"]
     ascii2mne_batch(ev.raw_root, subjects_list, ev.bids_root, tasks_list, session="2",
                     convert_exe=r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker\edf2asc.exe")
 
     subjects_list = [
-        "SX101", "SX105", "SX106", "SX108", "SX109", "SX110", "SX113", "SX114", "SX115", "SX116", "SX118", "SX122"
+        "SX101", "SX105", "SX106", "SX108", "SX109", "SX110", "SX113", "SX114", "SX115", "SX118", "SX122"
+        "SX118", "SX122"
     ]
     tasks_list = ["introspection"]
     ascii2mne_batch(ev.raw_root, subjects_list, ev.bids_root, tasks_list, session="3",
