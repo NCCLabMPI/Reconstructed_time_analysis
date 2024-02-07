@@ -3,7 +3,7 @@
   "task": "prp",
   "session": "1",
   "data_type": "eyetrack",
-  "plot_factors": ["task relevance", "duration", "category", "SOA", "lock"],
+  "plot_factors": ["task relevance", "duration", "category", "SOA", "lock", "stim_jit"],
   "plot_blinks": false,
   "preprocessing_steps": [
     "annotate_nan",
@@ -56,5 +56,11 @@
     "reject_by_annotation": true,
     "metadata_column": ["event type", "task relevance", "duration", "category", "orientation", "identity",
         "SOA", "lock", "pitch"]
+  },
+  "reject_bad_epochs": {
+    "baseline_window": [-0.2, 0.0],
+    "z_thresh": 2,
+    "eyes": ["left", "right"],
+    "exlude_beh": true
   }
 }

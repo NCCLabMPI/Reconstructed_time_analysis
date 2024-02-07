@@ -5,9 +5,91 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 from math import atan2, degrees
+from scipy.stats import zscore
 from eye_tracker.based_noise_blinks_detection import based_noise_blinks_detection
 
 show_checks = False
+
+
+def beh_exclusion(data_df):
+    """
+    This function performs the exclusion criterion reported in the paper. Packaged in a function such that we can use
+    it in various places:
+    :param data_df:
+    :return:
+    """
+    trial_orig = list(data_df.index)
+    # 1. Remove the trials with wrong visual responses:
+    data_df_clean = data_df[data_df["trial_response_vis"] != "fa"]
+    # 2. Remove the trials with wrong auditory responses:
+    data_df_clean = data_df_clean[data_df_clean["trial_accuracy_aud"] != 0]
+    # 3. Remove trials where the visual stimuli were responded second:
+    data_df_clean = data_df_clean[data_df_clean["trial_second_button_press"] != 1]
+    # 4. Determine the upper threshold for auditory trial responses as the maximum response window for the long trial
+    # with offset locked audio stimulus:
+    max_win_trials = data_df_clean[(data_df_clean["lock"] == "offset") & (data_df_clean["duration"] == 1.5) &
+                                   (data_df_clean["SOA"] == 0.466)]
+    max_rt_aud = np.mean(max_win_trials["stim_jit"].to_numpy() + 2 - (1.5 + 0.466))
+    data_df_clean = data_df_clean[(data_df_clean["RT_aud"] >= 0.1) & (data_df_clean["RT_aud"] <= max_rt_aud)]
+    # Fetch the removed indices:
+    trial_final = list(data_df_clean.index)
+    rejected_trials = [trial for trial in trial_orig if trial not in trial_final]
+
+    return rejected_trials
+
+
+def reject_bad_epochs(epochs, baseline_window=None, z_thresh=2, eyes=None, exlude_beh=True):
+    """
+    This function rejects epochs based on the zscore of the baseline. For some trials, there may be artifacts
+    in the baseline, in which case baseline correction will spread the artifact. Such epochs are discarded.
+    :param epochs:
+    :param baseline_window:
+    :param z_thresh:
+    :param eyes:
+    :param exlude_beh:
+    return:
+        - epochs:
+        - n rejected trials:
+    """
+    print("=" * 40)
+    print("Rejecting bad epochs")
+    if eyes is None:
+        eyes = ["left", "right"]
+    if baseline_window is None:
+        baseline_window = [None, 0]
+    # Get the initial number of trials:
+    ntrials_orig = len(epochs)
+
+    if exlude_beh:
+        print("     Applying behavioral exclusion criterion")
+        inds = beh_exclusion(epochs.metadata.copy().reset_index(drop=True))
+        if len(inds) > 0:
+            # Drop these epochs:
+            epochs.drop(inds, reason="baseline_artifact", verbose="ERROR")
+        print("{} out of {} ({:.2f}%) trials were rejected based on behavior.".format(len(inds), ntrials_orig,
+                                                                               (len(inds) / ntrials_orig) * 100))
+    # Extract the data:
+    if z_thresh is not None:
+        print("     Rejecting trials with artifactual baseline: ")
+        baseline_data = epochs.copy().crop(tmin=baseline_window[0],
+                                           tmax=baseline_window[1]).get_data(picks=["_".join(["pupil", eye])
+                                                                                    for eye in eyes])
+        # Compute the average across eyes and time:
+        baseline_avg = np.mean(np.mean(baseline_data, axis=1), axis=1)
+        # Z score:
+        baseline_zscore = zscore(baseline_avg, nan_policy='omit')
+        # Find the epochs indices that exceed the threshold:
+        inds = np.where(np.abs(baseline_zscore) > z_thresh)[0]
+        if len(inds) > 0:
+            # Drop these epochs:
+            epochs.drop(inds, reason="baseline_artifact", verbose="ERROR")
+        # Print the proportion of dropped epochs:
+        print("{} out of {} ({:.2f}%) trials had artifact in baseline.".format(len(inds), len(baseline_zscore),
+                                                                               (len(inds) / len(
+                                                                                   baseline_zscore)) * 100))
+    ntrials_final = len(epochs)
+
+    return epochs, 1 - ntrials_final/ntrials_orig
 
 
 def annotate_nan(raw, nan_annotation="BAD_nan", eyes=None):

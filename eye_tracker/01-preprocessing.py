@@ -6,7 +6,7 @@ from eye_tracker.general_helper_function import baseline_scaling
 from eye_tracker.preprocessing_helper_function import (extract_eyelink_events, epoch_data,
                                                        load_raw_eyetracker, compute_proportion_bad, add_logfiles_info,
                                                        gaze_to_dva, hershman_blinks_detection, plot_blinks,
-                                                       annotate_nan)
+                                                       annotate_nan, reject_bad_epochs)
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -121,6 +121,14 @@ def preprocessing(subject, parameters):
             # Add the log file information to the metadata
             if len(param["log_file_columns"]) > 0:
                 epochs = add_logfiles_info(epochs, log_df, param["log_file_columns"])
+
+            # Remove the bad epochs if needed:
+            if "reject_bad_epochs" in preprocessing_steps:
+                epochs, n_rej = reject_bad_epochs(epochs,
+                                                  baseline_window=param["reject_bad_epochs"]["baseline_window"],
+                                                  z_thresh=param["reject_bad_epochs"]["baseline_window"],
+                                                  eyes=param["reject_bad_epochs"]["eyes"],
+                                                  exlude_beh=param["reject_bad_epochs"]["exlude_beh"])
 
             # Save this epoch to file:
             save_root = Path(ev.bids_root, "derivatives", "preprocessing", "sub-" + subject,
