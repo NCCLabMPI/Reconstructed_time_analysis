@@ -56,12 +56,6 @@ def check_plots(parameters_file, subjects):
         # Crop if needed:
         epochs.crop(param["crop"][0], param["crop"][1])
 
-        # Perform trial exclusions:
-        if param["reject_bad_trials"] is not None:
-            reject_bad_epochs(epochs, baseline_window=param["baseline_window"],
-                              z_thresh=param["trial_rej_thresh"], eyes=None, remove_blinks=param["remove_blinks"],
-                              blinks_window=param["blinks_window"], remove_nan=param["remove_nan"])
-
         # Compute the gaze map for this subject:
         fixation_heatmaps.append(generate_gaze_map(epochs, 1080, 1920, sigma=20))
         # Extract the relevant channels:

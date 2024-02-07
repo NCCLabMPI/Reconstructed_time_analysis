@@ -37,18 +37,6 @@ def pupil_amplitude(parameters_file, subjects):
         epochs = epochs[param["task_relevance"]]
         # Crop if needed:
         epochs.crop(param["crop"][0], param["crop"][1])
-        # Perform trial exclusions:
-        if param["trial_rej_thresh"] is not None:
-            epochs, rejected_trials = reject_bad_epochs(epochs, baseline_window=param["baseline_window"],
-                                                        z_thresh=param["trial_rej_thresh"], eyes=None,
-                                                        remove_blinks=param["remove_blinks"],
-                                                        blinks_window=param["blinks_window"],
-                                                        remove_nan=param["remove_nan"])
-            if rejected_trials > param["max_trial_rejection"]:
-                print("WARNING: sub-{} had more than {}% rejected trials and will not be used for this analysis".format(
-                    sub, param["max_trial_rejection"]*100
-                ))
-                continue
 
         # Extract the relevant channels:
         epochs.pick(param["picks"])
