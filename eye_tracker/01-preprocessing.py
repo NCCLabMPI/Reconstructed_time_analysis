@@ -351,12 +351,12 @@ if __name__ == "__main__":
         print("Preprocessing subject {}".format(sub))
         prop_bad, drop_logs = preprocessing(sub, parameters_file)
         # Append the preprocessing information to the summary:
-        preprocessing_summary[sub]["proportion_bad"] = prop_bad
-        preprocessing_summary[sub]["drop_logs"] = drop_logs
+        preprocessing_summary[sub]["proportion_bad"] = np.mean(prop_bad)
+        preprocessing_summary[sub]["drop_logs"] = [item[0] if len(item) > 0 else '' for item in drop_logs]
     # Reformat the preprocessing summary as a dataframe:
     # Extract each reason for trial rejection:
     trial_rej_reas = [list(set(preprocessing_summary[sub]["drop_logs"])) for sub in subjects_list]
-    trial_rej_reas = list(set([item for items in trial_rej_reas for item in items]))
+    trial_rej_reas = list(set([item for items in trial_rej_reas for item in items if len(item) > 0]))
     preprocessing_summary_df = []
     for sub in subjects_list:
         sub_drops = preprocessing_summary[sub]["drop_logs"]
@@ -366,10 +366,10 @@ if __name__ == "__main__":
             **{reas: None for reas in trial_rej_reas}
         }
         for reas in trial_rej_reas:
-            sub_dict[reas] = np.sum(np.where(sub_drops == reas)[0]) / sub_drops
-        preprocessing_summary_df.append(pd.DataFrame(sub_dict))
+            sub_dict[reas] = np.sum(np.array(sub_drops) == reas) / len(sub_drops)
+        preprocessing_summary_df.append(pd.DataFrame(sub_dict, index=[0]))
     # Concatenate the data frame:
-    preprocessing_summary = pd.concat(preprocessing_summary_df)
+    preprocessing_summary = pd.concat(preprocessing_summary_df).reset_index(drop=True)
     # Save the data frame:
     save_dir = Path(ev.bids_root, "derivatives", "preprocessing")
     preprocessing_summary.to_csv(Path(save_dir, "participants.csv"))
