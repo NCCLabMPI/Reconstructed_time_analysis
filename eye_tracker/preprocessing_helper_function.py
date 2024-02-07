@@ -27,8 +27,8 @@ def beh_exclusion(data_df):
     data_df_clean = data_df_clean[data_df_clean["trial_second_button_press"] != 1]
     # 4. Determine the upper threshold for auditory trial responses as the maximum response window for the long trial
     # with offset locked audio stimulus:
-    max_win_trials = data_df_clean[(data_df_clean["lock"] == "offset") & (data_df_clean["duration"] == 1.5) &
-                                   (data_df_clean["SOA"] == 0.466)]
+    max_win_trials = data_df_clean[(data_df_clean["lock"] == "offset") & (data_df_clean["duration"] == "1.5") &
+                                   (data_df_clean["SOA"] == "0.466")]
     max_rt_aud = np.mean(max_win_trials["stim_jit"].to_numpy() + 2 - (1.5 + 0.466))
     data_df_clean = data_df_clean[(data_df_clean["RT_aud"] >= 0.1) & (data_df_clean["RT_aud"] <= max_rt_aud)]
     # Fetch the removed indices:
@@ -65,9 +65,9 @@ def reject_bad_epochs(epochs, baseline_window=None, z_thresh=2, eyes=None, exlud
         inds = beh_exclusion(epochs.metadata.copy().reset_index(drop=True))
         if len(inds) > 0:
             # Drop these epochs:
-            epochs.drop(inds, reason="baseline_artifact", verbose="ERROR")
+            epochs.drop(inds, reason="bad_beh", verbose="ERROR")
         print("{} out of {} ({:.2f}%) trials were rejected based on behavior.".format(len(inds), ntrials_orig,
-                                                                               (len(inds) / ntrials_orig) * 100))
+                                                                                      (len(inds) / ntrials_orig) * 100))
     # Extract the data:
     if z_thresh is not None:
         print("     Rejecting trials with artifactual baseline: ")
@@ -89,7 +89,7 @@ def reject_bad_epochs(epochs, baseline_window=None, z_thresh=2, eyes=None, exlud
                                                                                    baseline_zscore)) * 100))
     ntrials_final = len(epochs)
 
-    return epochs, 1 - ntrials_final/ntrials_orig
+    return epochs, 1 - ntrials_final / ntrials_orig
 
 
 def annotate_nan(raw, nan_annotation="BAD_nan", eyes=None):
@@ -122,7 +122,7 @@ def annotate_nan(raw, nan_annotation="BAD_nan", eyes=None):
                 orig_time=raw.annotations.orig_time
             )
             # Combine the annotations with the raw:
-            raw.set_annotations(raw.annotation + nan_annotations)
+            raw.set_annotations(raw.annotations + nan_annotations)
 
     # Return the raw:
     return raw
@@ -265,7 +265,6 @@ def read_calib(fname):
 
 
 def plot_blinks(raw, blinks_annotations=None):
-
     # Create a copy of the raw object:
     if blinks_annotations is None:
         blinks_annotations = ["BAD_blink"]
@@ -320,8 +319,8 @@ def hershman_blinks_detection(raw, eyes=None, replace_eyelink_blinks=True):
 
         # Create annotations accordingly:
         blinks_annotations = mne.Annotations(
-            onset=blinks["blink_onset"] * 1/1000,
-            duration=(blinks["blink_offset"] - blinks["blink_onset"]) * 1/1000,
+            onset=blinks["blink_onset"] * 1 / 1000,
+            duration=(blinks["blink_offset"] - blinks["blink_onset"]) * 1 / 1000,
             description=["BAD_blink"] * len(blinks["blink_onset"]),
             ch_names=[('xpos_' + eye, 'ypos_' + eye, 'pupil_' + eye)] * len(blinks["blink_onset"]),
             orig_time=raw.annotations.orig_time
@@ -573,7 +572,7 @@ def epoch_data(raw, events, event_dict, events_of_interest=None, metadata_column
     # Find trials whose end is outside the recording:
     bad_trials = np.where((epochs.events[:, 0] / raw.info["sfreq"]) + tmax > tend)[0]
     # Drop those trials:
-    epochs.drop(bad_trials)
+    epochs.drop(bad_trials, reason="outside_range")
     # Dropping the bad epochs if there were any:
     epochs.drop_bad()
     # Adding the meta data to the table. The meta data are created by parsing the events strings, as each substring

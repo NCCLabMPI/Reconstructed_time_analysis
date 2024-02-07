@@ -56,6 +56,7 @@ def preprocessing(subject, parameters):
     log_df = pd.concat(logs_list).reset_index(drop=True)
     # Prepare the proportion of bad data:
     proportion_bad = 0
+    drop_log = None
 
     # =============================================================================================
     # Loop through the preprocessing steps:
@@ -117,7 +118,7 @@ def preprocessing(subject, parameters):
                                                                         regexp=param["events_of_interest"][0])
             # Epoch the data:
             epochs = epoch_data(raw, events_from_annot, event_dict, **step_param)
-
+            epochs.load_data()
             # Add the log file information to the metadata
             if len(param["log_file_columns"]) > 0:
                 epochs = add_logfiles_info(epochs, log_df, param["log_file_columns"])
@@ -126,10 +127,11 @@ def preprocessing(subject, parameters):
             if "reject_bad_epochs" in preprocessing_steps:
                 epochs, n_rej = reject_bad_epochs(epochs,
                                                   baseline_window=param["reject_bad_epochs"]["baseline_window"],
-                                                  z_thresh=param["reject_bad_epochs"]["baseline_window"],
+                                                  z_thresh=param["reject_bad_epochs"]["z_thresh"],
                                                   eyes=param["reject_bad_epochs"]["eyes"],
                                                   exlude_beh=param["reject_bad_epochs"]["exlude_beh"])
-
+            # Extract the drop log:
+            drop_log = epochs.drop_log
             # Save this epoch to file:
             save_root = Path(ev.bids_root, "derivatives", "preprocessing", "sub-" + subject,
                              "ses-" + session, data_type)
@@ -139,7 +141,6 @@ def preprocessing(subject, parameters):
             file_name = "sub-{}_ses-{}_task-{}_{}_desc-epo.fif".format(subject, session, task, data_type)
             # Save:
             epochs.save(Path(save_root, file_name), overwrite=True, verbose="ERROR")
-            epochs.load_data()
 
             # ==========================================================================================================
             # Checks plots:
@@ -329,7 +330,7 @@ def preprocessing(subject, parameters):
                 plt.savefig(Path(save_root, file_name))
                 plt.close()
 
-    return np.mean(proportion_bad)
+    return proportion_bad, drop_log
 
 
 if __name__ == "__main__":
@@ -345,18 +346,30 @@ if __name__ == "__main__":
         r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker"
         r"\01-preprocessing_parameters_task-prp.json ")
     # Create a data frame to save the summary of all subjects:
-    preprocessing_summary = []
+    preprocessing_summary = {subject: {"drop_logs": None, "proportion_bad": None} for subject in subjects_list}
     for sub in subjects_list:
         print("Preprocessing subject {}".format(sub))
-        continuous_bad = preprocessing(sub, parameters_file)
-        # Append to the summary:
-        preprocessing_summary.append(pd.DataFrame({
+        prop_bad, drop_logs = preprocessing(sub, parameters_file)
+        # Append the preprocessing information to the summary:
+        preprocessing_summary[sub]["proportion_bad"] = prop_bad
+        preprocessing_summary[sub]["drop_logs"] = drop_logs
+    # Reformat the preprocessing summary as a dataframe:
+    # Extract each reason for trial rejection:
+    trial_rej_reas = [list(set(preprocessing_summary[sub]["drop_logs"])) for sub in subjects_list]
+    trial_rej_reas = list(set([item for items in trial_rej_reas for item in items]))
+    preprocessing_summary_df = []
+    for sub in subjects_list:
+        sub_drops = preprocessing_summary[sub]["drop_logs"]
+        sub_dict = {
             "subject": sub,
-            "total_bad": continuous_bad,
-            "valid_flag": True if np.min(continuous_bad) < 0.5 else False
-        }, index=[0]))
+            "proportion_bad": preprocessing_summary[sub]["proportion_bad"],
+            **{reas: None for reas in trial_rej_reas}
+        }
+        for reas in trial_rej_reas:
+            sub_dict[reas] = np.sum(np.where(sub_drops == reas)[0]) / sub_drops
+        preprocessing_summary_df.append(pd.DataFrame(sub_dict))
     # Concatenate the data frame:
-    preprocessing_summary = pd.concat(preprocessing_summary)
+    preprocessing_summary = pd.concat(preprocessing_summary_df)
     # Save the data frame:
     save_dir = Path(ev.bids_root, "derivatives", "preprocessing")
     preprocessing_summary.to_csv(Path(save_dir, "participants.csv"))
