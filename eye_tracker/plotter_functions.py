@@ -292,7 +292,7 @@ def plot_ts_ci(data, times, color, plot_ci=True, ax=None, label="", clusters=Non
     ax.plot(times, data_avg, label=label,
             color=color)
     if plot_single_subjects:
-        ax.plot(times, data.T, color=color, alpha=0.3)
+        ax.plot(times, data.T, color=color, alpha=0.3, linewidth=.5)
     # Plot the CI
     if plot_ci:
         ax.fill_between(times, data_ci[0, :], data_ci[1, :],
@@ -303,7 +303,7 @@ def plot_ts_ci(data, times, color, plot_ci=True, ax=None, label="", clusters=Non
             c = c[0]
             if clusters_pval[i_c] <= sig_thresh:
                 h = ax.axvspan(times[c.start], times[c.stop - 1], color=cluster_color, alpha=clusters_alpha)
-            elif clusters_pval[i_c] <= 0.05:
+            elif clusters_pval[i_c] <= 0.1:
                 if plot_nonsig_clusters:
                     ax.axvspan(times[c.start], times[c.stop - 1], color=(0.3, 0.3, 0.3), alpha=clusters_alpha)
     ax.set_xlim([times[0], times[-1]])
