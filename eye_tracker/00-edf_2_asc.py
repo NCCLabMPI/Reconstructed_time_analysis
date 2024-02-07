@@ -40,7 +40,10 @@ def ascii2mne_batch(raw_root, subjects, bids_root, tasks, session="1", convert_e
         # List the files in there:
         subject_files = [fl for fl in os.listdir(subject_dir) if fl.endswith(".edf")]
         # Create the save dir:
-        save_dir = Path(bids_root, "sub-" + subject, "ses-" + session, "eyetrack")
+        if subject == "SX122":
+            save_dir = Path(bids_root, "sub-" + "SX116", "ses-" + session, "eyetrack")
+        else:
+            save_dir = Path(bids_root, "sub-" + subject, "ses-" + session, "eyetrack")
         if not os.path.isdir(save_dir):
             os.makedirs(save_dir)
         for task in tasks:
@@ -61,17 +64,31 @@ def ascii2mne_batch(raw_root, subjects, bids_root, tasks, session="1", convert_e
                 else:
                     asci_stem = (asci_stem.split('run-')[0] + "run-00" +
                                  '_task' + asci_stem.split('run-')[1].split('_task')[1])
-
+                if subject == "SX122":
+                    asci_stem = asci_stem.replace(subject, "SX116")
                 print('Copying {} to {}'.format(asci_file, save_dir))
                 shutil.copyfile(asci_file, Path(save_dir, asci_stem + asci_file.suffix))
 
 
 if __name__ == "__main__":
+    # subjects_list = [
+    #      "SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112", "SX113",
+    #      "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121", "SX123"
+    #  ]
+    tasks_list = ["prp"]
+    # ascii2mne_batch(ev.raw_root, subjects_list, ev.bids_root, tasks_list,
+    #                 convert_exe=r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker\edf2asc.exe")
+
     subjects_list = [
-        "SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112", "SX113",
-        "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121"
+        "SX101", "SX105", "SX106", "SX108", "SX109", "SX110", "SX113", "SX114", "SX115", "SX116", "SX118", "SX122"
     ]
-    tasks_list = ["auditory", "visual"]
-    # data_root = r"C:\Users\alexander.lepauvre\Documents\PhD\Reconstructed_Time\raw_data"
-    ascii2mne_batch(ev.raw_root, subjects_list, ev.bids_root, tasks_list,
+    tasks_list = ["introspection"]
+    ascii2mne_batch(ev.raw_root, subjects_list, ev.bids_root, tasks_list, session="2",
+                    convert_exe=r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker\edf2asc.exe")
+
+    subjects_list = [
+        "SX101", "SX105", "SX106", "SX108", "SX109", "SX110", "SX113", "SX114", "SX115", "SX116", "SX118", "SX122"
+    ]
+    tasks_list = ["introspection"]
+    ascii2mne_batch(ev.raw_root, subjects_list, ev.bids_root, tasks_list, session="3",
                     convert_exe=r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker\edf2asc.exe")
