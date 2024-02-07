@@ -6,3 +6,5 @@ eye_tracker\__pycache__\
 *bids_old/
 *raw_data/
 eye_tracker/pupil_size_analysis/old
+*presentations/
+*eye_tracker/pupil_size_analysis
