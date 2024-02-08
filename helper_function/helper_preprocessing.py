@@ -1,4 +1,4 @@
-import os, glob
+import os
 import re
 import mne
 import numpy as np
@@ -6,8 +6,8 @@ import pandas as pd
 from pathlib import Path
 from math import atan2, degrees
 from scipy.stats import zscore
-from eye_tracker.based_noise_blinks_detection import based_noise_blinks_detection
-from eye_tracker.general_helper_function import beh_exclusion
+from helper_function.based_noise_blinks_detection import based_noise_blinks_detection
+from helper_function.helper_general import beh_exclusion
 
 show_checks = False
 

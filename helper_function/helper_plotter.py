@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 import matplotlib.patches as patches
 import numpy as np
-from eye_tracker.general_helper_function import get_event_ts
-from eye_tracker.general_helper_function import cousineau_morey_correction
+from helper_function.helper_general import get_event_ts
+from helper_function.helper_general import cousineau_morey_correction
 import environment_variables as ev
 from mne.stats import bootstrap_confidence_interval
 

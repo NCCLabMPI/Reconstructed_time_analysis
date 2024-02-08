@@ -3,11 +3,11 @@ import json
 from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
-from eye_tracker.general_helper_function import generate_gaze_map, reject_bad_epochs, deg_to_pix
+from helper_function.helper_general import generate_gaze_map, deg_to_pix
 import pandas as pd
 import os
 import environment_variables as ev
-from plotter_functions import soa_boxplot
+from helper_function.helper_plotter import soa_boxplot
 import matplotlib.image as mpimg
 import matplotlib.patches as patches
 

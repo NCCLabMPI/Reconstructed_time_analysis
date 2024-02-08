@@ -2,11 +2,11 @@ import mne
 from mne.viz.eyetracking import plot_gaze
 import json
 from pathlib import Path
-from eye_tracker.general_helper_function import baseline_scaling
-from eye_tracker.preprocessing_helper_function import (extract_eyelink_events, epoch_data,
-                                                       load_raw_eyetracker, compute_proportion_bad, add_logfiles_info,
-                                                       gaze_to_dva, hershman_blinks_detection, plot_blinks,
-                                                       annotate_nan, reject_bad_epochs, format_summary_table)
+from helper_function.helper_general import baseline_scaling
+from helper_function.helper_preprocessing import (extract_eyelink_events, epoch_data,
+                                                  load_raw_eyetracker, compute_proportion_bad, add_logfiles_info,
+                                                  gaze_to_dva, hershman_blinks_detection, plot_blinks,
+                                                  annotate_nan, reject_bad_epochs, format_summary_table)
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd

@@ -2,13 +2,11 @@ import os
 import pandas as pd
 import numpy as np
 from pathlib import Path
-import matplotlib
 import matplotlib.pyplot as plt
-from eye_tracker.general_helper_function import cousineau_morey_correction
-from eye_tracker.plotter_functions import plot_within_subject_boxplot, soa_boxplot
+from helper_function.helper_general import cousineau_morey_correction
+from helper_function.helper_plotter import plot_within_subject_boxplot, soa_boxplot
 import environment_variables as ev
-from eye_tracker.general_helper_function import beh_exclusion
-import mne
+from helper_function.helper_general import beh_exclusion
 
 SMALL_SIZE = 12
 MEDIUM_SIZE = 12

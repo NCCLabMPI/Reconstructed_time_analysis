@@ -4,8 +4,8 @@ import json
 import numpy as np
 from pathlib import Path
 import matplotlib.pyplot as plt
-from eye_tracker.general_helper_function import baseline_scaling, max_percentage_index, reject_bad_epochs
-from eye_tracker.plotter_functions import plot_pupil_latency
+from helper_function.helper_general import baseline_scaling, max_percentage_index
+from helper_function.helper_plotter import plot_pupil_latency
 import environment_variables as ev
 import pandas as pd
 

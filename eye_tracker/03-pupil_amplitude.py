@@ -1,11 +1,10 @@
 import mne
 import os
 import json
-import numpy as np
 from pathlib import Path
 import matplotlib.pyplot as plt
-from eye_tracker.general_helper_function import baseline_scaling, cluster_1samp_across_sub, reject_bad_epochs
-from eye_tracker.plotter_functions import plot_ts_ci
+from helper_function.helper_general import baseline_scaling, cluster_1samp_across_sub
+from helper_function.helper_plotter import plot_ts_ci
 import environment_variables as ev
 
 # Set the font size:
