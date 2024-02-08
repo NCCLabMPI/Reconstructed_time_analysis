@@ -6,7 +6,7 @@ from eye_tracker.general_helper_function import baseline_scaling
 from eye_tracker.preprocessing_helper_function import (extract_eyelink_events, epoch_data,
                                                        load_raw_eyetracker, compute_proportion_bad, add_logfiles_info,
                                                        gaze_to_dva, hershman_blinks_detection, plot_blinks,
-                                                       annotate_nan, reject_bad_epochs)
+                                                       annotate_nan, reject_bad_epochs, format_summary_table)
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -19,19 +19,19 @@ prop_cycle = plt.rcParams['axes.prop_cycle']
 colors = prop_cycle.by_key()['color']
 
 
-def preprocessing(subject, parameters):
+def preprocessing(subject, parameters, session="1", task="prp"):
     """
     This function preprocesses the eyetracking data, using several MNE key functionalities for handling the data
     :param subject: (string) name of the subject to process. Note: do not include the sub-!
     :param parameters: (string) parameter json file
+    :param session: (string) session for the data
+    :param task: (string) task for the data
     :return: None: saves the epochs to file
     """
     # First, load the parameters:
     with open(parameters) as json_file:
         param = json.load(json_file)
     # Extract the info about the session:
-    session = param["session"]
-    task = param["task"]
     data_type = param["data_type"]
     preprocessing_steps = param["preprocessing_steps"]
 
@@ -334,42 +334,58 @@ def preprocessing(subject, parameters):
 
 
 if __name__ == "__main__":
-    # The following subjects have the specified issues:
-    # SX101: differences in sampling rate due to experiment program issues
-    # SX104: missing files
-    # SX117: no eyetracking data
-    # ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112", "SX113",
-    # "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121", "SX123"]
-    subjects_list = ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112", "SX113",
-                     "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121", "SX123"]
+
+    # Set the parameters:
     parameters_file = (
         r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker"
-        r"\01-preprocessing_parameters_task-prp.json ")
-    # Create a data frame to save the summary of all subjects:
-    preprocessing_summary = {subject: {"drop_logs": None, "proportion_bad": None} for subject in subjects_list}
-    for sub in subjects_list:
+        r"\01-preprocessing_parameters.json ")
+
+    # List of subjects for each task:
+    subjects_list_prp = ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112",
+                         "SX113", "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121", "SX123"]
+    subjects_list_intro = ["SX101", "SX105", "SX106", "SX108", "SX109", "SX110", "SX113", "SX114",
+                           "SX115", "SX116", "SX118"]
+
+    # ==================================================================================
+    # Introspection preprocessing:
+
+    # Session 2:
+    preprocessing_summary = {subject: {"drop_logs": None, "proportion_bad": None}
+                             for subject in subjects_list_intro}
+    for sub in subjects_list_intro:
         print("Preprocessing subject {}".format(sub))
-        prop_bad, drop_logs = preprocessing(sub, parameters_file)
-        # Append the preprocessing information to the summary:
+        prop_bad, drop_logs = preprocessing(sub, parameters_file, session="2", task="introspection")
         preprocessing_summary[sub]["proportion_bad"] = np.mean(prop_bad)
         preprocessing_summary[sub]["drop_logs"] = [item[0] if len(item) > 0 else '' for item in drop_logs]
-    # Reformat the preprocessing summary as a dataframe:
-    # Extract each reason for trial rejection:
-    trial_rej_reas = [list(set(preprocessing_summary[sub]["drop_logs"])) for sub in subjects_list]
-    trial_rej_reas = list(set([item for items in trial_rej_reas for item in items if len(item) > 0]))
-    preprocessing_summary_df = []
-    for sub in subjects_list:
-        sub_drops = preprocessing_summary[sub]["drop_logs"]
-        sub_dict = {
-            "subject": sub,
-            "proportion_bad": preprocessing_summary[sub]["proportion_bad"],
-            **{reas: None for reas in trial_rej_reas}
-        }
-        for reas in trial_rej_reas:
-            sub_dict[reas] = np.sum(np.array(sub_drops) == reas) / len(sub_drops)
-        preprocessing_summary_df.append(pd.DataFrame(sub_dict, index=[0]))
-    # Concatenate the data frame:
-    preprocessing_summary = pd.concat(preprocessing_summary_df).reset_index(drop=True)
+    preprocessing_summary = format_summary_table(preprocessing_summary)
     # Save the data frame:
     save_dir = Path(ev.bids_root, "derivatives", "preprocessing")
-    preprocessing_summary.to_csv(Path(save_dir, "participants.csv"))
+    preprocessing_summary.to_csv(Path(save_dir, "participants_introspection_ses-2.csv"))
+
+    # Session 3:
+    preprocessing_summary = {subject: {"drop_logs": None, "proportion_bad": None}
+                             for subject in subjects_list_intro}
+    for sub in subjects_list_intro:
+        print("Preprocessing subject {}".format(sub))
+        prop_bad, drop_logs = preprocessing(sub, parameters_file, session="3", task="introspection")
+        preprocessing_summary[sub]["proportion_bad"] = np.mean(prop_bad)
+        preprocessing_summary[sub]["drop_logs"] = [item[0] if len(item) > 0 else '' for item in drop_logs]
+    preprocessing_summary = format_summary_table(preprocessing_summary)
+    # Save the data frame:
+    save_dir = Path(ev.bids_root, "derivatives", "preprocessing")
+    preprocessing_summary.to_csv(Path(save_dir, "participants_introspection_ses-3.csv"))
+
+    # ==================================================================================
+    # PRP preprocessing:
+    if False:
+        preprocessing_summary = {subject: {"drop_logs": None, "proportion_bad": None}
+                                 for subject in subjects_list_prp}
+        for sub in subjects_list_prp:
+            print("Preprocessing subject {}".format(sub))
+            prop_bad, drop_logs = preprocessing(sub, parameters_file, session="1", task="prp")
+            preprocessing_summary[sub]["proportion_bad"] = np.mean(prop_bad)
+            preprocessing_summary[sub]["drop_logs"] = [item[0] if len(item) > 0 else '' for item in drop_logs]
+        preprocessing_summary = format_summary_table(preprocessing_summary)
+        # Save the data frame:
+        save_dir = Path(ev.bids_root, "derivatives", "preprocessing")
+        preprocessing_summary.to_csv(Path(save_dir, "participants_prp.csv"))

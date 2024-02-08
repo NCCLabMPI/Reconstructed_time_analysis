@@ -1,0 +1,66 @@
+{
+  "visit": "1",
+  "data_type": "eyetrack",
+  "plot_factors": ["task relevance", "duration", "category", "SOA", "lock"],
+  "plot_blinks": false,
+  "preprocessing_steps": [
+    "annotate_nan",
+    "hershman_blinks",
+    "remove_long_blinks",
+    "interpolate_blinks",
+    "gaze_to_dva",
+    "extract_eyelink_events",
+    "epochs",
+    "reject_bad_epochs"
+  ],
+  "events_of_interest": ["vis_onset*"],
+  "plot_calibration": true,
+  "beh_file_name": "sub-{}_ses-{}_run-{}_task-{}_events.csv",
+  "log_file_columns":  ["trial_response_vis", "trial_accuracy_aud", "trial_second_button_press", "RT_aud", "RT_vis",
+    "stim_jit"],
+  "discard_bad_subjects": {
+    "bad_trials_threshold": 0.5,
+    "nan_threshold": 0.5
+  },
+  "annotate_nan": {
+    "eyes": ["left", "right"],
+    "nan_annotation": "BAD_nan"
+  },
+  "hershman_blinks": {
+    "eyes": ["left", "right"],
+    "replace_eyelink_blinks": true
+  },
+  "remove_long_blinks": {
+    "max_blinks_dur": 1.0,
+    "new_description": "BAD_lost_tracking"
+  },
+  "gaze_to_dva": {
+    "eyes": ["left", "right"]
+  },
+  "interpolate_blinks": {
+    "buffer": [0.05, 0.2],
+    "interpolate_gaze": true
+  },
+  "extract_eyelink_events": {
+    "eyes": ["left", "right"],
+    "events": ["blink", "saccade", "fixation"]
+  },
+  "epochs": {
+    "picks": "all",
+    "tmin": -1,
+    "tmax": 3.5,
+    "baseline": null,
+    "events_of_interest": [
+        "vis_onset"
+    ],
+    "reject_by_annotation": true,
+    "metadata_column": ["event type", "task relevance", "duration", "category", "orientation", "identity",
+        "SOA", "lock", "pitch"]
+  },
+  "reject_bad_epochs": {
+    "baseline_window": [-0.2, 0.0],
+    "z_thresh": 2,
+    "eyes": ["left", "right"],
+    "exlude_beh": true
+  }
+}
