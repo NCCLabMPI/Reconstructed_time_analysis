@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from eye_tracker.general_helper_function import cousineau_morey_correction
 from eye_tracker.plotter_functions import plot_within_subject_boxplot, soa_boxplot
 import environment_variables as ev
-from eye_tracker.general_helper_function import generate_gaze_map
+from eye_tracker.general_helper_function import beh_exclusion
 import mne
 
 SMALL_SIZE = 12
@@ -22,33 +22,6 @@ plt.rc('xtick', labelsize=SMALL_SIZE)  # fontsize of the tick labels
 plt.rc('ytick', labelsize=SMALL_SIZE)  # fontsize of the tick labels
 plt.rc('legend', fontsize=SMALL_SIZE)  # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
-
-
-def perform_exclusion(data_df):
-    """
-    This function performs the exclusion criterion reported in the paper. Packaged in a function such that we can use
-    it in various places:
-    :param data_df:
-    :return:
-    """
-    # 1. Remove the trials with wrong visual responses:
-    data_df_clean = data_df[data_df["trial_response_vis"] != "fa"]
-    # 2. Remove the trials with wrong auditory responses:
-    data_df_clean = data_df_clean[data_df_clean["trial_accuracy_aud"] != 0]
-    # 3. Remove trials where the visual stimuli were responded second:
-    data_df_clean = data_df_clean[data_df_clean["trial_second_button_press"] != 1]
-    # 4. Remove trials in which the participants responded to the auditory stimulus in less than 100ms and more than
-    # 1260ms:
-    data_df_clean = data_df_clean[(data_df_clean["RT_aud"] >= 0.1) & (data_df_clean["RT_aud"] <= 1.260)]
-
-    # Compute the proportion of rejected trials for each condition:
-    prop_vis_fa = data_df[data_df["trial_response_vis"] == "fa"].shape[0] / data_df.shape[0]
-    prop_false_aud = data_df[data_df["trial_accuracy_aud"] == 0].shape[0] / data_df.shape[0]
-    prop_vis_second = data_df[data_df["trial_second_button_press"] == 1].shape[0] / data_df.shape[0]
-    prop_rt_outlier = (data_df[(data_df["RT_aud"] <= 0.1) & (data_df["RT_aud"] >= 1.260)].shape[0] /
-                       data_df.shape[0])
-
-    return data_df_clean, prop_vis_fa, prop_false_aud, prop_vis_second, prop_rt_outlier
 
 
 def load_beh_data(root, subjects, session='1', task='prp', do_trial_exclusion=True):
@@ -76,15 +49,14 @@ def load_beh_data(root, subjects, session='1', task='prp', do_trial_exclusion=Tr
             # Add the subject ID:
             subject_data["subject"] = subject
             # Apply trial rejection:
-            subject_data, prop_vis_fa, prop_false_aud, prop_vis_second, prop_rt_outlier = (
-                perform_exclusion(subject_data))
+            rej_ind = beh_exclusion(subject_data)
+            prop_rej = len(rej_ind) / subject_data.shape[0]
+            subject_data = subject_data.drop(rej_ind)
             # Append to the rest of the subject
             subjects_data.append(subject_data.reset_index(drop=True))
-            # Compute the proportion of rejected trials:
-            rejected_trials_prop = prop_vis_fa + prop_false_aud + prop_vis_second + prop_rt_outlier
             # Print the proportion of trials that were discarded:
-            print("Subject {} - {:.2f}% trials were discarded".format(subject, rejected_trials_prop * 100))
-            prop_rejected.append(rejected_trials_prop)
+            print("Subject {} - {:.2f}% trials were discarded".format(subject, prop_rej * 100))
+            prop_rejected.append(prop_rej)
 
         print("The mean proportion of rejected trials is {:.2f}% +- {:.2f}".format(np.mean(prop_rejected) * 100,
                                                                            np.std(prop_rejected) * 100))
@@ -109,7 +81,7 @@ plot_check_plots = False
 # Set parameters:
 root = r"P:\2023-0357-ReconTime\03_data\raw_data"
 ses = "1"
-subjects_list = ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112",
+subjects_list = ["SX101", "SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112",
                  "SX113", "SX114", "SX115", "SX116", "SX117", "SX118", "SX119", "SX120", "SX121", "SX123"]
 file_name = "sub-{}_ses-1_run-all_task-prp_events.csv"
 save_root = Path(ev.bids_root, "derivatives", "figures")
@@ -123,111 +95,75 @@ subjects_data = load_beh_data(root, subjects_list, session='1', task='prp', do_t
 
 # ========================================================================================================
 # Figure quality checks:
-if plot_check_plots:
-    # ======================================================
-    # A: Accuracy:
-    fig1, ax1 = plt.subplots(nrows=1, ncols=2, sharex=False, sharey=True, figsize=[8.3, 8.3])
-    # T1 target detection accuracy per category:
-    t1_accuracy = []
-    categories = ["face", "object", "letter", "false-font"]
-    for subject in subjects_data_raw["sub_id"].unique():
-        for category in categories:
-            # Extract the data:
-            df = subjects_data_raw[(subjects_data_raw["sub_id"] == subject) &
-                                   (subjects_data_raw["category"] == category.replace("-", "_")) &
-                                   (subjects_data_raw["task_relevance"] == "target")]
-            acc = (df["trial_response_vis"].value_counts().get("hit", 0) / df.shape[0]) * 100
-            t1_accuracy.append([subject, category, acc])
-    t1_accuracy = pd.DataFrame(t1_accuracy, columns=["sub_id", "category", "T1_accuracy"])
+# ======================================================
+# A: Accuracy:
+fig1, ax1 = plt.subplots(nrows=1, ncols=2, sharex=False, sharey=True, figsize=[8.3, 8.3])
+# T1 target detection accuracy per category:
+t1_accuracy = []
+categories = ["face", "object", "letter", "false-font"]
+for subject in subjects_data_raw["sub_id"].unique():
+    for category in categories:
+        # Extract the data:
+        df = subjects_data_raw[(subjects_data_raw["sub_id"] == subject) &
+                               (subjects_data_raw["category"] == category.replace("-", "_")) &
+                               (subjects_data_raw["task_relevance"] == "target")]
+        acc = (df["trial_response_vis"].value_counts().get("hit", 0) / df.shape[0]) * 100
+        t1_accuracy.append([subject, category, acc])
+t1_accuracy = pd.DataFrame(t1_accuracy, columns=["sub_id", "category", "T1_accuracy"])
 
-    # T2 pitch detection accuracy:
-    t2_accuracy = []
-    pitches = [1000, 1100]
-    for subject in subjects_data_raw["sub_id"].unique():
-        for pitch in pitches:
-            # Extract the data:
-            df = subjects_data_raw[(subjects_data_raw["sub_id"] == subject) &
-                                   (subjects_data_raw["pitch"] == pitch) &
-                                   (subjects_data_raw["task_relevance"] == "target")]
-            acc = (np.nansum(df["trial_accuracy_aud"].to_numpy()) / df.shape[0]) * 100
-            t2_accuracy.append([subject, pitch, acc])
-    t2_accuracy = pd.DataFrame(t2_accuracy, columns=["sub_id", "pitch", "T2_accuracy"])
+# T2 pitch detection accuracy:
+t2_accuracy = []
+pitches = [1000, 1100]
+for subject in subjects_data_raw["sub_id"].unique():
+    for pitch in pitches:
+        # Extract the data:
+        df = subjects_data_raw[(subjects_data_raw["sub_id"] == subject) &
+                               (subjects_data_raw["pitch"] == pitch) &
+                               (subjects_data_raw["task_relevance"] == "target")]
+        acc = (np.nansum(df["trial_accuracy_aud"].to_numpy()) / df.shape[0]) * 100
+        t2_accuracy.append([subject, pitch, acc])
+t2_accuracy = pd.DataFrame(t2_accuracy, columns=["sub_id", "pitch", "T2_accuracy"])
 
-    _, _, _ = plot_within_subject_boxplot(t1_accuracy,
-                                          'sub_id', 'category', 'T1_accuracy',
-                                          positions=[1, 2, 3, 4], ax=ax1[0], cousineau_correction=False,
-                                          title="",
-                                          xlabel="Category", ylabel="Accuracy (%)",
-                                          xlim=None, width=0.5,
-                                          face_colors=[val for val in ev.colors["category"].values()])
-    _, _, _ = plot_within_subject_boxplot(t2_accuracy,
-                                          'sub_id', 'pitch', 'T2_accuracy',
-                                          positions=[1, 2], ax=ax1[1], cousineau_correction=False,
-                                          title="",
-                                          xlabel="Pitch", ylabel="",
-                                          xlim=None, width=0.3,
-                                          face_colors=[val for val in ev.colors["pitch"].values()])
-    ax1[0].set_xticklabels(categories)
-    ax1[1].set_xticklabels(pitches)
-    ax1[0].spines['right'].set_visible(False)
-    ax1[1].spines['left'].set_visible(False)
-    ax1[1].yaxis.set_visible(False)
-    plt.subplots_adjust(wspace=0)
-    fig1.suptitle("Task performances")
-    fig1.savefig(Path(save_root, "t1t2_accuracy.svg"), transparent=True, dpi=dpi)
-    fig1.savefig(Path(save_root, "t1t2_accuracy.png"), transparent=True, dpi=dpi)
-    plt.close(fig1)
+_, _, _ = plot_within_subject_boxplot(t1_accuracy,
+                                      'sub_id', 'category', 'T1_accuracy',
+                                      positions=[1, 2, 3, 4], ax=ax1[0], cousineau_correction=False,
+                                      title="",
+                                      xlabel="Category", ylabel="Accuracy (%)",
+                                      xlim=None, width=0.5,
+                                      face_colors=[val for val in ev.colors["category"].values()])
+_, _, _ = plot_within_subject_boxplot(t2_accuracy,
+                                      'sub_id', 'pitch', 'T2_accuracy',
+                                      positions=[1, 2], ax=ax1[1], cousineau_correction=False,
+                                      title="",
+                                      xlabel="Pitch", ylabel="",
+                                      xlim=None, width=0.3,
+                                      face_colors=[val for val in ev.colors["pitch"].values()])
+ax1[0].set_xticklabels(categories)
+ax1[1].set_xticklabels(pitches)
+ax1[0].spines['right'].set_visible(False)
+ax1[1].spines['left'].set_visible(False)
+ax1[1].yaxis.set_visible(False)
+plt.subplots_adjust(wspace=0)
+fig1.suptitle("Task performances")
+fig1.savefig(Path(save_root, "t1t2_accuracy.svg"), transparent=True, dpi=dpi)
+fig1.savefig(Path(save_root, "t1t2_accuracy.png"), transparent=True, dpi=dpi)
+plt.close(fig1)
 
-    # ======================================================
-    # B: Reaction time:
-    fig2, ax2 = plt.subplots(nrows=1, ncols=1, sharex=False, sharey=True, figsize=[8.3 / 2, 8.3])
-    _, _, _ = plot_within_subject_boxplot(subjects_data,
-                                          'sub_id', 'category', 'RT_vis',
-                                          positions=[1, 2, 3, 4], ax=ax2, cousineau_correction=False,
-                                          title="",
-                                          xlabel="Category", ylabel="Reaction time (sec.)",
-                                          xlim=None, width=0.5,
-                                          face_colors=[val for val in ev.colors["category"].values()])
-    ax2.set_xticklabels(categories)
-    fig2.suptitle("T1 reaction time")
-    fig2.savefig(Path(save_root, "t1_rt.svg"), transparent=True, dpi=dpi)
-    fig2.savefig(Path(save_root, "t1_rt.png"), transparent=True, dpi=dpi)
-    plt.close(fig2)
-
-    # ======================================================
-    # C: Fixation:
-    # Load the eyetracking data:
-    hists = []
-    for subject in ["SX102", "SX103", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX112", "SX113",
-                    "SX114", "SX115", "SX116", "SX119", "SX120", "SX121"]:
-        epochs_root = Path(ev.bids_root, "derivatives", "preprocessing", "sub-" + subject, "ses-1", "eyetrack",
-                           "sub-{}_ses-1_task-prp_eyetrack_desc-visual_onset-epo.fif".format(subject))
-        gaze_map = generate_gaze_map(mne.read_epochs(epochs_root), 1080, 1920, sigma=20)
-        hists.append(gaze_map)
-    hists = np.nanmean(np.array(hists), axis=0)
-    fig3, ax3 = plt.subplots(nrows=1, ncols=1, sharex=False, sharey=True, figsize=[8.3, 8.3 * 1080 / 1920])
-    vmin = np.nanmin(hists)
-    vmax = np.nanmax(hists)
-    extent = [0, 1920, 1080, 0]  # origin is the top left of the screen
-    # Plot heatmap
-    im = ax3.imshow(
-        hists,
-        aspect="equal",
-        cmap="RdYlBu_r",
-        alpha=1,
-        extent=extent,
-        origin="upper",
-        vmin=vmin,
-        vmax=vmax,
-    )
-    ax3.set_title("Gaze heatmap")
-    ax3.set_xlabel("X position")
-    ax3.set_ylabel("Y position")
-    fig3.colorbar(im, ax=ax3, shrink=0.8, label="Dwell time (seconds)")
-    fig3.savefig(Path(save_root, "fixation_map.svg"), transparent=True, dpi=dpi)
-    fig3.savefig(Path(save_root, "fixation_map.png"), transparent=True, dpi=dpi)
-    plt.close(fig3)
-    plt.show()
+# ======================================================
+# B: Reaction time:
+fig2, ax2 = plt.subplots(nrows=1, ncols=1, sharex=False, sharey=True, figsize=[8.3 / 2, 8.3])
+_, _, _ = plot_within_subject_boxplot(subjects_data,
+                                      'sub_id', 'category', 'RT_vis',
+                                      positions=[1, 2, 3, 4], ax=ax2, cousineau_correction=False,
+                                      title="",
+                                      xlabel="Category", ylabel="Reaction time (sec.)",
+                                      xlim=None, width=0.5,
+                                      face_colors=[val for val in ev.colors["category"].values()])
+ax2.set_xticklabels(categories)
+fig2.suptitle("T1 reaction time")
+fig2.savefig(Path(save_root, "t1_rt.svg"), transparent=True, dpi=dpi)
+fig2.savefig(Path(save_root, "t1_rt.png"), transparent=True, dpi=dpi)
+plt.close(fig2)
 
 # ========================================================================================================
 # Figure 5:
