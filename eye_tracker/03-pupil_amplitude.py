@@ -119,51 +119,6 @@ def pupil_amplitude(parameters_file, subjects):
     fig.savefig(Path(save_dir, "pupil_evoked_titr_{}_perdur.png".format(lock)), transparent=True, dpi=300)
     plt.close()
 
-    # ===========================================================
-    # Separately for each SOAs:
-    # Prepare a figure for all the durations:
-    fig, ax = plt.subplots(4, 1, sharex=True, sharey=True, figsize=[8.3, 11.7])
-    for dur_i, dur in enumerate(param["soas"]):
-        # Prepare the condition strings:
-        conditions = ["/".join([task, dur, lock]) for task in param["task_relevance"]]
-        # Run cluster based permutation test:
-        evks_dur, evks_diff_dur, _, clusters, cluster_p_values, _ = (
-            cluster_1samp_across_sub(subjects_epochs, conditions,
-                                     n_permutations=param["n_permutations"],
-                                     threshold=param["threshold"],
-                                     tail=1, downsample=True))
-        # Plot the results:
-        # Task relevant:
-        plot_ts_ci(evks_dur[conditions[0]], epochs.times,
-                   ev.colors["task_relevance"][param["task_relevance"][0]], ax=ax[dur_i],
-                   label=param["task_relevance"][0], sig_thresh=0.05 / len(param["soas"]),
-                   plot_single_subjects=False, plot_nonsig_clusters=True)
-        # Task irrelevant:
-        plot_ts_ci(evks_dur[conditions[1]], epochs.times,
-                   ev.colors["task_relevance"][param["task_relevance"][1]], ax=ax[dur_i], clusters=clusters,
-                   clusters_pval=cluster_p_values, clusters_alpha=0.1,
-                   label=param["task_relevance"][1], sig_thresh=0.05 / len(param["soas"]),
-                   plot_single_subjects=False, plot_nonsig_clusters=True)
-        ax[dur_i].set_title(dur)
-
-    # Decorate the axes:
-    ax[0].spines[['right', 'top']].set_visible(False)
-    ax[0].set_title(param["soas"][0])
-    ax[1].spines[['right', 'top']].set_visible(False)
-    ax[1].set_title(param["soas"][1])
-    ax[2].spines[['right', 'top']].set_visible(False)
-    ax[2].set_title(param["soas"][2])
-    ax[3].spines[['right', 'top']].set_visible(False)
-    ax[3].set_title(param["soas"][3])
-    ax[2].set_ylabel("Pupil dilation (norm.)")
-    ax[3].set_xlabel("Time (sec.)")
-    ax[3].legend()
-    plt.suptitle("{} locked pupil size (N={})".format(lock, len(subjects_epochs)))
-    plt.tight_layout()
-    fig.savefig(Path(save_dir, "pupil_evoked_titr_{}_persoa.svg".format(lock)), transparent=True, dpi=300)
-    fig.savefig(Path(save_dir, "pupil_evoked_titr_{}_persoa.png".format(lock)), transparent=True, dpi=300)
-    plt.close()
-
     # ==================================================================================================================
     # Offset locked task relevance analysis:
     # ===========================================================
@@ -235,49 +190,6 @@ def pupil_amplitude(parameters_file, subjects):
     plt.tight_layout()
     fig.savefig(Path(save_dir, "pupil_evoked_titr_{}_perdur.svg".format(lock)), transparent=True, dpi=300)
     fig.savefig(Path(save_dir, "pupil_evoked_titr_{}_perdur.png".format(lock)), transparent=True, dpi=300)
-    plt.close()
-
-    # ===========================================================
-    # Separately for each SOAs:
-    # Prepare a figure for all the durations:
-    fig, ax = plt.subplots(4, 1, sharex=True, sharey=True, figsize=[8.3, 11.7])
-    for dur_i, dur in enumerate(param["soas"]):
-        # Prepare the condition strings:
-        conditions = ["/".join([task, dur, lock]) for task in param["task_relevance"]]
-        # Run cluster based permutation test:
-        evks_dur, evks_diff_dur, _, clusters, cluster_p_values, _ = (
-            cluster_1samp_across_sub(subjects_epochs, conditions,
-                                     n_permutations=param["n_permutations"],
-                                     threshold=param["threshold"],
-                                     tail=1, downsample=True))
-        # Plot the results:
-        # Task relevant:
-        plot_ts_ci(evks_dur[conditions[0]], epochs.times,
-                   ev.colors["task_relevance"][param["task_relevance"][0]], ax=ax[dur_i],
-                   label=param["task_relevance"][0], plot_single_subjects=False)
-        # Task irrelevant:
-        plot_ts_ci(evks_dur[conditions[1]], epochs.times,
-                   ev.colors["task_relevance"][param["task_relevance"][1]], ax=ax[dur_i], clusters=clusters,
-                   clusters_pval=cluster_p_values, clusters_alpha=0.1,
-                   label=param["task_relevance"][1], sig_thresh=0.05 / len(param["soas"]),
-                   plot_single_subjects=False, plot_nonsig_clusters=True)
-
-    # Decorate the axes:
-    ax[0].spines[['right', 'top']].set_visible(False)
-    ax[0].set_title(param["soas"][0])
-    ax[1].spines[['right', 'top']].set_visible(False)
-    ax[1].set_title(param["soas"][1])
-    ax[2].spines[['right', 'top']].set_visible(False)
-    ax[2].set_title(param["soas"][2])
-    ax[3].spines[['right', 'top']].set_visible(False)
-    ax[3].set_title(param["soas"][3])
-    ax[2].set_ylabel("Pupil dilation (norm.)")
-    ax[3].set_xlabel("Time (sec.)")
-    ax[3].legend()
-    plt.suptitle("{} locked pupil size (N={})".format(lock, len(subjects_epochs)))
-    plt.tight_layout()
-    fig.savefig(Path(save_dir, "pupil_evoked_titr_{}_persoas.svg".format(lock)), transparent=True, dpi=300)
-    fig.savefig(Path(save_dir, "pupil_evoked_titr_{}_persoas.png".format(lock)), transparent=True, dpi=300)
     plt.close()
 
 
