@@ -57,7 +57,7 @@ def pupil_amplitude(parameters_file, subjects):
         cluster_1samp_across_sub(subjects_epochs, conditions,
                                  n_permutations=param["n_permutations"],
                                  threshold=param["threshold"],
-                                 tail=1, downsample=True))
+                                 tail=1, downsample=False))
     # Plot the results:
     fig, ax = plt.subplots(figsize=[8.3, 11.7 / 3])
     # Task relevant:
@@ -284,7 +284,7 @@ def pupil_amplitude(parameters_file, subjects):
 
 if __name__ == "__main__":
     subjects_list = ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112", "SX113",
-                     "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121"]
+                     "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121", "SX123"]
     parameters = (
         r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker"
         r"\03-pupil_amplitude_parameters.json ")
