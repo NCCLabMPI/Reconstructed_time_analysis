@@ -81,7 +81,6 @@ if __name__ == "__main__":
 
     subjects_list = [
         "SX101", "SX105", "SX106", "SX108", "SX109", "SX110", "SX113", "SX114", "SX115", "SX118", "SX122"
-        "SX118", "SX122"
     ]
     tasks_list = ["introspection"]
     ascii2mne_batch(ev.raw_root, subjects_list, ev.bids_root, tasks_list, session="2",
@@ -89,7 +88,6 @@ if __name__ == "__main__":
 
     subjects_list = [
         "SX101", "SX105", "SX106", "SX108", "SX109", "SX110", "SX113", "SX114", "SX115", "SX118", "SX122"
-        "SX118", "SX122"
     ]
     tasks_list = ["introspection"]
     ascii2mne_batch(ev.raw_root, subjects_list, ev.bids_root, tasks_list, session="3",
