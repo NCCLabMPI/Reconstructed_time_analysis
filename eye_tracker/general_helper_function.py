@@ -87,15 +87,21 @@ def beh_exclusion(data_df):
     :return:
     """
     trial_orig = list(data_df.index)
-    # 1. Remove the trials with wrong visual responses:
-    data_df_clean = data_df[data_df["trial_response_vis"] != "fa"]
-    # 2. Remove the trials with wrong auditory responses:
-    data_df_clean = data_df_clean[data_df_clean["trial_accuracy_aud"] != 0]
-    # 3. Remove trials where the visual stimuli were responded second:
-    data_df_clean = data_df_clean[data_df_clean["trial_second_button_press"] != 1]
-    # 4. Remove trials in which the participants responded to the auditory stimulus in less than 100ms and more than
-    # 1260ms:
-    data_df_clean = data_df_clean[(data_df_clean["RT_aud"] >= 0.1) & (data_df_clean["RT_aud"] <= 1.260)]
+    # 1. Remove all trials with no auditory responses:
+    data_df_clean = data_df[data_df["RT_aud"].notna()]
+    # 2. Remove each trial in which the reaction time exceeds the max reaction time:
+    # 2.1. Calculate the max threshold:
+    max_win_trials = data_df_clean[(data_df_clean["SOA_lock"] == "offset") & (data_df_clean["duration"] == 1.5) &
+                                   (data_df_clean["SOA"] == 0.466)]
+    max_rt_aud = np.mean(max_win_trials["stim_jit"].to_numpy() + 2 - (1.5 + 0.466))
+    # 2.2. Remove all trials with RT higher than that:
+    data_df_clean = data_df_clean[data_df_clean["RT_aud"] <= max_rt_aud]
+    # 3. Remove trials where the RT is lower than threshold:
+    data_df_clean = data_df_clean[data_df_clean["RT_aud"] >= 0.1]
+    # 4. Remove trials with false alarm to the visual stimulus:
+    data_df_clean = data_df_clean[data_df_clean["trial_response_vis"] != "fa"]
+    # 5. Remove incorrect auditory responses:
+    data_df_clean = data_df_clean[data_df_clean["trial_accuracy_aud"] == 1]
     # Fetch the removed indices:
     trial_final = list(data_df_clean.index)
     rejected_trials = [trial for trial in trial_orig if trial not in trial_final]
@@ -275,7 +281,7 @@ def cluster_1samp_across_sub(subjects_epochs, conditions, n_permutations=1024, t
     return evks, evks_diff, T_obs, clusters, cluster_p_values, H0
 
 
-def generate_gaze_map(epochs, height, width, sigma=20, eyes=None):
+def generate_gaze_map(epochs, height, width, sigma=5, eyes=None):
     """
     This function takes in the eyetracker data in the mne epochs object and generates gaze maps. This is highly inspired
     from this code https://github.com/mne-tools/mne-python/blob/main/mne/viz/eyetracking/heatmap.py#L13-L104

@@ -7,35 +7,41 @@ from pathlib import Path
 from math import atan2, degrees
 from scipy.stats import zscore
 from eye_tracker.based_noise_blinks_detection import based_noise_blinks_detection
+from eye_tracker.general_helper_function import beh_exclusion
 
 show_checks = False
 
 
-def beh_exclusion(data_df):
+def format_summary_table(summary_dict):
     """
-    This function performs the exclusion criterion reported in the paper. Packaged in a function such that we can use
-    it in various places:
-    :param data_df:
-    :return:
+    This function converts the summary dictionary into a data frame
+    :param summary_dict: (dict) format:
+                    {"sub-id":
+                        {
+                            "drop_logs": list,
+                            "proportion_bad": float
+                        }
+                    }
+    :return: df
     """
-    trial_orig = list(data_df.index)
-    # 1. Remove the trials with wrong visual responses:
-    data_df_clean = data_df[data_df["trial_response_vis"] != "fa"]
-    # 2. Remove the trials with wrong auditory responses:
-    data_df_clean = data_df_clean[data_df_clean["trial_accuracy_aud"] != 0]
-    # 3. Remove trials where the visual stimuli were responded second:
-    data_df_clean = data_df_clean[data_df_clean["trial_second_button_press"] != 1]
-    # 4. Determine the upper threshold for auditory trial responses as the maximum response window for the long trial
-    # with offset locked audio stimulus:
-    max_win_trials = data_df_clean[(data_df_clean["lock"] == "offset") & (data_df_clean["duration"] == "1.5") &
-                                   (data_df_clean["SOA"] == "0.466")]
-    max_rt_aud = np.mean(max_win_trials["stim_jit"].to_numpy() + 2 - (1.5 + 0.466))
-    data_df_clean = data_df_clean[(data_df_clean["RT_aud"] >= 0.1) & (data_df_clean["RT_aud"] <= max_rt_aud)]
-    # Fetch the removed indices:
-    trial_final = list(data_df_clean.index)
-    rejected_trials = [trial for trial in trial_orig if trial not in trial_final]
-
-    return rejected_trials
+    # Extract from the drop logs all the different reasons to drop an epoch:
+    trial_rej_reas = [list(set(summary_dict[sub]["drop_logs"])) for sub in summary_dict.keys()]
+    trial_rej_reas = list(set([item for items in trial_rej_reas for item in items if len(item) > 0]))
+    preprocessing_summary_df = []
+    # Loop through each subject:
+    for sub in summary_dict.keys():
+        # Extract this subject drop logs:
+        sub_drops = summary_dict[sub]["drop_logs"]
+        sub_dict = {
+            "subject": sub,
+            "proportion_bad": summary_dict[sub]["proportion_bad"],
+            **{reas: None for reas in trial_rej_reas}
+        }
+        # Loop through each reason to get the counts:
+        for reas in trial_rej_reas:
+            sub_dict[reas] = np.sum(np.array(sub_drops) == reas) / len(sub_drops)
+        preprocessing_summary_df.append(pd.DataFrame(sub_dict, index=[0]))
+    return pd.concat(preprocessing_summary_df).reset_index(drop=True)
 
 
 def reject_bad_epochs(epochs, baseline_window=None, z_thresh=2, eyes=None, exlude_beh=True):
@@ -175,14 +181,24 @@ def load_raw_eyetracker(files_root, subject, session, task, beh_files_root, beh_
                 continue
 
             # Load the log file. For some subjects, there was a repetition. Always keep the last:
-            log_file = [beh_fl
-                        for beh_fl in os.listdir(Path(beh_files_root, "sub-" + subject, "ses-" + session))
-                        if beh_fl == beh_file_name.format(subject, session, run_i, task) or
-                        beh_fl == beh_file_name.format(subject, session, run_i, task).split(".")[0] +
-                        "_repetition_1.csv"]
-            if len(log_file) > 1:
-                log_file = [beh_fl for beh_fl in log_file if "repetition" in beh_fl]
-            log_file = pd.read_csv(Path(beh_files_root, "sub-" + subject, "ses-" + session, log_file[0]))
+            if subject == "SX116" and (session == "2" or session == "3"):
+                log_file = [beh_fl
+                            for beh_fl in os.listdir(Path(beh_files_root, "sub-" + "SX122", "ses-" + session))
+                            if beh_fl == beh_file_name.format("SX122", session, run_i, task) or
+                            beh_fl == beh_file_name.format("SX122", session, run_i, task).split(".")[0] +
+                            "_repetition_1.csv"]
+                if len(log_file) > 1:
+                    log_file = [beh_fl for beh_fl in log_file if "repetition" in beh_fl]
+                log_file = pd.read_csv(Path(beh_files_root, "sub-" + "SX122", "ses-" + session, log_file[0]))
+            else:
+                log_file = [beh_fl
+                            for beh_fl in os.listdir(Path(beh_files_root, "sub-" + subject, "ses-" + session))
+                            if beh_fl == beh_file_name.format(subject, session, run_i, task) or
+                            beh_fl == beh_file_name.format(subject, session, run_i, task).split(".")[0] +
+                            "_repetition_1.csv"]
+                if len(log_file) > 1:
+                    log_file = [beh_fl for beh_fl in log_file if "repetition" in beh_fl]
+                log_file = pd.read_csv(Path(beh_files_root, "sub-" + subject, "ses-" + session, log_file[0]))
             # Extract the events of interest from the raw annotations:
             evt = [desc.split("/") for desc in raw.annotations.description[
                 np.where([event_of_interest in val for val in raw.annotations.description])[0]]]
