@@ -163,7 +163,7 @@ def load_raw_eyetracker(bids_root, subject, session, task, beh_file_name,
 
     # Create the files roots:
     et_root = Path(bids_root, "sub-" + subject, "ses-" + session, "eyetrack")
-    beh_root = Path(bids_root, "sub-" + subject, "ses-" + session, "eyetrack")
+    beh_root = Path(bids_root, "sub-" + subject, "ses-" + session, "beh")
     # ===================================================================================
     # Load the behavioral log files:
     log_file = pd.read_csv(Path(beh_root, beh_file_name.format(subject, session, "all", task)))
