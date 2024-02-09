@@ -161,8 +161,32 @@ def load_raw_eyetracker(files_root, subject, session, task, beh_files_root, beh_
     screen_ress = []
     screen_distances = []
     ctr = 0
+
+    # ===================================================================================
+    # Load the behavioral log file (extra handling with data collection issues:
+    if subject == "SX116" and (session == "2" or session == "3"):
+        log_file = [beh_fl
+                    for beh_fl in os.listdir(Path(beh_files_root, "sub-" + "SX122", "ses-" + session))
+                    if beh_fl == beh_file_name.format("SX122", session, "all", task) or
+                    beh_fl == beh_file_name.format("SX122", session, "all", task).split(".")[0] +
+                    "_repetition_1.csv"]
+        if len(log_file) > 1:
+            log_file = [beh_fl for beh_fl in log_file if "repetition" in beh_fl]
+        log_file = pd.read_csv(Path(beh_files_root, "sub-" + "SX122", "ses-" + session, log_file[0]))
+    else:
+        log_file = [beh_fl
+                    for beh_fl in os.listdir(Path(beh_files_root, "sub-" + subject, "ses-" + session))
+                    if beh_fl == beh_file_name.format(subject, session, "all", task) or
+                    beh_fl == beh_file_name.format(subject, session, "all", task).split(".")[0] +
+                    "_repetition_1.csv"]
+        if len(log_file) > 1:
+            log_file = [beh_fl for beh_fl in log_file if "repetition" in beh_fl]
+        log_file = pd.read_csv(Path(beh_files_root, "sub-" + subject, "ses-" + session, log_file[0]))
+
+    # ===================================================================================
+    # Load the eyetracking data and ensure that the log files match:
     for fl in os.listdir(files_root):
-        if debug and ctr > 2:  # Load only a subpart of the files for the debugging
+        if debug and ctr > 5:  # Load only a subpart of the files for the debugging
             continue
         if fl.endswith('.asc') and fl.split("_task-")[1].split("_eyetrack.asc")[0] == task:
             if verbose:
@@ -170,6 +194,8 @@ def load_raw_eyetracker(files_root, subject, session, task, beh_files_root, beh_
 
             # Extract the run ID:
             run_i = int(re.search(r'run-(\d{2})', fl).group(1))
+            # Extract the corresponding part of the log file:
+            run_log = log_file[log_file["block"] == run_i].reset_index(drop=True)
 
             try:
                 raw = mne.io.read_raw_eyelink(Path(files_root, fl), verbose=verbose)
@@ -180,25 +206,6 @@ def load_raw_eyetracker(files_root, subject, session, task, beh_files_root, beh_
                                                                                              run_i))
                 continue
 
-            # Load the log file. For some subjects, there was a repetition. Always keep the last:
-            if subject == "SX116" and (session == "2" or session == "3"):
-                log_file = [beh_fl
-                            for beh_fl in os.listdir(Path(beh_files_root, "sub-" + "SX122", "ses-" + session))
-                            if beh_fl == beh_file_name.format("SX122", session, run_i, task) or
-                            beh_fl == beh_file_name.format("SX122", session, run_i, task).split(".")[0] +
-                            "_repetition_1.csv"]
-                if len(log_file) > 1:
-                    log_file = [beh_fl for beh_fl in log_file if "repetition" in beh_fl]
-                log_file = pd.read_csv(Path(beh_files_root, "sub-" + "SX122", "ses-" + session, log_file[0]))
-            else:
-                log_file = [beh_fl
-                            for beh_fl in os.listdir(Path(beh_files_root, "sub-" + subject, "ses-" + session))
-                            if beh_fl == beh_file_name.format(subject, session, run_i, task) or
-                            beh_fl == beh_file_name.format(subject, session, run_i, task).split(".")[0] +
-                            "_repetition_1.csv"]
-                if len(log_file) > 1:
-                    log_file = [beh_fl for beh_fl in log_file if "repetition" in beh_fl]
-                log_file = pd.read_csv(Path(beh_files_root, "sub-" + subject, "ses-" + session, log_file[0]))
             # Extract the events of interest from the raw annotations:
             evt = [desc.split("/") for desc in raw.annotations.description[
                 np.where([event_of_interest in val for val in raw.annotations.description])[0]]]
@@ -206,29 +213,29 @@ def load_raw_eyetracker(files_root, subject, session, task, beh_files_root, beh_
             annotations_df = pd.DataFrame(evt, columns=annotations_col_names)
 
             # Compare the log files to the annotations to identify and  address any discrepancies:
-            if log_file.shape[0] == annotations_df.shape[0]:
+            if run_log.shape[0] == annotations_df.shape[0]:
                 # If the two data frames have the same length, compare the identity column in each respectively.
                 # Identity changes on a trial by trial basis:
-                assert all(annotations_df["identity"] == log_file["identity"]), \
+                assert all(annotations_df["identity"] == run_log["identity"]), \
                     "The events logged in the logs do not match the events in the eyetracker triggers!"
-            elif log_file.shape[0] > annotations_df.shape[0]:
-                n_miss_triggers = log_file.shape[0] - annotations_df.shape[0]
+            elif run_log.shape[0] > annotations_df.shape[0]:
+                n_miss_triggers = run_log.shape[0] - annotations_df.shape[0]
                 start_index = -1
-                identities_log_file = log_file["identity"].to_list()
+                identities_log_file = run_log["identity"].to_list()
                 identities_et = annotations_df["identity"].to_list()
                 for i in range(len(identities_log_file) - len(identities_et) + 1):
                     if identities_log_file[i:i + len(identities_et)] == identities_et:
                         start_index = i
                         break
                 if start_index >= 0:
-                    log_file = log_file.iloc[start_index:start_index + len(identities_et)]
+                    run_log = run_log.iloc[start_index:start_index + len(identities_et)]
                     print("WARNING: There were {} missing triggers in run-{} of task-{} in ses-{}!".format(
                         n_miss_triggers, run_i, task, session))
                 else:
                     raise Exception("The events in the log file do not match the events in the Eyetracking triggers!!!")
             else:
                 raise Exception("More triggers than there were events in the log file!!!")
-            logs.append(log_file)
+            logs.append(run_log)
             raws.append(raw)
             calib, screen_dist, screen_size, screen_res = read_calib(Path(files_root, fl))
             calibs.append(calib)
