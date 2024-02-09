@@ -134,7 +134,7 @@ def annotate_nan(raw, nan_annotation="BAD_nan", eyes=None):
     return raw
 
 
-def load_raw_eyetracker(files_root, subject, session, task, beh_files_root, beh_file_name,
+def load_raw_eyetracker(bids_root, subject, session, task, beh_file_name,
                         annotations_col_names, event_of_interest, verbose=False, debug=False):
     """
     This functions loads the eyetracking data using mne python function. In addition, it loads the log files from the
@@ -145,7 +145,6 @@ def load_raw_eyetracker(files_root, subject, session, task, beh_files_root, beh_
     :param subject: (string) name of the subject
     :param session: (string) session
     :param task: (string) task
-    :param beh_files_root: (path or string) path to the behavioral log files
     :param beh_file_name: (string) template string  for the name of the behavioral log files
     :param annotations_col_names: (list of strings) name to give the columns of the annotation table
     :param event_of_interest: (string) identifier of the events of interest
@@ -162,30 +161,16 @@ def load_raw_eyetracker(files_root, subject, session, task, beh_files_root, beh_
     screen_distances = []
     ctr = 0
 
+    # Create the files roots:
+    et_root = Path(bids_root, "sub-" + subject, "ses-" + session, "eyetrack")
+    beh_root = Path(bids_root, "sub-" + subject, "ses-" + session, "eyetrack")
     # ===================================================================================
-    # Load the behavioral log file (extra handling with data collection issues:
-    if subject == "SX116" and (session == "2" or session == "3"):
-        log_file = [beh_fl
-                    for beh_fl in os.listdir(Path(beh_files_root, "sub-" + "SX122", "ses-" + session))
-                    if beh_fl == beh_file_name.format("SX122", session, "all", task) or
-                    beh_fl == beh_file_name.format("SX122", session, "all", task).split(".")[0] +
-                    "_repetition_1.csv"]
-        if len(log_file) > 1:
-            log_file = [beh_fl for beh_fl in log_file if "repetition" in beh_fl]
-        log_file = pd.read_csv(Path(beh_files_root, "sub-" + "SX122", "ses-" + session, log_file[0]))
-    else:
-        log_file = [beh_fl
-                    for beh_fl in os.listdir(Path(beh_files_root, "sub-" + subject, "ses-" + session))
-                    if beh_fl == beh_file_name.format(subject, session, "all", task) or
-                    beh_fl == beh_file_name.format(subject, session, "all", task).split(".")[0] +
-                    "_repetition_1.csv"]
-        if len(log_file) > 1:
-            log_file = [beh_fl for beh_fl in log_file if "repetition" in beh_fl]
-        log_file = pd.read_csv(Path(beh_files_root, "sub-" + subject, "ses-" + session, log_file[0]))
+    # Load the behavioral log files:
+    log_file = pd.read_csv(Path(beh_root, beh_file_name.format(subject, session, "all", task)))
 
     # ===================================================================================
     # Load the eyetracking data and ensure that the log files match:
-    for fl in os.listdir(files_root):
+    for fl in os.listdir(et_root):
         if debug and ctr > 5:  # Load only a subpart of the files for the debugging
             continue
         if fl.endswith('.asc') and fl.split("_task-")[1].split("_eyetrack.asc")[0] == task:
@@ -198,7 +183,7 @@ def load_raw_eyetracker(files_root, subject, session, task, beh_files_root, beh_
             run_log = log_file[log_file["block"] == run_i].reset_index(drop=True)
 
             try:
-                raw = mne.io.read_raw_eyelink(Path(files_root, fl), verbose=verbose)
+                raw = mne.io.read_raw_eyelink(Path(et_root, fl), verbose=verbose)
             except ValueError:
                 print("The data in sub-{}, ses-{}, task-{} and run-{} are unreadable".format(subject,
                                                                                              session,
@@ -237,7 +222,7 @@ def load_raw_eyetracker(files_root, subject, session, task, beh_files_root, beh_
                 raise Exception("More triggers than there were events in the log file!!!")
             logs.append(run_log)
             raws.append(raw)
-            calib, screen_dist, screen_size, screen_res = read_calib(Path(files_root, fl))
+            calib, screen_dist, screen_size, screen_res = read_calib(Path(et_root, fl))
             calibs.append(calib)
             screen_distances.append(screen_dist)
             screen_sizes.append(screen_size)
