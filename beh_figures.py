@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 import matplotlib.pyplot as plt
-from helper_function.helper_general import cousineau_morey_correction
+from scipy.stats import zscore
 from helper_function.helper_plotter import plot_within_subject_boxplot, soa_boxplot
 import environment_variables as ev
 from helper_function.helper_general import beh_exclusion
@@ -209,57 +209,58 @@ plt.close(fig_ti)
 
 # ==================================
 # Figure 5b:
-# Cousineau Morey correction of the data:
-subject_data_corrected = cousineau_morey_correction(subjects_data, 'sub_id', 'onset_SOA', 'RT_aud')
-
+subjects_data["zscore_RT_aud"] = np.zeros(subjects_data.shape[0])
+for sub_id in subjects_data["sub_id"].unique():
+    subjects_data.loc[subjects_data["sub_id"] == sub_id, "zscore_RT_aud"] = (
+        zscore(np.log(subjects_data.loc[subjects_data["sub_id"] == sub_id, "RT_aud"])))
 # Task relevant onset:
 fig_tr_onset, ax_tr_onset = plt.subplots(nrows=1, ncols=1, figsize=[8.3 / 2, 8.3 / 4])
-for soa in list(subject_data_corrected["SOA"].unique()):
+for soa in list(subjects_data["SOA"].unique()):
     data = subjects_data[(subjects_data["task_relevance"] == 'non-target')
                          & (subjects_data["SOA_lock"] == 'onset')
-                         & (subjects_data["SOA"] == soa)]["RT_aud"].to_numpy()
+                         & (subjects_data["SOA"] == soa)]["zscore_RT_aud"].to_numpy()
     # Remove the nans:
     data = data[~np.isnan(data)]
     ax_tr_onset.ecdf(data, label=str(soa), color=ev.colors["soa_onset_locked"][str(soa)])
 # Task irrelevant onset:
 fig_ti_onset, ax_ti_onset = plt.subplots(nrows=1, ncols=1, figsize=[8.3 / 2, 8.3 / 4])
-for soa in list(subject_data_corrected["SOA"].unique()):
+for soa in list(subjects_data["SOA"].unique()):
     data = subjects_data[(subjects_data["task_relevance"] == 'irrelevant')
                          & (subjects_data["SOA_lock"] == 'onset')
-                         & (subjects_data["SOA"] == soa)]["RT_aud"].to_numpy()
+                         & (subjects_data["SOA"] == soa)]["zscore_RT_aud"].to_numpy()
     # Remove the nans:
     data = data[~np.isnan(data)]
     ax_ti_onset.ecdf(data, label=str(soa), color=ev.colors["soa_onset_locked"][str(soa)])
 
 # Offset 500:
 fig_offset_short, ax_offset_short = plt.subplots(nrows=1, ncols=1, figsize=[8.3 / 3, 8.3 / 4])
-for soa in list(subject_data_corrected["SOA"].unique()):
+for soa in list(subjects_data["SOA"].unique()):
     data = subjects_data[(subjects_data["task_relevance"].isin(['non-target', 'irrelevant']))
                          & (subjects_data["SOA_lock"] == 'offset')
                          & (subjects_data["SOA"] == soa)
-                         & (subjects_data["duration"] == 0.5)]["RT_aud"].to_numpy()
+                         & (subjects_data["duration"] == 0.5)]["zscore_RT_aud"].to_numpy()
     # Remove the nans:
     data = data[~np.isnan(data)]
     ax_offset_short.ecdf(data, label=str(soa), color=ev.colors["soa_offset_locked"][str(soa)])
 
 # Offset 1000:
 fig_offset_int, ax_offset_int = plt.subplots(nrows=1, ncols=1, figsize=[8.3 / 3, 8.3 / 4])
-for soa in list(subject_data_corrected["SOA"].unique()):
+for soa in list(subjects_data["SOA"].unique()):
     data = subjects_data[(subjects_data["task_relevance"].isin(['non-target', 'irrelevant']))
                          & (subjects_data["SOA_lock"] == 'offset')
                          & (subjects_data["SOA"] == soa)
-                         & (subjects_data["duration"] == 1.0)]["RT_aud"].to_numpy()
+                         & (subjects_data["duration"] == 1.0)]["zscore_RT_aud"].to_numpy()
     # Remove the nans:
     data = data[~np.isnan(data)]
     ax_offset_int.ecdf(data, label=str(soa), color=ev.colors["soa_offset_locked"][str(soa)])
 
 # Offset 1500:
 fig_offset_long, ax_offset_long = plt.subplots(nrows=1, ncols=1, figsize=[8.3 / 3, 8.3 / 4])
-for soa in list(subject_data_corrected["SOA"].unique()):
+for soa in list(subjects_data["SOA"].unique()):
     data = subjects_data[(subjects_data["task_relevance"].isin(['non-target', 'irrelevant']))
                          & (subjects_data["SOA_lock"] == 'offset')
                          & (subjects_data["SOA"] == soa)
-                         & (subjects_data["duration"] == 1.5)]["RT_aud"].to_numpy()
+                         & (subjects_data["duration"] == 1.5)]["zscore_RT_aud"].to_numpy()
     # Remove the nans:
     data = data[~np.isnan(data)]
     ax_offset_long.ecdf(data, label=str(soa), color=ev.colors["soa_offset_locked"][str(soa)])
