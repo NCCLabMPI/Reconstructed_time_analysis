@@ -4,7 +4,7 @@ import json
 import numpy as np
 from pathlib import Path
 import matplotlib.pyplot as plt
-from helper_function.helper_general import baseline_scaling, max_percentage_index
+from helper_function.helper_general import baseline_scaling, max_percentage_index, equate_epochs_events
 from helper_function.helper_plotter import plot_pupil_latency
 import environment_variables as ev
 import pandas as pd
@@ -13,25 +13,40 @@ import pandas as pd
 plt.rcParams.update({'font.size': 14})
 
 
-def pupil_latency(parameters_file, subjects):
+def pupil_latency(parameters_file, subjects, session="1", task="prp"):
     # First, load the parameters:
     with open(parameters_file) as json_file:
         param = json.load(json_file)
     # Load all subjects data:
     subjects_epochs = {sub: None for sub in subjects}
     # Create the directory to save the results in:
-    save_dir = Path(ev.bids_root, "derivatives", "pupil_latency")
+    save_dir = Path(ev.bids_root, "derivatives", "pupil_latency", task)
     if not os.path.isdir(save_dir):
         os.makedirs(save_dir)
-
+    # The soas differ between the experiments, therefore, extracting them directly from the epochs objects:
+    soas = []
     # Loop through each subject:
     for sub in subjects:
         print("Loading sub-{}".format(sub))
-        root = Path(ev.bids_root, "derivatives", "preprocessing", "sub-" + sub, "ses-" + param["session"],
-                    param["data_type"])
-        file_name = "sub-{}_ses-{}_task-{}_{}_desc-epo.fif".format(sub, param["session"], param["task"],
-                                                                   param["data_type"])
-        epochs = mne.read_epochs(Path(root, file_name))
+        if isinstance(session, list):
+            epochs = []
+            for ses in session:
+                root = Path(ev.bids_root, "derivatives", "preprocessing", "sub-" + sub, "ses-" + ses,
+                            param["data_type"])
+                file_name = "sub-{}_ses-{}_task-{}_{}_desc-epo.fif".format(sub, ses, task,
+                                                                           param["data_type"])
+                epochs.append(mne.read_epochs(Path(root, file_name)))
+            # Equate the epochs events.
+            epochs = equate_epochs_events(epochs)
+            epochs = mne.concatenate_epochs(epochs, add_offset=True)
+        else:
+            root = Path(ev.bids_root, "derivatives", "preprocessing", "sub-" + sub, "ses-" + session,
+                        param["data_type"])
+            file_name = "sub-{}_ses-{}_task-{}_{}_desc-epo.fif".format(sub, session, task,
+                                                                       param["data_type"])
+            epochs = mne.read_epochs(Path(root, file_name))
+        # Extract the soas:
+        soas = list(epochs.metadata["SOA"].unique())
         # Extract the relevant conditions:
         epochs = epochs[param["task_relevance"]]
         # Crop if needed:
@@ -48,7 +63,7 @@ def pupil_latency(parameters_file, subjects):
     # Create LMM tables:
     # ===========================================================
     latencies_lmm = []
-    for soa in param["soas"]:
+    for soa in soas:
         for task in param["task_relevance"]:
             for duration in param["duration"]:
                 for lock in param["lock"]:
@@ -109,8 +124,8 @@ def pupil_latency(parameters_file, subjects):
         # ===========================================================
         # Per SOA:
         if lock == "onset":  # For the offset locked trials, we need to plot separately per stimuli durations:
-            evks = {soa: [] for soa in param["soas"]}
-            for soa in param["soas"]:
+            evks = {soa: [] for soa in soas}
+            for soa in soas:
                 # Loop through each subject:
                 for sub in subjects_epochs.keys():
                     # Average the data across both eyes:
@@ -134,8 +149,8 @@ def pupil_latency(parameters_file, subjects):
             # ===========================================================
             # Separately for each task relevance condition:
             for task in param["task_relevance"]:
-                evks = {soa: [] for soa in param["soas"]}
-                for soa in param["soas"]:
+                evks = {soa: [] for soa in soas}
+                for soa in soas:
                     # Loop through each subject:
                     for sub in subjects_epochs.keys():
                         # Average the data across both eyes:
@@ -161,8 +176,8 @@ def pupil_latency(parameters_file, subjects):
         # ===========================================================
         # Separately for each durations:
         for duration in param["duration"]:
-            evks = {soa: [] for soa in param["soas"]}
-            for soa in param["soas"]:
+            evks = {soa: [] for soa in soas}
+            for soa in soas:
                 # Loop through each subject:
                 for sub in subjects_epochs.keys():
                     # Average the data across both eyes:
@@ -191,8 +206,8 @@ def pupil_latency(parameters_file, subjects):
         # Separately for each durations and task relevance:
         for task in param["task_relevance"]:
             for duration in param["duration"]:
-                evks = {soa: [] for soa in param["soas"]}
-                for soa in param["soas"]:
+                evks = {soa: [] for soa in soas}
+                for soa in soas:
                     # Loop through each subject:
                     for sub in subjects_epochs.keys():
                         data = np.nanmean(subjects_epochs[sub].copy()["/".join([soa, lock, duration, task])],
@@ -221,11 +236,20 @@ def pupil_latency(parameters_file, subjects):
 
 
 if __name__ == "__main__":
-    # ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112", "SX113",
-    # "SX114", "SX115", "SX118", "SX116", "SX119", "SX120", "SX121"]
-    subjects_list = ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112", "SX113",
-                     "SX114", "SX115", "SX118", "SX116", "SX119", "SX120", "SX121", "SX123"]
+    # Set the parameters to use:
     parameters = (
         r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker"
         r"\04-pupil_latency_parameters.json ")
-    pupil_latency(parameters, subjects_list)
+
+    # Subjects lists:
+    subjects_list_prp = ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112",
+                         "SX113", "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121", "SX123"]
+    subjects_list_intro = ["SX101", "SX105", "SX106", "SX108", "SX109", "SX110", "SX113", "SX114",
+                           "SX115", "SX116", "SX118"]
+    # ==================================================================================
+    # Introspection analysis:
+    pupil_latency(parameters, subjects_list_intro, task="introspection", session=["2", "3"])
+
+    # ==================================================================================
+    # PRP analysis:
+    pupil_latency(parameters, subjects_list_prp, task="prp", session="1")
