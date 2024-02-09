@@ -12,9 +12,9 @@ date: "2023-08-22"
 rm(list = ls())
 
 # define workspace
-wd = 'C:/Users/micha.engeser/Documents/GitHub/Reconstructed_time_analysis'
+wd = 'C:/Users/alexander.lepauvre/Documents/GitHub/Reconstructed_time_analysis'
 setwd(wd)
-dir()
+bids_root = 'C:/Users/alexander.lepauvre/Documents/GitHub/Reconstructed_time_analysis/bids'
 ```
 
 # required packages
@@ -66,10 +66,7 @@ ses_folder = paste0('ses-', ses)
 file_name = paste0(sub_folder, '_', ses_folder, '_run-all_task-', task,'_events.csv')
 
 # make file directory
-setwd("..")
-parent_dir = getwd()
-setwd(wd)
-file = file.path(parent_dir, 'Reconstructed_time_experiment', 'data', sub_folder, ses_folder, file_name)
+file = file.path(bids_root, sub_folder, ses_folder, 'beh', file_name)
 
 # load file name 
 event_table = read.csv(file)
@@ -113,7 +110,7 @@ all_event_table = all_event_table %>% mutate(resp_window = (2-onset_SOA)+stim_ji
 
 # remove RTaud > mean response window for offset, long duration and long SOA (deviation from preregistration)
 max_RT = mean(all_event_table$resp_window[all_event_table$SOA == 0.466 & all_event_table$SOA_lock == 'offset' & all_event_table$duration == 1.5], na.rm = TRUE)
-all_event_table = all_event_table[all_event_table$RT_aud < 1.8, ]
+all_event_table = all_event_table[all_event_table$RT_aud < max_RT, ]
 
 # remove RTaud < 100 ms
 all_event_table = all_event_table[all_event_table$RT_aud > 0.1, ]
@@ -716,7 +713,7 @@ As experiment 1 but with introspective ratings of decision time for both tasks (
 ```{r loading2}
 
 # details of subjects  
-subNums2 = c(105, 106, 108, 109, 110, 113, 114, 115, 118, 122) # 101 excluded, 122 is the same as participant 116 from experiment one
+subNums2 = c(105, 106, 108, 109, 110, 113, 114, 115, 116, 118) # 101 excluded, 122 is the same as participant 116 from experiment one
 n2 = length(subNums2)
 sessions2 = c(2,3)
 Lab_ID = 'SX'
@@ -744,10 +741,7 @@ for (subNum in subNums2){
     file_name = paste0(sub_folder, '_', ses_folder, '_run-all_task-', task,'_events.csv')
     
     # make file directory 
-    setwd("..")
-    parent_dir = getwd()
-    setwd(wd)
-    file = file.path(parent_dir, 'Reconstructed_time_experiment', 'data', sub_folder, ses_folder, file_name)
+    file = file.path(bids_root, sub_folder, ses_folder, 'beh', file_name)
     
     # load file
     event_table2 = read.csv(file)

@@ -10,7 +10,7 @@ date: "2023-04-05"
 # clear workspace
 rm(list = ls())
 
-wd = 'C:/Users/micha.engeser/Documents/GitHub/Reconstructed_time_analysis'
+wd = 'C:/Users/alexander.lepauvre/Documents/GitHub/Reconstructed_time_analysis'
 setwd(wd)
 dir()
 ```
@@ -56,10 +56,9 @@ sub_folder = paste0('sub-', Lab_ID, subNum)
 ses_folder = paste0('ses-', ses)
 file_name = paste0(sub_folder, '_', ses_folder, '_run-all_task-', task,'_events.csv')
 
-setwd("..")
 parent_dir = getwd()
 setwd(wd)
-file = file.path(parent_dir, 'Reconstructed_time_experiment', 'data', sub_folder, ses_folder, file_name)
+file = file.path(parent_dir, 'bids', sub_folder, ses_folder, 'beh', file_name)
 
 event_table = read.csv(file)
 
@@ -104,7 +103,7 @@ all_event_table = all_event_table %>% mutate(resp_window = (2-onset_SOA)+stim_ji
 
 # # remove RT > mean response window for offset, long duration adn long SOA 
 max_RT = mean(all_event_table$resp_window[all_event_table$SOA == 0.466 & all_event_table$SOA_lock == 'offset' & all_event_table$duration == 1.5], na.rm = TRUE)
-all_event_table = all_event_table[all_event_table$RT_aud < 1.8, ]
+all_event_table = all_event_table[all_event_table$RT_aud < max_RT, ]
 
 # remove RT < 100 ms
 all_event_table = all_event_table[all_event_table$RT_aud > 0.1, ]
