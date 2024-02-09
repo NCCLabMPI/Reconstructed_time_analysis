@@ -4,7 +4,7 @@
   "session": "1",
   "data_type": "eyetrack",
   "crop": [-0.2, 2.7],
-  "baseline": "percent",
+  "baseline": "mean",
   "baseline_window": [null, 0.0],
   "picks": ["pupil_left", "pupil_right"],
   "task_relevance": ["non-target", "irrelevant"],
