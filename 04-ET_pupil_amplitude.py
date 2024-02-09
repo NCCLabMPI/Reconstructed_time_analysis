@@ -1,7 +1,6 @@
 import mne
 import os
 import json
-import numpy as np
 from pathlib import Path
 import matplotlib.pyplot as plt
 from helper_function.helper_general import baseline_scaling, cluster_1samp_across_sub, equate_epochs_events
@@ -209,17 +208,14 @@ def pupil_amplitude(parameters_file, subjects, session="1", task="prp"):
 if __name__ == "__main__":
     # Set the parameters to use:
     parameters = (
-        r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker"
-        r"\03-pupil_amplitude_parameters.json ")
-    # Subjects lists:
-    subjects_list_prp = ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112",
-                         "SX113", "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121", "SX123"]
-    subjects_list_intro = ["SX101", "SX105", "SX106", "SX108", "SX109", "SX110", "SX113", "SX114",
-                           "SX115", "SX116", "SX118"]
+        r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis"
+        r"\03-ET_pupil_amplitude_parameters.json ")
     # ==================================================================================
     # Introspection analysis:
-    pupil_amplitude(parameters, subjects_list_intro, task="introspection", session=["2", "3"])
+    task = "introspection"
+    pupil_amplitude(parameters, ev.subjects_lists[task], task=task, session=["2", "3"])
 
     # ==================================================================================
     # PRP analysis:
-    pupil_amplitude(parameters, subjects_list_prp, task="prp", session="1")
+    task = "prp"
+    pupil_amplitude(parameters, ev.subjects_lists[task], task="prp", session="1")

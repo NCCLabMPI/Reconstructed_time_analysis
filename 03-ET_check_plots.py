@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
-from helper_function.helper_general import generate_gaze_map, deg_to_pix
+from helper_function.helper_general import generate_gaze_map, deg_to_pix, equate_epochs_events
 import pandas as pd
 import os
 import environment_variables as ev
@@ -29,7 +29,7 @@ dpi = 300
 figure_height = 8.3
 
 
-def check_plots(parameters_file, subjects):
+def check_plots(parameters_file, subjects, session="1", task="prp"):
     # First, load the parameters:
     with open(parameters_file) as json_file:
         param = json.load(json_file)
@@ -39,15 +39,24 @@ def check_plots(parameters_file, subjects):
     fixation_heatmaps = []
     # Loop through each subject:
     for sub in subjects:
-        print(sub)
-        # ===========================================
-        # Data loading:
-        # Load the epochs:
-        root = Path(ev.bids_root, "derivatives", "preprocessing", "sub-" + sub, "ses-" + param["session"],
-                    param["data_type"])
-        file_name = "sub-{}_ses-{}_task-{}_{}_desc-epo.fif".format(sub, param["session"], param["task"],
-                                                                   param["data_type"])
-        epochs = mne.read_epochs(Path(root, file_name))
+        print("Loading sub-{}".format(sub))
+        if isinstance(session, list):
+            epochs = []
+            for ses in session:
+                root = Path(ev.bids_root, "derivatives", "preprocessing", "sub-" + sub, "ses-" + ses,
+                            param["data_type"])
+                file_name = "sub-{}_ses-{}_task-{}_{}_desc-epo.fif".format(sub, ses, task,
+                                                                           param["data_type"])
+                epochs.append(mne.read_epochs(Path(root, file_name)))
+            # Equate the epochs events.
+            epochs = equate_epochs_events(epochs)
+            epochs = mne.concatenate_epochs(epochs, add_offset=True)
+        else:
+            root = Path(ev.bids_root, "derivatives", "preprocessing", "sub-" + sub, "ses-" + session,
+                        param["data_type"])
+            file_name = "sub-{}_ses-{}_task-{}_{}_desc-epo.fif".format(sub, session, task,
+                                                                       param["data_type"])
+            epochs = mne.read_epochs(Path(root, file_name))
         # Decimate
         epochs.decimate(int(epochs.info["sfreq"] / param["decim_freq"]))
 
@@ -248,9 +257,15 @@ def check_plots(parameters_file, subjects):
 
 
 if __name__ == "__main__":
-    subjects_list = ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112", "SX113",
-                     "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121", "SX123"]
     parameters = (
-        r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker"
-        r"\02-check_plots_parameters.json ")
-    check_plots(parameters, subjects_list)
+        r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis"
+        r"\02-ET_check_plots_parameters.json")
+    # ==================================================================================
+    # Introspection analysis:
+    task = "introspection"
+    check_plots(parameters, ev.subjects_lists[task], task=task, session=["2", "3"])
+
+    # ==================================================================================
+    # PRP analysis:
+    task = "prp"
+    check_plots(parameters, ev.subjects_lists[task], task="prp", session="1")

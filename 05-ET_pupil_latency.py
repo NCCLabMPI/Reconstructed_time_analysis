@@ -248,8 +248,10 @@ if __name__ == "__main__":
                            "SX115", "SX116", "SX118"]
     # ==================================================================================
     # Introspection analysis:
-    pupil_latency(parameters, subjects_list_intro, task="introspection", session=["2", "3"])
+    task = "introspection"
+    pupil_latency(parameters, ev.subjects_lists[task], task=task, session=["2", "3"])
 
     # ==================================================================================
     # PRP analysis:
-    pupil_latency(parameters, subjects_list_prp, task="prp", session="1")
+    task = "prp"
+    pupil_latency(parameters, ev.subjects_lists[task], task=task, session="1")
