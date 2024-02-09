@@ -310,7 +310,7 @@ def plot_ts_ci(data, times, color, plot_ci=True, ax=None, label="", clusters=Non
     return ax
 
 
-def plot_pupil_latency(evoked_dict, times, latencies_df, colors, boxplot_ylim=None):
+def plot_pupil_latency(evoked_dict, times, latencies_df, colors, pupil_size_ylim=None, boxplot_ylim=None):
     """
 
     :param evoked_dict:
@@ -331,14 +331,14 @@ def plot_pupil_latency(evoked_dict, times, latencies_df, colors, boxplot_ylim=No
         # Extract the mean latencies:
         lat = np.mean(latencies_df[latencies_df["SOA"] == soa]["latency"].to_numpy())
         # Plot the latency:
-        ax1.vlines(x=latencies_df[latencies_df["SOA"] == soa]["SOA_locked"].to_numpy()[0],
-                   ymin=-0.02, ymax=-0.01, linestyle="-",
+        ax1.vlines(x=latencies_df[latencies_df["SOA"] == soa]["SOA_locked"].to_numpy()[0], ymin=0,
+                   ymax=5, linestyle="-",
                    color=colors[soa], linewidth=2, zorder=10)
-        ax1.vlines(x=lat, ymin=-0.02,
+        ax1.vlines(x=lat, ymin=0,
                    ymax=np.mean(np.array(evoked_dict[soa]), axis=0)[np.argmin(np.abs(times - lat))],
                    linestyle="--",
                    color=colors[soa], linewidth=2, zorder=10)
-    ax1.set_ylim([-0.02, 0.09])
+    ax1.set_ylim(pupil_size_ylim)
     ax1.legend()
     ax1.set_xlabel("Time (sec.)")
     ax1.set_ylabel("Pupil size (norm.)")
