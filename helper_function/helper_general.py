@@ -91,8 +91,9 @@ def beh_exclusion(data_df):
     data_df_clean = data_df[data_df["RT_aud"].notna()]
     # 2. Remove each trial in which the reaction time exceeds the max reaction time:
     # 2.1. Calculate the max threshold:
-    max_win_trials = data_df_clean[(data_df_clean["SOA_lock"] == "offset") & (data_df_clean["duration"] == 1.5) &
-                                   (data_df_clean["SOA"] == 0.466)]
+    max_win_trials = data_df_clean[(data_df_clean["SOA_lock"] == "offset") &
+                                   (data_df_clean["duration"].to_numpy().astype(float) == 1.5) &
+                                   (data_df_clean["SOA"].to_numpy().astype(float) == 0.466)]
     max_rt_aud = np.mean(max_win_trials["stim_jit"].to_numpy() + 2 - (1.5 + 0.466))
     # 2.2. Remove all trials with RT higher than that:
     data_df_clean = data_df_clean[data_df_clean["RT_aud"] <= max_rt_aud]
