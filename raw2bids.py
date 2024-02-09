@@ -110,8 +110,8 @@ if __name__ == "__main__":
 
     # Subject list for each task:
     subjects_list_prp = [
-         "SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112", "SX113",
-         "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121", "SX123"
+         "SX101", "SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112", "SX113",
+         "SX114", "SX115", "SX116", "SX117", "SX118", "SX119", "SX120", "SX121", "SX123"
      ]
     subjects_list_introspection = [
          "SX101", "SX105", "SX106", "SX108", "SX109", "SX110", "SX113", "SX114", "SX115", "SX118", "SX122"
