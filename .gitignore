@@ -8,3 +8,4 @@ eye_tracker\__pycache__\
 eye_tracker/pupil_size_analysis/old
 *presentations/
 *eye_tracker/pupil_size_analysis
+.Rproj.user
