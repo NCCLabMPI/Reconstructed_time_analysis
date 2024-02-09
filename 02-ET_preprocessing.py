@@ -335,21 +335,15 @@ if __name__ == "__main__":
 
     # Set the parameters:
     parameters_file = (
-        r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker"
-        r"\01-preprocessing_parameters.json ")
-
-    # List of subjects for each task:
-    subjects_list_prp = ["SX109", "SX110", "SX111", "SX112",
-                         "SX113", "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121", "SX123"]
-    subjects_list_intro = ["SX101", "SX105", "SX106", "SX108", "SX109", "SX110", "SX114",
-                           "SX115", "SX116", "SX118"]
+        r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\02-ET_preprocessing_parameters.json")
 
     # ==================================================================================
     # Introspection preprocessing:
+    task = "introspection"
     # Session 2:
     preprocessing_summary = {subject: {"drop_logs": None, "proportion_bad": None}
-                             for subject in subjects_list_intro}
-    for sub in subjects_list_intro:
+                             for subject in ev.subjects_lists[task]}
+    for sub in ev.subjects_lists[task]:
         print("Preprocessing subject {}".format(sub))
         prop_bad, drop_logs = preprocessing(sub, parameters_file, session="2", task="introspection")
         preprocessing_summary[sub]["proportion_bad"] = np.mean(prop_bad)
@@ -361,8 +355,8 @@ if __name__ == "__main__":
 
     # Session 3:
     preprocessing_summary = {subject: {"drop_logs": None, "proportion_bad": None}
-                             for subject in subjects_list_intro}
-    for sub in subjects_list_intro:
+                             for subject in ev.subjects_lists[task]}
+    for sub in ev.subjects_lists[task]:
         print("Preprocessing subject {}".format(sub))
         prop_bad, drop_logs = preprocessing(sub, parameters_file, session="3", task="introspection")
         preprocessing_summary[sub]["proportion_bad"] = np.mean(prop_bad)
@@ -374,9 +368,10 @@ if __name__ == "__main__":
 
     # ==================================================================================
     # PRP preprocessing:
+    task = "prp"
     preprocessing_summary = {subject: {"drop_logs": None, "proportion_bad": None}
-                             for subject in subjects_list_prp}
-    for sub in subjects_list_prp:
+                             for subject in ev.subjects_lists[task]}
+    for sub in ev.subjects_lists[task]:
         print("Preprocessing subject {}".format(sub))
         prop_bad, drop_logs = preprocessing(sub, parameters_file, session="1", task="prp")
         preprocessing_summary[sub]["proportion_bad"] = np.mean(prop_bad)
