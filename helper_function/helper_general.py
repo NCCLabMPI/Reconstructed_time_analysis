@@ -6,6 +6,45 @@ from scipy.stats import zscore
 from math import atan2, degrees
 
 
+def equate_epochs_events(epochs_list):
+    """
+    This function equates the events ID of different epochs. In some cases, different epochs may have the same
+    events description but different identifier associated to it. Alternatively, some epochs may not have all the
+    events within them, leading to the dictionaries being different. In this function, the dictionaries gets equated
+    such that all events from all epochs are combined to get each unique event across all and given the same identifier
+    Note that it is a bit risky as it touches the trial labels, so make sure you really understand well why that is
+    needed before using!
+    :param epochs_list: (list of mne epochs object) contains the epochs that have to be equated
+    :return:
+        - list: lost of mne epochs object. This function operates in place!
+    """
+    # Extract the events description in each epoch:
+    epochs_events = [epo.event_id for epo in epochs_list]
+    # Check whether all the epochs have the same events
+    if not all([evts == epochs_events[0] for evts in epochs_events]):
+        print("WARNING: The epochs do not have the same events! The events dictionaries will be updated!")
+
+        # Extract all the descriptions across all epochs:
+        evts_names = [list(epo_evts.keys()) for epo_evts in epochs_events]
+        evts_names = list(set([item for items in evts_names for item in items]))  # Flatten the list
+
+        # Create the new events dictionary:
+        new_evts = dict(zip(evts_names, list(range(len(evts_names)))))
+
+        # Loop through each epochs:
+        for epo in epochs_list:
+            for evts in new_evts.keys():
+                if evts in epo.event_id.keys():
+                    # Extract the epoch id:
+                    evt_id = epo.event_id[evts]
+                    evt_ind = np.where(epo.events[:, 2] == evt_id)[0]
+                    if len(evt_ind) > 0:
+                        epo.events[evt_ind, 2] = new_evts[evts]
+            # Replace the event dictionary:
+            epo.event_id = new_evts
+    return epochs_list
+
+
 def deg_to_pix(size_deg, distance_cm, screen_size_cm, screen_res):
     """
     This function converts a given degrees of visual angle to pixels
