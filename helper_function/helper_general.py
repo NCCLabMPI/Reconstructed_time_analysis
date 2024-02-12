@@ -1,9 +1,58 @@
 from mne.baseline import rescale
+from pathlib import Path
 import numpy as np
+import pandas as pd
 from scipy.ndimage import gaussian_filter
 from mne.stats import permutation_cluster_1samp_test
 from scipy.stats import zscore
 from math import atan2, degrees
+
+
+def load_beh_data(bids_root, subjects, fn_template, session='1', task='prp', do_trial_exclusion=True):
+    """
+    This function loads the behavioral data
+    :param bids_root:
+    :param subjects:
+    :param fn_template:
+    :param session:
+    :param task:
+    :param do_trial_exclusion:
+    :return:
+    """
+    # Load the data:
+    subjects_data = []
+    if do_trial_exclusion:
+        prop_rejected = []
+        for sub in subjects:
+            behavioral_file = Path(bids_root, "sub-" + sub, "ses-" + session, "beh",
+                                   fn_template.format(sub, session, task))
+            # Load the file:
+            subject_data = pd.read_csv(behavioral_file, sep=",")
+            # Add the subject ID:
+            subject_data["subject"] = sub
+            # Apply trial rejection:
+            rej_ind = beh_exclusion(subject_data)
+            prop_rej = len(rej_ind) / subject_data.shape[0]
+            subject_data = subject_data.drop(rej_ind)
+            # Append to the rest of the subject
+            subjects_data.append(subject_data.reset_index(drop=True))
+            # Print the proportion of trials that were discarded:
+            print("Subject {} - {:.2f}% trials were discarded".format(sub, prop_rej * 100))
+            prop_rejected.append(prop_rej)
+
+        print("The mean proportion of rejected trials is {:.2f}% +- {:.2f}".format(np.mean(prop_rejected) * 100,
+                                                                                   np.std(prop_rejected) * 100))
+    else:
+        for sub in subjects:
+            behavioral_file = Path(bids_root, "sub-" + sub, "ses-" + session, "beh",
+                                   fn_template.format(sub, session, task))
+            # Load the file:
+            subject_data = pd.read_csv(behavioral_file, sep=",")
+            # Add the subject ID:
+            subject_data["subject"] = sub
+            # Append to the rest of the subjects:
+            subjects_data.append(subject_data.reset_index(drop=True))
+    return pd.concat(subjects_data).reset_index(drop=True)
 
 
 def equate_epochs_events(epochs_list):
