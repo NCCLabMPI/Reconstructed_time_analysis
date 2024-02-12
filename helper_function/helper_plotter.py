@@ -217,7 +217,7 @@ def soa_boxplot(data_df, dependent_variable, fig_size=None, lock_column="SOA_loc
     """
     if fig_size is None:
         fig_size = [8.3 / 3, 11.7 / 2]
-    if ax is None or fig is None:
+    if ax is None:
         fig, ax = plt.subplots(nrows=1, ncols=4, sharex=False, sharey=True, figsize=fig_size)
     if colors_onset_locked is None:
         colors_onset_locked = [val for val in ev.colors["soa_onset_locked"].values()]
