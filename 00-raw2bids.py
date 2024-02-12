@@ -93,6 +93,9 @@ def beh2bids_batch(raw_root, subjects, bids_root, task, session="1",
         log_df = log_df.sort_values(by="vis_stim_time").reset_index(drop=True)
         # For a few participants, the experiment crashed and blocks had to be restarted. Marking duplicates with a flag:
         log_df['is_duplicate'] = log_df.duplicated(subset=['block', 'trial'], keep='last')
+        # For some participants, there was a bug in the code such that the practice table were saved alongside the
+        # prp. Removing any such trials:
+        log_df = log_df[log_df["is_practice"] == 0]
         # Create the bids directory for that subject:
         if subject == "SX122":  # The subject SX122 was misnamed, it was actually SX116
             save_dir = Path(bids_root, "sub-" + "SX116", "ses-" + session, "beh")
