@@ -75,37 +75,40 @@ def check_plots(parameters_file, subjects, session="1", task="prp"):
             for duration in param["durations"]:
                 for lock in param["locks"]:
                     for soa in param["soas"]:
-                        # Extract data locked to the visual stimulus:
-                        epochs_cropped = epochs.copy().crop(param["crop"][0], param["crop"][1])
+                        for window in param["windows"]:
+                            # Extract data locked to the visual stimulus:
+                            epochs_cropped = epochs.copy().crop(param["windows"][window][0],
+                                                                param["windows"][window][1])
 
-                        # Extract the data and average across left and right eye:
-                        fixation_data = np.mean(
-                            epochs_cropped.copy()["/".join([task_rel, duration, lock, soa])].pick(["fixdist_left",
-                                                                                                   "fixdist_right"]).get_data(
-                                copy=False),
-                            axis=1)
-                        blinks_data = np.mean(
-                            epochs_cropped.copy()["/".join([task_rel, duration, lock, soa])].pick(["blink_left",
-                                                                                                   "blink_right"]).get_data(
-                                copy=False),
-                            axis=1)
-                        # Compute the fixation proportion:
-                        fix_prop = np.mean(np.mean(fixation_data < param["fixdist_thresh_deg"], axis=1))
-                        # Compute the blink rate:
-                        blink_rate = np.mean(np.sum(np.diff(blinks_data, axis=1) == 1, axis=1))
+                            # Extract the data and average across left and right eye:
+                            fixation_data = np.mean(
+                                epochs_cropped.copy()["/".join([task_rel, duration, lock, soa])].pick(["fixdist_left",
+                                                                                                       "fixdist_right"]).get_data(
+                                    copy=False),
+                                axis=1)
+                            blinks_data = np.mean(
+                                epochs_cropped.copy()["/".join([task_rel, duration, lock, soa])].pick(["blink_left",
+                                                                                                       "blink_right"]).get_data(
+                                    copy=False),
+                                axis=1)
+                            # Compute the fixation proportion:
+                            fix_prop = np.mean(np.mean(fixation_data < param["fixdist_thresh_deg"], axis=1))
+                            # Compute the proportion of trials in which participants blinked:
+                            blink_trials = len(np.where(np.any(blinks_data, axis=1))[0]) / blinks_data.shape[0]
 
-                        # Add to data frame using pd.concat:
-                        check_values = pd.concat([check_values,
-                                                  pd.DataFrame({"sub_id": sub,
-                                                                "task_relevance": task_rel,
-                                                                "duration": float(duration),
-                                                                "SOA_lock": lock,
-                                                                "soa": float(soa),
-                                                                "onset_SOA": float(soa) + float(duration)
-                                                                if lock == "offset" else float(soa),
-                                                                "fixation_proportion": fix_prop,
-                                                                "blink_rate": blink_rate},
-                                                               index=[0])])
+                            # Add to data frame using pd.concat:
+                            check_values = pd.concat([check_values,
+                                                      pd.DataFrame({"sub_id": sub,
+                                                                    "task_relevance": task_rel,
+                                                                    "duration": float(duration),
+                                                                    "SOA_lock": lock,
+                                                                    "soa": float(soa),
+                                                                    "onset_SOA": float(soa) + float(duration)
+                                                                    if lock == "offset" else float(soa),
+                                                                    "window": window,
+                                                                    "fixation_proportion": fix_prop,
+                                                                    "blink_trials": blink_trials},
+                                                                   index=[0])])
     check_values = check_values.reset_index(drop=True)
     # Create the save directory:
     save_dir = Path(ev.bids_root, "derivatives", "check_plots", "data")
@@ -123,91 +126,97 @@ def check_plots(parameters_file, subjects, session="1", task="prp"):
 
     # =========================================================================
     # Fixation proportion:
-    # Across task relevances:
-    fig_all, ax_all = soa_boxplot(check_values,
-                                  "fixation_proportion",
-                                  fig_size=[figure_height, figure_height * param["screen_res"][1] /
-                                            param["screen_res"][0]])
-    # Task relevant:
-    fig_tr, ax_tr = soa_boxplot(check_values[check_values["task_relevance"] == 'non-target'],
-                                "fixation_proportion",
-                                fig_size=[figure_height, figure_height * param["screen_res"][1] /
-                                          param["screen_res"][0]])
-    # Task irrelevant:
-    fig_ti, ax_ti = soa_boxplot(check_values[check_values["task_relevance"] == 'irrelevant'],
-                                "fixation_proportion",
-                                fig_size=[figure_height, figure_height * param["screen_res"][1] /
-                                          param["screen_res"][0]])
-    # Set the y limit to be the same for both plots:
-    lims = [[ax_all[0].get_ylim()[0], ax_tr[0].get_ylim()[0], ax_ti[0].get_ylim()[0]],
-            [ax_all[0].get_ylim()[1], ax_tr[0].get_ylim()[1], ax_ti[0].get_ylim()[1]]]
-    max_lims = [min(min(lims)), max(max(lims))]
-    ax_all[0].set_ylim(max_lims)
-    ax_tr[0].set_ylim(max_lims)
-    ax_ti[0].set_ylim(max_lims)
-    # Axes decoration:
-    fig_all.suptitle("Fixation proportion per SOA condition")
-    fig_tr.suptitle("Relevant non-target")
-    fig_ti.suptitle("Irrelevant non-target")
-    fig_all.text(0.5, 0, 'Time (sec.)', ha='center', va='center')
-    fig_tr.text(0.5, 0, 'Time (sec.)', ha='center', va='center')
-    fig_ti.text(0.5, 0, 'Time (sec.)', ha='center', va='center')
-    fig_all.text(0, 0.5, 'Fixation proportion', ha='center', va='center', fontsize=18, rotation=90)
-    fig_tr.text(0, 0.5, 'Fixation proportion', ha='center', va='center', fontsize=18, rotation=90)
-    fig_ti.text(0, 0.5, 'Fixation proportion', ha='center', va='center', fontsize=18, rotation=90)
-    fig_all.savefig(Path(save_dir, "fixation_all.svg"), transparent=True, dpi=dpi)
-    fig_all.savefig(Path(save_dir, "fixation_all.png"), transparent=True, dpi=dpi)
-    fig_tr.savefig(Path(save_dir, "fixation_tr.svg"), transparent=True, dpi=dpi)
-    fig_tr.savefig(Path(save_dir, "fixation_tr.png"), transparent=True, dpi=dpi)
-    fig_ti.savefig(Path(save_dir, "fixation_ti.svg"), transparent=True, dpi=dpi)
-    fig_ti.savefig(Path(save_dir, "fixation_ti.png"), transparent=True, dpi=dpi)
-    plt.close(fig_all)
-    plt.close(fig_tr)
-    plt.close(fig_ti)
+    # Separately in each window:
+    for window in param["windows"]:
+        check_values_window = check_values[check_values["window"] == window].reset_index(drop=True)
+        # Across task relevances:
+        fig_all, ax_all = soa_boxplot(check_values_window,
+                                      "fixation_proportion",
+                                      fig_size=[figure_height, figure_height * param["screen_res"][1] /
+                                                param["screen_res"][0]])
+        # Task relevant:
+        fig_tr, ax_tr = soa_boxplot(check_values_window[check_values_window["task_relevance"] == 'non-target'],
+                                    "fixation_proportion",
+                                    fig_size=[figure_height, figure_height * param["screen_res"][1] /
+                                              param["screen_res"][0]])
+        # Task irrelevant:
+        fig_ti, ax_ti = soa_boxplot(check_values_window[check_values_window["task_relevance"] == 'irrelevant'],
+                                    "fixation_proportion",
+                                    fig_size=[figure_height, figure_height * param["screen_res"][1] /
+                                              param["screen_res"][0]])
+        # Set the y limit to be the same for both plots:
+        lims = [[ax_all[0].get_ylim()[0], ax_tr[0].get_ylim()[0], ax_ti[0].get_ylim()[0]],
+                [ax_all[0].get_ylim()[1], ax_tr[0].get_ylim()[1], ax_ti[0].get_ylim()[1]]]
+        max_lims = [min(min(lims)), max(max(lims))]
+        ax_all[0].set_ylim(max_lims)
+        ax_tr[0].set_ylim(max_lims)
+        ax_ti[0].set_ylim(max_lims)
+        # Axes decoration:
+        fig_all.suptitle("Fixation proportion per SOA condition")
+        fig_tr.suptitle("Relevant non-target")
+        fig_ti.suptitle("Irrelevant non-target")
+        fig_all.text(0.5, 0, 'Time (sec.)', ha='center', va='center')
+        fig_tr.text(0.5, 0, 'Time (sec.)', ha='center', va='center')
+        fig_ti.text(0.5, 0, 'Time (sec.)', ha='center', va='center')
+        fig_all.text(0, 0.5, 'Fixation proportion', ha='center', va='center', fontsize=18, rotation=90)
+        fig_tr.text(0, 0.5, 'Fixation proportion', ha='center', va='center', fontsize=18, rotation=90)
+        fig_ti.text(0, 0.5, 'Fixation proportion', ha='center', va='center', fontsize=18, rotation=90)
+        fig_all.savefig(Path(save_dir, "fixation_all_{}.svg".format(window)), transparent=True, dpi=dpi)
+        fig_all.savefig(Path(save_dir, "fixation_all_{}.png".format(window)), transparent=True, dpi=dpi)
+        fig_tr.savefig(Path(save_dir, "fixation_tr_{}.svg".format(window)), transparent=True, dpi=dpi)
+        fig_tr.savefig(Path(save_dir, "fixation_tr_{}.png".format(window)), transparent=True, dpi=dpi)
+        fig_ti.savefig(Path(save_dir, "fixation_ti_{}.svg".format(window)), transparent=True, dpi=dpi)
+        fig_ti.savefig(Path(save_dir, "fixation_ti_{}.png".format(window)), transparent=True, dpi=dpi)
+        plt.close(fig_all)
+        plt.close(fig_tr)
+        plt.close(fig_ti)
 
     # =========================================================================
     # Blink rate:
-    # Across task relevances:
-    fig_all, ax_all = soa_boxplot(check_values,
-                                  "blink_rate",
-                                  fig_size=[figure_height, figure_height * param["screen_res"][1] /
-                                            param["screen_res"][0]])
-    # Task relevant:
-    fig_tr, ax_tr = soa_boxplot(check_values[check_values["task_relevance"] == 'non-target'],
-                                "blink_rate",
-                                fig_size=[figure_height, figure_height * param["screen_res"][1] /
-                                          param["screen_res"][0]])
-    # Task irrelevant:
-    fig_ti, ax_ti = soa_boxplot(check_values[check_values["task_relevance"] == 'irrelevant'],
-                                "blink_rate",
-                                fig_size=[figure_height, figure_height * param["screen_res"][1] /
-                                          param["screen_res"][0]])
-    # Set the y limit to be the same for both plots:
-    lims = [[ax_all[0].get_ylim()[0], ax_tr[0].get_ylim()[0], ax_ti[0].get_ylim()[0]],
-            [ax_all[0].get_ylim()[1], ax_tr[0].get_ylim()[1], ax_ti[0].get_ylim()[1]]]
-    max_lims = [min(min(lims)), max(max(lims))]
-    ax_all[0].set_ylim(max_lims)
-    ax_tr[0].set_ylim(max_lims)
-    ax_ti[0].set_ylim(max_lims)
-    # Axes decoration:
-    fig_all.suptitle("Blink rate per SOA condition")
-    fig_tr.suptitle("Relevant non-target")
-    fig_ti.suptitle("Irrelevant non-target")
-    fig_all.text(0.5, 0, 'Time (sec.)', ha='center', va='center')
-    fig_tr.text(0.5, 0, 'Time (sec.)', ha='center', va='center')
-    fig_ti.text(0.5, 0, 'Time (sec.)', ha='center', va='center')
-    fig_all.text(0, 0.5, 'Blink rate (Hz)', ha='center', va='center', fontsize=18, rotation=90)
-    fig_tr.text(0, 0.5, 'Blink rate (Hz)', ha='center', va='center', fontsize=18, rotation=90)
-    fig_ti.text(0, 0.5, 'Blink rate (Hz)', ha='center', va='center', fontsize=18, rotation=90)
-    fig_all.savefig(Path(save_dir, "blink_rate_all.svg"), transparent=True, dpi=dpi)
-    fig_all.savefig(Path(save_dir, "blink_rate_all.png"), transparent=True, dpi=dpi)
-    fig_tr.savefig(Path(save_dir, "blink_rate_tr.svg"), transparent=True, dpi=dpi)
-    fig_tr.savefig(Path(save_dir, "blink_rate_tr.png"), transparent=True, dpi=dpi)
-    fig_ti.savefig(Path(save_dir, "blink_rate_ti.svg"), transparent=True, dpi=dpi)
-    fig_ti.savefig(Path(save_dir, "blink_rate_ti.png"), transparent=True, dpi=dpi)
-    plt.close(fig_all)
-    plt.close(fig_tr)
-    plt.close(fig_ti)
+    # Separately in each window:
+    for window in param["windows"]:
+        check_values_window = check_values[check_values["window"] == window].reset_index(drop=True)
+        # Across task relevances:
+        fig_all, ax_all = soa_boxplot(check_values_window,
+                                      "blink_trials",
+                                      fig_size=[figure_height, figure_height * param["screen_res"][1] /
+                                                param["screen_res"][0]])
+        # Task relevant:
+        fig_tr, ax_tr = soa_boxplot(check_values_window[check_values_window["task_relevance"] == 'non-target'],
+                                    "blink_trials",
+                                    fig_size=[figure_height, figure_height * param["screen_res"][1] /
+                                              param["screen_res"][0]])
+        # Task irrelevant:
+        fig_ti, ax_ti = soa_boxplot(check_values_window[check_values_window["task_relevance"] == 'irrelevant'],
+                                    "blink_trials",
+                                    fig_size=[figure_height, figure_height * param["screen_res"][1] /
+                                              param["screen_res"][0]])
+        # Set the y limit to be the same for both plots:
+        lims = [[ax_all[0].get_ylim()[0], ax_tr[0].get_ylim()[0], ax_ti[0].get_ylim()[0]],
+                [ax_all[0].get_ylim()[1], ax_tr[0].get_ylim()[1], ax_ti[0].get_ylim()[1]]]
+        max_lims = [min(min(lims)), max(max(lims))]
+        ax_all[0].set_ylim(max_lims)
+        ax_tr[0].set_ylim(max_lims)
+        ax_ti[0].set_ylim(max_lims)
+        # Axes decoration:
+        fig_all.suptitle("Blinked trials per SOA condition")
+        fig_tr.suptitle("Relevant non-target")
+        fig_ti.suptitle("Irrelevant non-target")
+        fig_all.text(0.5, 0, 'Time (sec.)', ha='center', va='center')
+        fig_tr.text(0.5, 0, 'Time (sec.)', ha='center', va='center')
+        fig_ti.text(0.5, 0, 'Time (sec.)', ha='center', va='center')
+        fig_all.text(0, 0.5, 'Blinked trials (prop.)', ha='center', va='center', fontsize=18, rotation=90)
+        fig_tr.text(0, 0.5, 'Blinked trials (prop.)', ha='center', va='center', fontsize=18, rotation=90)
+        fig_ti.text(0, 0.5, 'Blinked trials (prop.)', ha='center', va='center', fontsize=18, rotation=90)
+        fig_all.savefig(Path(save_dir, "blink_rate_all_{}.svg".format(window)), transparent=True, dpi=dpi)
+        fig_all.savefig(Path(save_dir, "blink_rate_all_{}.png".format(window)), transparent=True, dpi=dpi)
+        fig_tr.savefig(Path(save_dir, "blink_rate_tr_{}.svg".format(window)), transparent=True, dpi=dpi)
+        fig_tr.savefig(Path(save_dir, "blink_rate_tr_{}.png".format(window)), transparent=True, dpi=dpi)
+        fig_ti.savefig(Path(save_dir, "blink_rate_ti_{}.svg".format(window)), transparent=True, dpi=dpi)
+        fig_ti.savefig(Path(save_dir, "blink_rate_ti_{}.png".format(window)), transparent=True, dpi=dpi)
+        plt.close(fig_all)
+        plt.close(fig_tr)
+        plt.close(fig_ti)
 
     # Plot the dwell time image:
     hists = np.nanmean(np.array(fixation_heatmaps), axis=0)
@@ -259,13 +268,14 @@ def check_plots(parameters_file, subjects, session="1", task="prp"):
 if __name__ == "__main__":
     parameters = (
         r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis"
-        r"\02-ET_check_plots_parameters.json")
-    # ==================================================================================
-    # Introspection analysis:
-    task = "introspection"
-    check_plots(parameters, ev.subjects_lists[task], task=task, session=["2", "3"])
-
+        r"\03-ET_check_plots_parameters.json")
     # ==================================================================================
     # PRP analysis:
     task = "prp"
-    check_plots(parameters, ev.subjects_lists[task], task="prp", session="1")
+    check_plots(parameters, ev.subjects_lists_et[task], task="prp", session="1")
+    # ==================================================================================
+    # Introspection analysis:
+    task = "introspection"
+    check_plots(parameters, ev.subjects_lists_et[task], task=task, session=["2", "3"])
+
+
