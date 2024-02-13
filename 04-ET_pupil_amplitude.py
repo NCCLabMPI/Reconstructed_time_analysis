@@ -209,13 +209,13 @@ if __name__ == "__main__":
     # Set the parameters to use:
     parameters = (
         r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis"
-        r"\03-ET_pupil_amplitude_parameters.json ")
+        r"\04-ET_pupil_amplitude_parameters.json")
     # ==================================================================================
     # Introspection analysis:
     task = "introspection"
-    pupil_amplitude(parameters, ev.subjects_lists[task], task=task, session=["2", "3"])
+    pupil_amplitude(parameters, ev.subjects_lists_et[task], task=task, session=["2", "3"])
 
     # ==================================================================================
     # PRP analysis:
     task = "prp"
-    pupil_amplitude(parameters, ev.subjects_lists[task], task="prp", session="1")
+    pupil_amplitude(parameters, ev.subjects_lists_et[task], task="prp", session="1")
