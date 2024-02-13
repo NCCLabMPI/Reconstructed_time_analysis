@@ -3,7 +3,8 @@ import os
 import json
 from pathlib import Path
 import matplotlib.pyplot as plt
-from helper_function.helper_general import baseline_scaling, cluster_1samp_across_sub, equate_epochs_events
+from helper_function.helper_general import (baseline_scaling, cluster_1samp_across_sub, equate_epochs_events,
+                                            reject_bad_epochs, format_drop_logs)
 from helper_function.helper_plotter import plot_ts_ci
 import environment_variables as ev
 
@@ -11,14 +12,15 @@ import environment_variables as ev
 plt.rcParams.update({'font.size': 14})
 
 
-def pupil_amplitude(parameters_file, subjects, session="1", task="prp"):
+def pupil_amplitude(parameters_file, subjects, session="1", task="prp", analysis_name="pupil_amplitude",
+                    reject_bad_trials=True):
     # First, load the parameters:
     with open(parameters_file) as json_file:
         param = json.load(json_file)
     # Load all subjects data:
     subjects_epochs = {}
     # Create the directory to save the results in:
-    save_dir = Path(ev.bids_root, "derivatives", "pupil_amplitude", task)
+    save_dir = Path(ev.bids_root, "derivatives", analysis_name, task)
     if not os.path.isdir(save_dir):
         os.makedirs(save_dir)
 
@@ -42,18 +44,50 @@ def pupil_amplitude(parameters_file, subjects, session="1", task="prp"):
             file_name = "sub-{}_ses-{}_task-{}_{}_desc-epo.fif".format(sub, session, task,
                                                                        param["data_type"])
             epochs = mne.read_epochs(Path(root, file_name))
+        # Crop the epochs:
+        epochs.crop(param["crop"][0], param["crop"][1])
+
+        # Reject bad epochs according to predefined criterion:
+        if reject_bad_trials:
+            reject_bad_epochs(epochs,
+                              baseline_window=param["baseline_window"],
+                              z_thresh=param["baseline_zthresh"],
+                              eyes=param["eyes"],
+                              exlude_beh=param["exlude_beh"],
+                              remove_blinks=param["remove_blinks"],
+                              blinks_window=param["blinks_window"])
         # Decimate
         epochs.decimate(int(epochs.info["sfreq"] / param["decim_freq"]))
+
         # Extract the relevant conditions:
         epochs = epochs[param["task_relevance"]]
-        # Crop if needed:
-        epochs.crop(param["crop"][0], param["crop"][1])
 
         # Extract the relevant channels:
         epochs.pick(param["picks"])
         # Baseline correction:
         baseline_scaling(epochs, correction_method=param["baseline"], baseline=param["baseline_window"])
         subjects_epochs[sub] = epochs
+
+    # Plot the drop logs:
+    drop_log_df = format_drop_logs({sub: subjects_epochs[sub].drop_log for sub in subjects_epochs.keys()})
+
+    # Plot the drop log:
+    # Extract the columns:
+    cols = [col for col in drop_log_df.columns if col != "sub"]
+    fig, ax = plt.subplots(figsize=[8.3, 8.3])
+    ax.boxplot([drop_log_df[col].to_numpy() for col in cols], labels=cols)
+    ax.axhline(param["drop_trials_threshold"], linestyle="--", color="r")
+    ax.set_ylabel("Proportion dropped trials")
+    ax.set_xlabel("Reason")
+    plt.tight_layout()
+    fig.savefig(Path(save_dir, "drop_log.svg"), transparent=True, dpi=300)
+    fig.savefig(Path(save_dir, "drop_log.png"), transparent=True, dpi=300)
+    plt.close()
+
+    # Extract the subject that exceed the proportion of dropped trials
+    drop_subjects = drop_log_df.loc[drop_log_df["total"] >= param["drop_trials_threshold"], "sub"].to_list()
+    for sub in drop_subjects:
+        del subjects_epochs[sub]
 
     # ==================================================================================================================
     # Task relevance comparisons:
@@ -213,9 +247,15 @@ if __name__ == "__main__":
     # ==================================================================================
     # Introspection analysis:
     task = "introspection"
-    pupil_amplitude(parameters, ev.subjects_lists_et[task], task=task, session=["2", "3"])
+    pupil_amplitude(parameters, ev.subjects_lists_et[task], task=task, session=["2", "3"],
+                    analysis_name="pupil_amplitude", reject_bad_trials=True)
+    pupil_amplitude(parameters, ev.subjects_lists_et[task], task=task, session=["2", "3"],
+                    analysis_name="pupil_amplitude_no_rej", reject_bad_trials=False)
 
     # ==================================================================================
     # PRP analysis:
     task = "prp"
-    pupil_amplitude(parameters, ev.subjects_lists_et[task], task="prp", session="1")
+    pupil_amplitude(parameters, ev.subjects_lists_et[task], task="prp", session="1",
+                    analysis_name="pupil_amplitude", reject_bad_trials=True)
+    pupil_amplitude(parameters, ev.subjects_lists_et[task], task="prp", session="1",
+                    analysis_name="pupil_amplitude_no_rej", reject_bad_trials=False)
