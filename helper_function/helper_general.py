@@ -1,11 +1,39 @@
+import math
 from mne.baseline import rescale
 from pathlib import Path
 import numpy as np
 import pandas as pd
 from scipy.ndimage import gaussian_filter
+from scipy.stats import norm
 from mne.stats import permutation_cluster_1samp_test
 from scipy.stats import zscore
 from math import atan2, degrees
+
+
+def compute_dprime(hits, misses, false_alarms, correct_rejections):
+    """
+    This function takes in hits, misses, false alarms and correct rejections to compute d'
+    :param hits:
+    :param misses:
+    :param false_alarms:
+    :param correct_rejections:
+    :return: dprime, c and beta
+    """
+    z = norm.ppf
+    # Calculate hit rate and false alarm rate
+    hit_rate = hits / (hits + misses)
+    fa_rate = false_alarms / (false_alarms + correct_rejections)
+
+    # Ensure rates are not 0 or 1 to avoid infinite values in Z-transform
+    hit_rate = min(0.99, max(0.01, hit_rate))
+    fa_rate = min(0.99, max(0.01, fa_rate))
+
+    # Compute the dprime as the difference between the zscores of the hit and false alarms rates:
+    dprime = z(hit_rate) - z(fa_rate)
+    # Compute the beta:
+    beta = math.exp((z(fa_rate) ** 2 - z(hit_rate) ** 2) / 2)
+
+    return dprime, beta
 
 
 def format_drop_logs(drop_logs_dict):

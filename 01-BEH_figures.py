@@ -7,7 +7,7 @@ import seaborn as sns
 from scipy.stats import zscore
 from helper_function.helper_plotter import plot_within_subject_boxplot, soa_boxplot
 import environment_variables as ev
-from helper_function.helper_general import load_beh_data
+from helper_function.helper_general import load_beh_data, compute_dprime
 
 SMALL_SIZE = 12
 MEDIUM_SIZE = 12
@@ -45,49 +45,67 @@ data_df = load_beh_data(ev.bids_root, ev.subjects_lists_beh[task], file_name, se
 # A: Accuracy:
 fig1, ax1 = plt.subplots(nrows=1, ncols=2, sharex=False, sharey=True, figsize=[8.3, 8.3])
 # T1 target detection accuracy per category:
-t1_accuracy = []
+t1_dprime = []
 categories = ["face", "object", "letter", "false-font"]
 for subject in data_df_raw["sub_id"].unique():
     for category in categories:
         # Extract the data:
         df = data_df_raw[(data_df_raw["sub_id"] == subject) &
-                         (data_df_raw["category"] == category.replace("-", "_")) &
-                         (data_df_raw["task_relevance"] == "target")]
-        acc = (df["trial_response_vis"].value_counts().get("hit", 0) / df.shape[0]) * 100
-        t1_accuracy.append([subject, category, acc])
-t1_accuracy = pd.DataFrame(t1_accuracy, columns=["sub_id", "category", "T1_accuracy"])
+                         (data_df_raw["category"] == category.replace("-", "_"))]
+        hit = df["trial_response_vis"].value_counts().get("hit", 0)
+        miss = df["trial_response_vis"].value_counts().get("miss", 0)
+        fa = df["trial_response_vis"].value_counts().get("fa", 0)
+        cr = df["trial_response_vis"].value_counts().get("cr", 0)
+        dprime, _ = compute_dprime(hit, miss, fa, cr)
+        t1_dprime.append([subject, category, dprime])
+t1_dprime = pd.DataFrame(t1_dprime, columns=["sub_id", "category", "T1_dprime"])
 
 # T2 pitch detection accuracy:
-t2_accuracy = []
+t2_dprime = []
+t2_beta = []
 pitches = [1000, 1100]
 for subject in data_df_raw["sub_id"].unique():
-    for pitch in pitches:
-        # Extract the data:
-        df = data_df_raw[(data_df_raw["sub_id"] == subject) &
-                         (data_df_raw["pitch"] == pitch) &
-                         (data_df_raw["task_relevance"] == "target")]
-        acc = (np.nansum(df["trial_accuracy_aud"].to_numpy()) / df.shape[0]) * 100
-        t2_accuracy.append([subject, pitch, acc])
-t2_accuracy = pd.DataFrame(t2_accuracy, columns=["sub_id", "pitch", "T2_accuracy"])
+    # Take low pitch as a reference:
+    df = data_df_raw[(data_df_raw["sub_id"] == subject)]
+    hit = df.loc[(df["pitch"] == pitches[0]) & (df["trial_accuracy_aud"] == 1)].shape[0]
+    miss = df.loc[(df["pitch"] == pitches[0]) & (df["trial_accuracy_aud"] != 1)].shape[0]
+    fa = df.loc[(df["pitch"] != pitches[0]) & (df["trial_accuracy_aud"] != 1)].shape[0]
+    cr = df.loc[(df["pitch"] != pitches[0]) & (df["trial_accuracy_aud"] == 1)].shape[0]
+    dprime, beta = compute_dprime(hit, miss, fa, cr)
+    t2_dprime.append([subject, dprime])
+    t2_beta.append([subject, beta])
+t2_dprime = pd.DataFrame(t2_dprime, columns=["sub_id", "dprime"])
+t2_beta = pd.DataFrame(t2_beta, columns=["sub_id", "beta"])
 
-_, _, _ = plot_within_subject_boxplot(t1_accuracy,
-                                      'sub_id', 'category', 'T1_accuracy',
+# Plot T1 dprimes:
+_, _, _ = plot_within_subject_boxplot(t1_dprime,
+                                      'sub_id', 'category', 'T1_dprime',
                                       positions=[1, 2, 3, 4], ax=ax1[0], cousineau_correction=False,
                                       title="",
-                                      xlabel="Category", ylabel="Accuracy (%)",
+                                      xlabel="Category", ylabel="d'",
                                       xlim=None, width=0.5,
-                                      face_colors=[val for val in ev.colors["category"].values()])
-_, _, _ = plot_within_subject_boxplot(t2_accuracy,
-                                      'sub_id', 'pitch', 'T2_accuracy',
-                                      positions=[1, 2], ax=ax1[1], cousineau_correction=False,
-                                      title="",
-                                      xlabel="Pitch", ylabel="",
-                                      xlim=None, width=0.3,
-                                      face_colors=[val for val in ev.colors["pitch"].values()])
+                                      face_colors=[val for val in ev.colors["category"].values()],
+                                      xlabel_fontsize=12)
+# Plot T2 dprimes:
+bplot = ax1[1].boxplot(t2_dprime["dprime"].to_numpy(), patch_artist=True, notch=False,
+                       positions=[1], widths=0.3, medianprops=dict(color="black", linewidth=1.5))
+for i, patch in enumerate(bplot['boxes']):
+    patch.set_facecolor(ev.colors["pitch"]["1000"])
+# Plot the beta:
+ax2 = ax1[1].twinx()
+ax2.sharey(ax1[1])
+bplot = ax1[1].boxplot(t2_beta["beta"].to_numpy(), patch_artist=True, notch=False,
+                       positions=[2], widths=0.3, medianprops=dict(color="black", linewidth=1.5))
+for i, patch in enumerate(bplot['boxes']):
+    patch.set_facecolor(ev.colors["pitch"]["1100"])
+ax1[1].set_xlabel("Pitch")
 ax1[0].set_xticklabels(categories)
-ax1[1].set_xticklabels(pitches)
+ax1[1].set_xticklabels(["d'", r"$\beta$ "])
+ax2.set_ylabel(r"$\beta$ ")
 ax1[0].spines['right'].set_visible(False)
 ax1[1].spines['left'].set_visible(False)
+ax2.spines['left'].set_visible(False)
+ax2.tick_params(length=0)
 ax1[1].yaxis.set_visible(False)
 plt.subplots_adjust(wspace=0)
 fig1.suptitle("Task performances")
@@ -97,18 +115,30 @@ plt.close(fig1)
 
 # ======================================================
 # B: Reaction time:
-fig2, ax2 = plt.subplots(nrows=1, ncols=1, sharex=False, sharey=True, figsize=[8.3 / 2, 8.3])
+fig2, ax2 = plt.subplots(nrows=1, ncols=2, sharex=False, sharey=True, figsize=[8.3, 8.3])
 _, _, _ = plot_within_subject_boxplot(data_df,
                                       'sub_id', 'category', 'RT_vis',
-                                      positions=[1, 2, 3, 4], ax=ax2, cousineau_correction=False,
+                                      positions=[1, 2, 3, 4], ax=ax2[0], cousineau_correction=False,
                                       title="",
                                       xlabel="Category", ylabel="Reaction time (sec.)",
                                       xlim=None, width=0.5,
                                       face_colors=[val for val in ev.colors["category"].values()])
-ax2.set_xticklabels(categories)
-fig2.suptitle("T1 reaction time")
-fig2.savefig(Path(save_root, "t1_rt.svg"), transparent=True, dpi=dpi)
-fig2.savefig(Path(save_root, "t1_rt.png"), transparent=True, dpi=dpi)
+_, _, _ = plot_within_subject_boxplot(data_df,
+                                      'sub_id', 'pitch', 'RT_aud',
+                                      positions=[1, 2], ax=ax2[1], cousineau_correction=False,
+                                      title="",
+                                      xlabel="Pitch", ylabel="",
+                                      xlim=None, width=0.5,
+                                      face_colors=[val for val in ev.colors["pitch"].values()])
+ax2[0].spines['right'].set_visible(False)
+ax2[1].spines['left'].set_visible(False)
+ax2[1].set_xticklabels(pitches)
+ax2[0].set_xticklabels(categories)
+# Remove the white space between both plots:
+plt.subplots_adjust(wspace=0)
+fig2.suptitle("Reaction time")
+fig2.savefig(Path(save_root, "RT.svg"), transparent=True, dpi=dpi)
+fig2.savefig(Path(save_root, "RT.png"), transparent=True, dpi=dpi)
 plt.close(fig2)
 
 # ========================================================================================================
