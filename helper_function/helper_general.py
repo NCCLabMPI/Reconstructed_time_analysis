@@ -8,6 +8,27 @@ from scipy.stats import zscore
 from math import atan2, degrees
 
 
+def format_drop_logs(drop_logs_dict):
+    """
+    This function converts a dictionary of mne python drop logs into a data frame. The dictionary must be of the
+    shape "sub": drop log
+    :param drop_logs_dict:
+    :return:
+    """
+    trial_rej_reas = [list(set(drop_logs_dict[sub])) for sub in drop_logs_dict.keys()]
+    trial_rej_reas = list(set([item for items in trial_rej_reas for item in items if len(item) > 0]))
+    drop_logs_df = []
+    for sub in drop_logs_dict.keys():
+        drop_log_counts = {"sub": sub}
+        drop_log_list = [drop[0] for drop in drop_logs_dict[sub] if len(drop) > 0]
+        # Loop through each reason to get the counts:
+        for reas in trial_rej_reas:
+            drop_log_counts[reas] = np.sum(np.array(drop_log_list) == reas) / len(drop_logs_dict[sub])
+        drop_log_counts["total"] = len(drop_log_list) / len(drop_logs_dict[sub])
+        drop_logs_df.append(pd.DataFrame(drop_log_counts, index=[0]))
+    return pd.concat(drop_logs_df).reset_index(drop=True)
+
+
 def load_beh_data(bids_root, subjects, fn_template, session='1', task='prp', do_trial_exclusion=True):
     """
     This function loads the behavioral data
