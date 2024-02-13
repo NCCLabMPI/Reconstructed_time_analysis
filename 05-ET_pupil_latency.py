@@ -238,8 +238,8 @@ def pupil_latency(parameters_file, subjects, session="1", task="prp"):
 if __name__ == "__main__":
     # Set the parameters to use:
     parameters = (
-        r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker"
-        r"\04-pupil_latency_parameters.json ")
+        r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis"
+        r"\05-ET_pupil_latency_parameters.json")
 
     # Subjects lists:
     subjects_list_prp = ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112",
@@ -249,9 +249,9 @@ if __name__ == "__main__":
     # ==================================================================================
     # Introspection analysis:
     task = "introspection"
-    pupil_latency(parameters, ev.subjects_lists[task], task=task, session=["2", "3"])
+    pupil_latency(parameters, ev.subjects_lists_et[task], task=task, session=["2", "3"])
 
     # ==================================================================================
     # PRP analysis:
     task = "prp"
-    pupil_latency(parameters, ev.subjects_lists[task], task=task, session="1")
+    pupil_latency(parameters, ev.subjects_lists_et[task], task=task, session="1")
