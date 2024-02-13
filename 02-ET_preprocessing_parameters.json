@@ -10,8 +10,7 @@
     "interpolate_blinks",
     "gaze_to_dva",
     "extract_eyelink_events",
-    "epochs",
-    "reject_bad_epochs"
+    "epochs"
   ],
   "events_of_interest": ["vis_onset*"],
   "plot_calibration": true,
