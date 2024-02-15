@@ -74,7 +74,7 @@ def check_plots(parameters_file, subjects, session="1", task="prp"):
         for task_rel in param["task_relevance"]:
             for duration in param["durations"]:
                 for lock in param["locks"]:
-                    for soa in param["soas"]:
+                    for soa in epochs.metadata["SOA"].unique():
                         for window in param["windows"]:
                             # Extract data locked to the visual stimulus:
                             epochs_cropped = epochs.copy().crop(param["windows"][window][0],
@@ -111,7 +111,7 @@ def check_plots(parameters_file, subjects, session="1", task="prp"):
                                                                    index=[0])])
     check_values = check_values.reset_index(drop=True)
     # Create the save directory:
-    save_dir = Path(ev.bids_root, "derivatives", "check_plots", "data")
+    save_dir = Path(ev.bids_root, "derivatives", "check_plots", task, "data")
     if not os.path.isdir(save_dir):
         os.makedirs(save_dir)
     # Save the peak latencies:
@@ -133,17 +133,17 @@ def check_plots(parameters_file, subjects, session="1", task="prp"):
         fig_all, ax_all = soa_boxplot(check_values_window,
                                       "fixation_proportion",
                                       fig_size=[figure_height, figure_height * param["screen_res"][1] /
-                                                param["screen_res"][0]])
+                                                param["screen_res"][0]], cousineau_correction=False)
         # Task relevant:
         fig_tr, ax_tr = soa_boxplot(check_values_window[check_values_window["task_relevance"] == 'non-target'],
                                     "fixation_proportion",
                                     fig_size=[figure_height, figure_height * param["screen_res"][1] /
-                                              param["screen_res"][0]])
+                                              param["screen_res"][0]], cousineau_correction=False)
         # Task irrelevant:
         fig_ti, ax_ti = soa_boxplot(check_values_window[check_values_window["task_relevance"] == 'irrelevant'],
                                     "fixation_proportion",
                                     fig_size=[figure_height, figure_height * param["screen_res"][1] /
-                                              param["screen_res"][0]])
+                                              param["screen_res"][0]], cousineau_correction=False)
         # Set the y limit to be the same for both plots:
         lims = [[ax_all[0].get_ylim()[0], ax_tr[0].get_ylim()[0], ax_ti[0].get_ylim()[0]],
                 [ax_all[0].get_ylim()[1], ax_tr[0].get_ylim()[1], ax_ti[0].get_ylim()[1]]]
@@ -180,17 +180,17 @@ def check_plots(parameters_file, subjects, session="1", task="prp"):
         fig_all, ax_all = soa_boxplot(check_values_window,
                                       "blink_trials",
                                       fig_size=[figure_height, figure_height * param["screen_res"][1] /
-                                                param["screen_res"][0]])
+                                                param["screen_res"][0]], cousineau_correction=False)
         # Task relevant:
         fig_tr, ax_tr = soa_boxplot(check_values_window[check_values_window["task_relevance"] == 'non-target'],
                                     "blink_trials",
                                     fig_size=[figure_height, figure_height * param["screen_res"][1] /
-                                              param["screen_res"][0]])
+                                              param["screen_res"][0]], cousineau_correction=False)
         # Task irrelevant:
         fig_ti, ax_ti = soa_boxplot(check_values_window[check_values_window["task_relevance"] == 'irrelevant'],
                                     "blink_trials",
                                     fig_size=[figure_height, figure_height * param["screen_res"][1] /
-                                              param["screen_res"][0]])
+                                              param["screen_res"][0]], cousineau_correction=False)
         # Set the y limit to be the same for both plots:
         lims = [[ax_all[0].get_ylim()[0], ax_tr[0].get_ylim()[0], ax_ti[0].get_ylim()[0]],
                 [ax_all[0].get_ylim()[1], ax_tr[0].get_ylim()[1], ax_ti[0].get_ylim()[1]]]

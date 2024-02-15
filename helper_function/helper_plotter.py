@@ -203,7 +203,8 @@ def plot_within_subject_boxplot(data_df, within_column, between_column, dependen
 
 
 def soa_boxplot(data_df, dependent_variable, fig_size=None, lock_column="SOA_lock", subject_column="sub_id",
-                between_column="onset_SOA", ax=None, fig=None, colors_onset_locked=None, colors_offset_locked=None):
+                between_column="onset_SOA", ax=None, fig=None, colors_onset_locked=None, colors_offset_locked=None,
+                cousineau_correction=True):
     """
     This function plots the PRP study data in a standardized format, so that it can be used across experiments and data
     types. It is not super well documented, but it is not meant to be reuused as highly specific to this design.
@@ -227,7 +228,7 @@ def soa_boxplot(data_df, dependent_variable, fig_size=None, lock_column="SOA_loc
     # Onset locked data:
     _, _, _ = plot_within_subject_boxplot(data_df[data_df[lock_column] == 'onset'],
                                           subject_column, between_column, dependent_variable,
-                                          positions=between_column, ax=ax[0], cousineau_correction=True,
+                                          positions=between_column, ax=ax[0], cousineau_correction=cousineau_correction,
                                           title="",
                                           xlabel="", ylabel="",
                                           xlim=[-0.1, 0.6], width=0.1,
@@ -238,7 +239,8 @@ def soa_boxplot(data_df, dependent_variable, fig_size=None, lock_column="SOA_loc
                                                       & (data_df["duration"] == dur)], subject_column,
                                               between_column,
                                               dependent_variable,
-                                              positions=between_column, ax=ax[i + 1], cousineau_correction=True,
+                                              positions=between_column, ax=ax[i + 1],
+                                              cousineau_correction=cousineau_correction,
                                               title="",
                                               xlabel="", ylabel="",
                                               xlim=[dur - 0.1, dur + 0.6], width=0.1,
