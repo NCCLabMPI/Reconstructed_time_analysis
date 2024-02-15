@@ -263,182 +263,6 @@ perf = perf %>% add_row(sub_num = 'sd',
 ```
 
 
-# plotting Figure 5a for experiment 1
-RTaud and RTvis as a function of SOA from the visual stimulus onset, grouped by duration and subplots for task-relevance
-
-```{R plotting_fig5a_exp1}
-
-# define size of the plots
-
-width = 1500
-height = 1000
-
-# take mean RTauds for each condition and each subject
-RTaud_table_fig5a = target_event_table %>% group_by(onset_SOA, SOA_lock, duration, sub_id, task_relevance) %>%
-                                      summarise(RT_mean = mean(RT_aud, na.rm = TRUE)*1000)
-
-# take mean and standard deviation of RTauds for each condition
-RTaud_table_fig5a = RTaud_table_fig5a %>%  group_by(onset_SOA, SOA_lock,duration, task_relevance) %>%
-                                      summarise(mean_RT = mean(RT_mean, na.rm = TRUE),
-                                                         sd_RT = sd(RT_mean, na.rm = TRUE),
-                                                         sem_RT = sd_RT / sqrt(n))
-
-# take mean RTvis for each condition and each subject
-RTvis_table_fig5a = target_event_table %>% group_by(onset_SOA,SOA_lock, sub_id, task_relevance, duration) %>%
-                                      summarise(RT_mean_vis = mean(RT_vis, na.rm = TRUE)*1000)
-
-# on onset collapse duration 
-RTvis_table_fig5a= RTvis_table_fig5a %>% mutate(duration = ifelse(SOA_lock == 'onset',0,duration))
-
-# take mean and standard deviation of RTvis for each condition
-RTvis_table_fig5a = RTvis_table_fig5a %>%  group_by(onset_SOA, SOA_lock, task_relevance, duration) %>%
-                                      summarise(mean_RT_vis = mean(RT_mean_vis, na.rm = TRUE),
-                                                         sd_RT_vis = sd(RT_mean_vis, na.rm = TRUE),
-                                                         sem_RT_vis = sd_RT_vis / sqrt(n))
-
-
-# remove NaNs from auditory responses
-RTaud_table_fig5a = RTaud_table_fig5a[!is.na(RTaud_table_fig5a$mean_RT), ]
-RTvis_table_fig5a = RTvis_table_fig5a[!is.na(RTvis_table_fig5a$mean_RT_vis), ]
-
-# define order of task-relevance
-RTaud_table_fig5a$task_relevance = factor(RTaud_table_fig5a$task_relevance,
-                                   levels = c('target', 'non-target', 'irrelevant'),
-                                   labels = c('Target', 'Relevant non-target', 'Irrelevant non-target'))
-RTvis_table_fig5a$task_relevance = factor(RTvis_table_fig5a$task_relevance,
-                                   levels = c('target'),
-                                   labels = c('Target'))
-
-# start plotting
-fig5a = ggplot(data = RTaud_table_fig5a, aes(x = onset_SOA*1000, y = mean_RT, group = interaction(as.character(duration), SOA_lock), color = as.character(duration), linetype = SOA_lock)) +
-  # RTvis
-  geom_line(data = RTvis_table_fig5a, aes(x = onset_SOA*1000, y = mean_RT_vis, color = 'darkgrey', group = interaction(as.character(duration), SOA_lock)), linewidth = 1) +
-  geom_errorbar(data = RTvis_table_fig5a, aes(x = onset_SOA*1000, y = mean_RT_vis, ymin = (mean_RT_vis - sem_RT_vis), ymax = (mean_RT_vis + sem_RT_vis), group = interaction(as.character(duration), SOA_lock), color = 'darkgrey', width = 30), linewidth = 1) +
-  geom_point(data = RTvis_table_fig5a, aes(x = onset_SOA*1000, y = mean_RT_vis, color = 'darkgrey', group = interaction(as.character(duration), SOA_lock)), size = 1.5) +
-  # RTaud
-  geom_line(linewidth = 1) +
-  geom_errorbar(aes(ymin = (mean_RT - sem_RT), ymax = (mean_RT + sem_RT)), width = 30, linewidth = 1) +
-  geom_point(size = 1.5) +
-  # split by task-relevance
-  facet_grid(. ~ task_relevance) +
-  # define optics 
-  labs(title = "Objective reaction time by task-relevance", tag = "A") +
-  ylab("Reaction time [ms]") +
-  xlab('SOA to visual onset [ms]') +
-  scale_color_manual(values = c('darkviolet', 'darkorange', 'darkred', 'darkgrey'),
-                     name = 'Measure',
-                     labels = c(expression("RT"[aud]~" [500 ms duration]  "),
-                                expression("RT"[aud]~" [1000 ms duration]"),
-                                expression("RT"[aud]~" [1500 ms duration]"),
-                                expression("RT"[vis]~" [all durations]        "))) +
-  scale_linetype_manual(values = c("solid", "longdash"),
-                        name = 'SOA time-locked to',
-                        breaks = c('onset', 'offset')) +
-  theme_bw() +
-  theme(axis.line = element_line(colour = "black"),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        panel.border = element_rect(linetype = "solid"),
-        panel.background = element_blank(),
-        axis.text = element_text(color = "black", size = 15),
-        legend.text = element_text(size = 20),
-        legend.title = element_text(size = 20, face="bold"),
-        axis.title = element_text(size = 20, face="bold"),
-        plot.title = element_text(size = 25, face="bold"),
-        plot.tag = element_text(size = 25, face="bold"),
-        strip.text = element_text(size = 20))
-
-# plot figure
-print(fig5a)
-
-# specify the file name for the SVG and png export
-svg_filename = "exp1_fig5a.svg"
-png_filename = "exp1_fig5a.png"
-
-# save an SVG and png graphic 
-svg(svg_filename, width = width, height = height)
-png(png_filename, width = width, height = height)
-
-```
-
-# plotting Figure 5b for experiment 1
-- distribution analysis not preregistered
-
-```{R plotting_fig5b_exp1}
-
-# distribution analysis 
-
-# define custom labels for the columns
-custom_labels <- labeller(SOA_lock = c("onset" = "Onset", "offset" = "Offset"),
-                          task_relevance = c("non-target" = "Relevant non-target",
-                                             "irrelevant" = "Irrelevant non-target"),
-                          duration = c("0.5" = "500 ms",
-                                       "1" = "1000 ms",
-                                       "1.5" = "1500 ms"))
-
-# define order of task relevance
-all_event_table$task_relevance <- factor(all_event_table$task_relevance, levels = c("non-target", "irrelevant"))
-
-# plot for onset - split by task-relevance 
-cdf_on = ggplot(all_event_table %>% filter(SOA_lock == 'onset'& z_RT_aud < 3), aes(x = z_RT_aud, color = as.factor(SOA))) +
-  stat_ecdf(geom = "step", size = 1) +
-  ylab("Cumulative Probability") +
-  labs(title = "Auditory reaction time distribution", tag = "B") +
-  #xlim(c(-2,3))+
-  scale_color_manual(values = c('red', 'blue', '#00b300', "orange"), name = 'SOA [ms]', labels=c('0', '116', '232', '466'))+
-  theme_bw() +
-  theme(axis.line = element_line(colour = "black"),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        panel.border = element_rect(linetype = "solid"),
-        panel.background = element_blank(),
-        axis.text = element_text(color = "black", size = 15),
-        legend.text = element_text(size = 20),
-        legend.title = element_text(size = 20, face="bold"),
-        axis.title = element_blank(),
-        plot.title = element_text(size = 25, face="bold"),
-        plot.tag = element_text(size = 25, face="bold"),
-        strip.text = element_text(size = 20))+   
-  facet_grid(SOA_lock ~ task_relevance, labeller = custom_labels)
-cdf_on
-
-# plot for offset - split by duration
-cdf_off = ggplot(all_event_table %>% filter(SOA_lock == 'offset' & z_RT_aud < 3), aes(x = z_RT_aud, color = as.factor(SOA))) +
-  stat_ecdf(geom = "step", size = 1) +
-  ylab("Cumulative Probability") +
-  xlab("z-scored auditory reaction time") +
-#  xlim(c(-2,3))+
-  scale_color_manual(values = c('red', 'blue', '#00b300', "orange"), name = 'SOA [ms]', labels=c('0', '116', '232', '466'))+
-  theme_bw() +
-  theme(axis.line = element_line(colour = "black"),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        panel.border = element_rect(linetype = "solid"),
-        panel.background = element_blank(),
-        axis.text = element_text(color = "black", size = 15),
-        legend.text = element_text(size = 20),
-        legend.title = element_text(size = 20, face="bold"),
-        axis.title = element_text(size = 20, face="bold"),
-        plot.title = element_text(size = 25, face="bold"),
-        plot.tag = element_text(size = 25, face="bold"),
-        strip.text = element_text(size = 20))+
-  facet_grid(SOA_lock ~ duration, labeller = custom_labels)
-cdf_off
-
-# combine plots
-fig5b = ggarrange(cdf_on, cdf_off, ncol = 1, nrow = 2, common.legend = TRUE, legend = "right")
-print(fig5b)
-
-# specify the file name for the SVG and png export
-svg_filename = "exp1_fig5b.svg"
-png_filename = "exp1_fig5b.png"
-
-# save an SVG and png graphic 
-svg(svg_filename, width = width, height = height)
-png(png_filename, width = width, height = height)
-
-```
-
 # main analysis experiment - model 1 
 
 Generalized linear mixed effect model (GLMM)
@@ -601,60 +425,6 @@ acc_model = glmer(trial_accuracy_aud ~ f_SOA*c_is_onset*c_task_relevant +
 
 summary(acc_model)
 Anova(acc_model)
-
-
-```
-
-# accuracy analysis - accuracy plot (Figure S1) 
-- not preregistered
-
-```{r acc_plot}
-
-# accuracy plot as RT plot
-acc_data = raw_event_table %>% group_by(onset_SOA,SOA_lock, duration, sub_id, task_relevance) %>%
-                                      summarise(acc_mean = mean(trial_accuracy_aud, na.rm = TRUE))
-
-acc_data  = acc_data  %>%  group_by(onset_SOA, SOA_lock,duration, task_relevance) %>%
-                                      summarise(mean_acc = mean(acc_mean, na.rm = TRUE),
-                                                         sd_acc = sd(acc_mean, na.rm = TRUE),
-                                                         sem_acc = sd_acc / sqrt(n))
-
-# remove NaNs from auditory responses
-acc_data  = acc_data [!is.na(acc_data $mean_acc), ]
-
-# define order
-acc_data $task_relevance = factor(acc_data $task_relevance,
-                                   levels = c('target', 'non-target', 'irrelevant'),
-                                   labels = c('Target', 'Relevant non-target', 'Irrelevant non-target'))
-
-
-fig_S1 = ggplot(data = acc_data , aes(x = onset_SOA * 1000, y = mean_acc, group = interaction(as.character(duration), SOA_lock), color = as.character(duration), linetype = SOA_lock)) +
-  geom_line(linewidth = 1) +
-  geom_errorbar(aes(ymin = (mean_acc - sem_acc), ymax = (mean_acc + sem_acc)), width = 30, linewidth = 1) +
-  geom_point(size = 1.5) +
-  facet_grid(. ~ task_relevance) +
-  labs(title = "Auditory accuracy by task-relevance") +
-  ylab("Auditory accuracy [%]") +
-  xlab('SOA to visual onset [ms]') +
-  scale_color_manual(values = c('darkviolet', 'darkorange', 'darkred'),
-                     name = 'Duration [ms]',
-                     labels = c('500', '1000', '1500')) +
-  scale_linetype_manual(values = c("solid", "longdash"),
-                        name = 'SOA time-locked to',
-                        breaks = c('onset', 'offset')) +
-  theme_bw() +
-  theme(axis.line = element_line(colour = "black"),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        panel.border = element_rect(linetype = "solid"),
-        panel.background = element_blank(),
-        axis.text = element_text(color = "black", size = 15),
-        legend.text = element_text(size = 20),
-        legend.title = element_text(size = 20, face="bold"),
-        axis.title = element_text(size = 20, face="bold"),
-        plot.title = element_text(size = 25, face="bold"),
-        strip.text = element_text(size = 20))
-fig_S1
 
 
 ```
@@ -953,188 +723,6 @@ underest_RTaud = mean(all_event_table2$iRT_aud)/mean(all_event_table2$RT_aud*100
 
 ```
 
-# plotting Figure 8a and b for experiment 2
-correlation plots RTvis ~ iRTvis and RTaud ~ iRTaud
-- as preregistred
-
-```{R plotting_fig8ab_exp2}
-
-# correlation for auditory RT (fig 8a)
-fig8a = ggscatter(target_event_table2 , x = "z_RT_aud", y = "z_iRT_aud",
-          add = "reg.line", conf.int = TRUE, 
-          cor.coef = TRUE, cor.method = "pearson", cor.coef.size = 6)+
-  labs(title = "Estimation performance auditory task", tag = "B")+
-  xlab("Objective z-scored reaction time")+
-  ylab('Subjective z-scored decision time')+
-  theme_bw() +
-  theme(axis.line = element_line(colour = "black"),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        panel.border = element_rect(linetype = "solid"),
-        panel.background = element_blank(),
-        axis.text = element_text(color = "black", size = 15),
-        legend.text = element_text(size = 20),
-        legend.title = element_text(size = 20, face="bold"),
-        axis.title = element_text(size = 20, face="bold"),
-        plot.title = element_text(size = 25, face="bold"),
-        plot.tag = element_text(size = 25, face="bold"))
-
-# plot figure
-print(fig8a)
-
-# specify the file name for the SVG and png export
-svg_filename = "exp1_fig8a.svg"
-png_filename = "exp1_fig8a.png"
-
-# save an SVG and png graphic 
-svg(svg_filename, width = width, height = height)
-png(png_filename, width = width, height = height)
-
-
-
-# correlation for auditory RT (fig 8b)
-fig8b = ggscatter(target_event_table2 , x = "z_RT_vis", y = "z_iRT_vis",
-          add = "reg.line", conf.int = TRUE, 
-          cor.coef = TRUE,  cor.method = "pearson", cor.coef.size = 6)+
-  labs(title = "Estimation performance visual task", tag = "A")+
-  xlab("Objective z-scored reaction time")+
-  ylab('Subjective z-scored decision time')+
-  theme_bw() +
-  theme(axis.line = element_line(colour = "black"),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        panel.border = element_rect(linetype = "solid"),
-        panel.background = element_blank(),
-        axis.text = element_text(color = "black", size = 15),
-        legend.text = element_text(size = 20),
-        legend.title = element_text(size = 20, face="bold"),
-        axis.title = element_text(size = 20, face="bold"),
-        plot.title = element_text(size = 25, face="bold"),
-        plot.tag = element_text(size = 25, face="bold"))
-
-# plot figure
-print(fig8b)
-
-# specify the file name for the SVG and png export
-svg_filename = "exp1_fig8b.svg"
-png_filename = "exp1_fig8b.png"
-
-# save an SVG and png graphic
-svg(svg_filename, width = width, height = height)
-png(png_filename, width = width, height = height)
-
-```
-
-# plotting Figure 8c for experiment 2
-RTaud, RTvis, iRTaud and iRTvis as a function of onset SOA, grouped by duration and split by task-relevance
-- as preregistred
-
-```{R plotting_fig8c_exp2}
-
-# take mean RTaud, iRTaud, and iRTvis for each condition and subjects
-RTaud_table_fig8c = target_event_table2 %>% group_by(onset_SOA, SOA_lock, sub_id, task_relevance, duration) %>%
-  summarise(RT_mean = mean(RT_aud, na.rm = TRUE)*1000,
-            iT_aud_mean = mean(iRT_aud, na.rm = TRUE),
-            iT_vis_mean = mean(iRT_vis, na.rm = TRUE))
-
-# collapse across duration
-RTaud_table_fig8c = RTaud_table_fig8c %>% mutate(duration = ifelse(SOA_lock == 'onset',0 , duration))
-
-# take mean and standard deviation of RTaud, iRTaud, and iRTvis for each condition
-RTaud_table_fig8c = RTaud_table_fig8c %>%  group_by(onset_SOA, SOA_lock, task_relevance, duration) %>%
-  summarise(mean_RT = mean(RT_mean, na.rm = TRUE),
-            sd_RT = sd(RT_mean, na.rm = TRUE),
-            sem_RT = sd_RT/sqrt(n2),
-            mean_iT_aud = mean(iT_aud_mean, na.rm = TRUE),
-            sd_iT_aud = sd(iT_aud_mean, na.rm = TRUE),
-            sem_iT_aud = sd_iT_aud/sqrt(n2),
-            mean_iT_vis = mean(iT_vis_mean, na.rm = TRUE),
-            sd_iT_vis = sd(iT_vis_mean, na.rm = TRUE),
-            sem_iT_vis = sd_iT_vis/sqrt(n2))
-
-# define order
-RTaud_table_fig8c$task_relevance = factor(RTaud_table_fig8c$task_relevance , levels=c('target','non-target','irrelevant'))
-
-# take mean RTvis for each condition and subjects
-RTvis_table_fig8c = RTvis_table_fig8c %>% group_by(onset_SOA,SOA_lock, sub_id, task_relevance, duration) %>%
-                                      summarise(RT_mean_vis = mean(RT_vis, na.rm = TRUE))
-
-# collapse duration 
-RTvis_table_fig8c = RTvis_table_fig8c %>% mutate(duration = ifelse(SOA_lock == 'onset',0,duration))
-
-# take mean and standard deviation of RTvis for each condition
-RTvis_table_fig8c = RTvis_table_fig8c %>%  group_by(onset_SOA, SOA_lock, task_relevance, duration) %>%
-                                      summarise(mean_RT_vis = mean(RT_mean_vis, na.rm = TRUE),
-                                                         sd_RT_vis = sd(RT_mean_vis, na.rm = TRUE),
-                                                         sem_RT_vis = sd_RT_vis / sqrt(n2))
-
-
-# remove NaNs from auditory responses
-RTvis_table_fig8c = RTvis_table_fig8c[!is.na(RTvis_table_fig8c$mean_RT_vis), ]
-
-# Define order and relabel levels for the task_relevance variable
-RTaud_table_fig8c$task_relevance <- factor(RTaud_table_fig8c$task_relevance,
-                                   levels = c('target', 'non-target', 'irrelevant'),
-                                   labels = c('Target', 'Relevant non-target', 'Irrelevant non-target'))
-RTvis_table_fig8c$task_relevance <- factor(RTvis_table_fig8c$task_relevance,
-                                   levels = c('target'),
-                                   labels = c('Target'))
-
-# start plotting
-fig8c = ggplot(data = RTaud_table_fig8c, aes(x = onset_SOA * 1000, y = mean_RT, group = interaction(as.character(duration), SOA_lock), linetype = SOA_lock, color = 'RT aud')) +
-  # RTvis
-  geom_line(data = RTvis_table_fig8c, aes(x = onset_SOA * 1000, y = mean_RT_vis * 1000, color = 'RT vis', linetype = SOA_lock),linewidth = 1) +
-  geom_errorbar(data = RTvis_table_fig8c, aes(x = onset_SOA * 1000, y = mean_RT_vis * 1000, ymin = (mean_RT_vis - sem_RT_vis) * 1000, ymax = (mean_RT_vis + sem_RT_vis) * 1000, color = 'RT vis'), width = 30, linewidth = 1) +
-  geom_point(data = RTvis_table_fig8c, aes(x = onset_SOA * 1000, y = mean_RT_vis * 1000, color = 'RT vis', linetype = SOA_lock), size = 1.5) +
-  # RT aud
-  geom_line(linewidth = 1) +
-  geom_point(size = 1.5) +
-  geom_errorbar(aes(ymin = (mean_RT - sem_RT), ymax = (mean_RT + sem_RT)), width = 30, linewidth = 1) +
-  # iRT aud
-  geom_line(aes(y = mean_iT_aud, linetype = SOA_lock, color = 'IT aud'), linewidth = 1) +
-  geom_point(aes(y = mean_iT_aud, color = 'IT aud'), size = 1.5) +
-  geom_errorbar(aes(ymin = (mean_iT_aud - sem_iT_aud), ymax = (mean_iT_aud + sem_iT_aud), color = 'IT aud'), width = 30, linewidth = 1) +
-  # iRT vis
-  geom_line(aes(y = mean_iT_vis, linetype = SOA_lock, color = 'IT vis'), linewidth = 1) +
-  geom_point(aes(y = mean_iT_vis, color = 'IT vis'), size = 1.5) +
-  geom_errorbar(aes(ymin = (mean_iT_vis - sem_iT_vis), ymax = (mean_iT_vis + sem_iT_vis), color = 'IT vis'), width = 30, linewidth = 1) +
-  # split by task-relevance
-  facet_grid(. ~ task_relevance) +
-  # define optics
-  labs(title = "Subjective and objective reaction time", tag = "C") +
-  ylab("Time [ms]") +
-  xlab('SOA to visual onset [ms]') +
-  scale_linetype_manual(values = c("solid", "dashed"), name = 'SOA time-locked to', breaks = c('onset', 'offset')) +
-  scale_color_manual(values = c('RT aud' = 'black', 'RT vis' = 'darkgrey', 'IT aud' = 'darkgreen', 'IT vis' = '#e600ac'),
-                     name = 'Measure',
-                     breaks = c('RT aud', 'RT vis', 'IT aud', 'IT vis'),
-                     labels = c(expression("RT"[aud]), expression("RT"[vis]~" "), expression("IT"[aud]~" "), expression("IT"[vis]~"  "))) +
-  theme_bw() +
-  theme(axis.line = element_line(colour = "black"),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        panel.border = element_rect(linetype = "solid"),
-        panel.background = element_blank(),
-        axis.text = element_text(color = "black", size = 15),
-        legend.text = element_text(size = 20),
-        legend.title = element_text(size = 20, face="bold"),
-        axis.title = element_text(size = 20, face="bold"),
-        plot.title = element_text(size = 25, face="bold"),
-        plot.tag = element_text(size = 25, face="bold"),
-        strip.text = element_text(size = 20))
-
-# plot figure
-print(fig8c)
-
-# specify the file name for the SVG and png export
-svg_filename = "exp1_fig8c.svg"
-png_filename = "exp1_fig8c.png"
-
-# save an SVG and png graphic 
-svg(svg_filename, width = width, height = height)
-png(png_filename, width = width, height = height)
-
-```
 
 # main analysis - experiment 2
 general linear mixed effect model 1 with iRTvis or iRT_aud as dependent variables - as preregistred
@@ -1171,7 +759,7 @@ rsq.glmm(aud_iRT_model)
 vis_iRT_model = glmer(iRT_vis ~ f_SOA*c_is_onset*c_task_relevant +
                      (1*f_SOA*c_is_onset*c_task_relevant | sub_id)+
                      (1*f_SOA*c_is_onset*c_task_relevant | f_duration),
-                   family=Gamma(link="identity"), data=all_event_table2)
+                   family=Gamma(link="log"), data=all_event_table2)
 
 summary(vis_iRT_model)
 
@@ -1295,6 +883,53 @@ rsq.glmm(model_T1)
 
 ```
 
+
+# Relationship between introspective and objective RT
+In our data, we observe that despite the SOA effect on the iT being significant, the iT curve are much flatter than the RT curves, indicating that participants strongly underestimate their RT. Nonetheless, the iT is correlated with RT on a trial by trial basis. To quantify this two aspects of our data statistically, we compute Beta weights for the within and between SOA condition correlation of RT and iT. For that purpose, we compute two regressors: the mean RT per SOA condition and the deviation from mean RT on a trial by trial basis. We expect the mean RT per SOA to not explain a lot of variance, as the slope between mean RT and iT do not show a close association. On the other hand, participants iT still show a close association with RT overall, which should be reflected in a stronger correlation with the trial by trial deviation from the mean.
+
+```{r RTaud~iRTaud}
+# Subselect the column of interest:
+df <- all_event_table2[, c("sub_id", "onset_SOA", "RT_aud", "iRT_aud")]
+
+# Convert iRT to sec:
+df <- df %>% mutate(iRT_aud_0.001 = iRT_aud*0.001)
+# Log transform the RT:
+df$RT_aud <- log(df$RT_aud)
+
+# Compute mean RT audio separately for each SOA:
+df <- df %>%
+  group_by(onset_SOA) %>%
+  mutate(mean_RT_aud = mean(RT_aud))
+# Compute deviation between mean RT and single  trials RT:
+df <- df %>%
+  mutate(dev_RT_aud = RT_aud - mean_RT_aud)
+# Mean center both predictors:
+df$mean_RT_aud <- df$mean_RT_aud - mean(df$mean_RT_aud)
+df$dev_RT_aud <- df$dev_RT_aud - mean(df$dev_RT_aud)
+
+# Model iT as a function of mean RT and deviation from mean RT:
+model_full = glmer(iRT_aud_0.001 ~ dev_RT_aud + mean_RT_aud +
+                  (1 + dev_RT_aud + mean_RT_aud | sub_id), family=Gamma(link="log"), data=df)
+model_meanRT = glmer(iRT_aud_0.001 ~ mean_RT_aud +
+                  (1 + mean_RT_aud | sub_id), family=Gamma(link="log"), data=df)
+model_devRT = glmer(iRT_aud_0.001 ~ dev_RT_aud +
+                  (1 + dev_RT_aud | sub_id), family=Gamma(link="log"), data=df)
+
+# Compute the proportion of variance explained by the mean and RT deviance respectively:
+rsq_full <- rsq.glmm(model_full)
+rsq_meanRT <- rsq.glmm(model_meanRT)
+rsq_devRT <- rsq.glmm(model_devRT)
+print('Variance explained by meanRT:')
+print(rsq_full[['model']] - rsq_devRT[['model']])
+print('Variance explained by devRT:')
+print(rsq_full[['model']] - rsq_meanRT[['model']])
+
+summary(model_full)
+Anova(model_full)
+plot(fitted(model_full),residuals(model_full))
+qqnorm(residuals(model_full))
+
+```
 
 # power analysis
 Based on Marti el al. (2010). What is the minimum sample size required to find a PRP effect that is 4 times smaller than what Mart et al. have found with a power of 0.8?

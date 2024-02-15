@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib as mpl
 
 
-colors_maps = ["Greens", "Greys"]
+colors_maps = ["Oranges", "Purples"]
 conditions = ["T1", "Offset"]
 n_colors = 4
 soas = [0, 0.116, 0.232, 0.466]

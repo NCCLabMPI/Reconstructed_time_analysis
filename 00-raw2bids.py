@@ -75,7 +75,7 @@ def ascii2mne_batch(raw_root, subjects, bids_root, task, session="1", convert_ex
 
 
 def beh2bids_batch(raw_root, subjects, bids_root, task, session="1",
-                   beh_fn_template="sub-{}_ses-{}_run-{}_task-{}_events.csv"):
+                   beh_fn_template="sub-{}_ses-{}_run-{}_task-{}_events.csv", run="all"):
     # Loop through each subject
     for subject in subjects:
         # Get the subject directory:
@@ -84,8 +84,8 @@ def beh2bids_batch(raw_root, subjects, bids_root, task, session="1",
         # Load the concatenated tables:
         log_file = [beh_fl
                     for beh_fl in os.listdir(Path(subject_dir))
-                    if beh_fl == beh_fn_template.format(subject, session, "all", task) or
-                    beh_fl == beh_fn_template.format(subject, session, "all", task).split(".")[0] +
+                    if beh_fl == beh_fn_template.format(subject, session, run, task) or
+                    beh_fl == beh_fn_template.format(subject, session,run, task).split(".")[0] +
                     "_repetition_1.csv"]
         # Load and concatenate the log files:
         log_df = pd.concat([pd.read_csv(Path(subject_dir, log)) for log in log_file]).reset_index(drop=True)
@@ -126,7 +126,15 @@ if __name__ == "__main__":
     # ===========================================
     # PRP:
     beh2bids_batch(ev.raw_root, subjects_list_prp, ev.bids_root, "prp", session="1",
-                   beh_fn_template="sub-{}_ses-{}_run-{}_task-{}_events.csv")
+                   beh_fn_template="sub-{}_ses-{}_run-{}_task-{}_events.csv", run="all")
+    # ===========================================
+    # visual:
+    beh2bids_batch(ev.raw_root, subjects_list_prp, ev.bids_root, "visual", session="1",
+                   beh_fn_template="sub-{}_ses-{}_run-{}_task-{}_events.csv", run="0")
+    # ===========================================
+    # auditory:
+    beh2bids_batch(ev.raw_root, subjects_list_prp, ev.bids_root, "auditory", session="1",
+                   beh_fn_template="sub-{}_ses-{}_run-{}_task-{}_events.csv", run="0")
     # ===========================================
     # Introspection:
     beh2bids_batch(ev.raw_root, subjects_list_introspection, ev.bids_root, "introspection", session="2",
@@ -139,11 +147,19 @@ if __name__ == "__main__":
     # ===========================================
     # PRP:
     ascii2mne_batch(ev.raw_root, subjects_list_prp, ev.bids_root, "prp",
-                    convert_exe=r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker\edf2asc.exe")
+                    convert_exe=r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\edf2asc.exe")
+    # ===========================================
+    # Auditory only practice:
+    ascii2mne_batch(ev.raw_root, subjects_list_prp, ev.bids_root, "auditory",
+                    convert_exe=r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\edf2asc.exe")
+    # ===========================================
+    # Visual only practice:
+    ascii2mne_batch(ev.raw_root, subjects_list_prp, ev.bids_root, "visual",
+                    convert_exe=r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\edf2asc.exe")
     # ===========================================
     # Introspection:
     ascii2mne_batch(ev.raw_root, subjects_list_introspection, ev.bids_root, "introspection", session="2",
-                    convert_exe=r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker\edf2asc.exe")
+                    convert_exe=r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\edf2asc.exe")
     tasks_list = ["introspection"]
     ascii2mne_batch(ev.raw_root, subjects_list_introspection, ev.bids_root, "introspection", session="3",
-                    convert_exe=r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\eye_tracker\edf2asc.exe")
+                    convert_exe=r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\edf2asc.exe")
