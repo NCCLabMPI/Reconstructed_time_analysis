@@ -370,8 +370,8 @@ if __name__ == "__main__":
     # PRP preprocessing:
     task = "prp"
     preprocessing_summary = {subject: {"drop_logs": None, "proportion_bad": None}
-                             for subject in ["SX117", "SX119", "SX120", "SX121", "SX123"]}
-    for sub in ["SX117", "SX119", "SX120", "SX121", "SX123"]:
+                             for subject in  ev.subjects_lists_et[task]}
+    for sub in  ev.subjects_lists_et[task]:
         print("Preprocessing subject {}".format(sub))
         prop_bad, drop_logs = preprocessing(sub, parameters_file, session="1", task="prp")
         preprocessing_summary[sub]["proportion_bad"] = np.mean(prop_bad)

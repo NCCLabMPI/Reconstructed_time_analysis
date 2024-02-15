@@ -77,7 +77,7 @@ subjects_lists_beh = {
 subjects_lists_et = {
     "prp": [
          "SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112", "SX113",
-         "SX114", "SX115", "SX116", "SX117", "SX118", "SX119", "SX120", "SX121", "SX123"
+         "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121", "SX123"
      ],
     "introspection": [
         "SX105", "SX106", "SX108", "SX109", "SX110", "SX113", "SX114", "SX115", "SX116", "SX118"
