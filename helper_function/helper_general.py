@@ -1,4 +1,5 @@
 import math
+import matplotlib
 from mne.baseline import rescale
 from pathlib import Path
 import numpy as np
@@ -8,6 +9,210 @@ from scipy.stats import norm
 from mne.stats import permutation_cluster_1samp_test
 from scipy.stats import zscore
 from math import atan2, degrees
+import mne
+from mne_bids import convert_montage_to_mri
+from matplotlib import colormaps
+
+
+def get_cmap_rgb_values(values, cmap=None, center=None):
+    """
+    This function takes in a list of values and returns a set of RGB values mapping onto a specified color bar. If a
+    midpoint is set, the color bar will be normalized accordingly.
+    :param values: (list of floats) list of values for which to obtain a color map
+    :param cmap: (string) name of the colormap
+    :param center: (float) values on which to center the colormap
+    return: colors (list of rgb triplets) color for each passed value
+    """
+    if cmap is None:
+        cmap = "RdYlBu_r"
+    if center is None:
+        center = np.mean([min(values), max(values)])
+    # Create the normalization function:
+    norm = matplotlib.colors.TwoSlopeNorm(vmin=min(values), vcenter=center, vmax=max(values))
+    colormap = colormaps.get_cmap(cmap)
+    colors = [colormap(norm(value)) for value in values]
+
+    return colors
+
+
+def create_super_subject(epochs_dict, targets_col, n_trials=80):
+    # Extract all targets:
+    targets_id = [list(epochs_dict[sub].metadata[targets_col].unique()) for sub in epochs_dict.keys()]
+    targets_id = list(set([item for items in targets_id for item in items]))
+    # Loop through each target to get counts per subjects:
+    target_counts = {}
+    for sub in epochs_dict.keys():
+        sub_counts = []
+        for target in targets_id:
+            sub_counts.append(np.sum(epochs_dict[sub].metadata[targets_col] == target))
+        target_counts[sub] = sub_counts
+    # Exclude any subjects with less than the set number of trials in each condition:
+    valid_subjects = [sub for sub in target_counts.keys() if all([cts >= n_trials for cts in target_counts[sub]])]
+    # Delete discarded subjects:
+    for sub in epochs_dict.keys():
+        if sub not in valid_subjects:
+            print("Discarding sub-{}, not enough trials!".format(sub))
+            del epochs_dict[sub]
+
+    super_sub_data = []
+    super_sub_labels = []
+    # Loop through each subject:
+    for sub in valid_subjects:
+        sub_labels = []
+        sub_data = []
+        # Loop through each target:
+        for target in targets_id:
+            # Extract the data:
+            data = epochs_dict[sub].copy()[target].get_data(copy=False)
+            if data.shape[0] > n_trials:
+                data = data[np.random.choice(data.shape[0], n_trials, replace=False), :, :]
+            elif data.shape[0] < n_trials:
+                raise Exception("sub-{} has less than {} trials, which is not supposed to be possible!")
+            sub_data.append(data)
+            sub_labels.extend([target] * n_trials)
+        # Concatenate the subject data:
+        super_sub_data.append(np.concatenate(sub_data, axis=0))
+        super_sub_labels.append(sub_labels)
+    assert all([lbls == super_sub_labels[0] for lbls in super_sub_labels]), \
+        "The labels are misaligned across subjects!"
+    # Concatenate the data:
+    super_sub_data = np.concatenate(super_sub_data, axis=1)
+    super_sub_targets = np.array(super_sub_labels[0])
+
+    return super_sub_data, super_sub_targets
+
+
+def get_roi_channels(montage, subject, rois, fs_dir, aseg="aparc+aseg", dist=2):
+    """
+    This function takes in a list of channels and returns only those which are in a particular set of ROIs.
+    :param montage: (list of string) list of channels
+    :param subject: (list of string) list of channels
+    :param rois: (list of string) list of channels
+    :param fs_dir:
+    :param aseg:
+    :param dist:
+    """
+
+    # Extract the labels of each channel:
+    labels, colors = mne.get_montage_volume_labels(montage, subject, fs_dir, aseg=aseg, dist=dist)
+
+    # Keep each channel found within the list:
+    roi_channels = []
+    for ch in labels.keys():
+        for lbl in labels[ch]:
+            if lbl in rois:
+                roi_channels.append(ch)
+    return list(set(roi_channels))
+
+
+def extract_first_bout(times, data, threshold, min_duration):
+    """
+
+    :param times:
+    :param data:
+    :param threshold:
+    :param min_duration:
+    :return:
+    """
+    # Binarize the data with threshold:
+    data_bin = data < threshold
+    if np.any(data_bin):
+        # Compute the diff:
+        data_diff = np.diff(data_bin.astype(float), axis=0)
+        # Find onsets and offsets:
+        onsets = times[np.where(data_diff == 1)[0]]
+        offset_ind = np.where(data_diff == -1)[0]
+        for i, onset in enumerate(onsets):
+            if i == len(offset_ind):
+                offset = times[-1]
+            else:
+                offset = times[offset_ind[i]]
+            if offset - onset > min_duration:
+                return onset, offset
+
+        return None, None
+    else:
+        return None, None
+
+
+def create_mni_montage(channels, bids_path, fs_dir, fsaverage_dir):
+    """
+    This function fetches the mni coordinates of a set of channels. Importantly, the channels must
+    consist of a string with the subject identifier and the channel identifier separated by a minus,
+    like: SF102-G1. This ensures that the channels positions can be fecthed from the right subject
+    folder. This is specific to iEEG for which we have different channels in each patient which
+    may have the same name.
+    :param channels: (list) name of the channels for whom to fetch the MNI coordinates. Must contain
+    the subject identifier as well as the channel identifier, like SF102-G1.
+    :param bids_path: (mne-bids bidsPATH object) contains all the information to fetch the coordinates.
+    :param fs_dir: (string or pathlib path object) path to the free surfer root folder containing the fsaverage
+    :param fsaverage_dir: (string or pathlib path object) path to the free surfer root folder containing the fsaverage
+    :return: info (mne info object) mne info object with the channels info, including position in MNI space
+    """
+    from mne_bids import BIDSPath
+    from mne.transforms import apply_trans
+    import environment_variables as ev
+    # First, extract the name of each subject present in the channels list:
+    subjects = list(set([channel.split('-')[0] for channel in channels]))
+    # Prepare a dictionary:
+    mni_coords = {}
+    channels_types = {}
+    for subject in subjects:
+        # Extract this participant's channels:
+        subject_channels = [channel.split('-')[1] for channel in channels
+                            if channel.split('-')[0] == subject]
+        # Create the path to this particular subject:
+        subject_path = BIDSPath(root=bids_path.root, subject=subject,
+                                session=bids_path.session,
+                                datatype=bids_path.datatype,
+                                task=bids_path.task)
+        # Create the name of the mni file coordinates:
+        coordinates_file = 'sub-{}_ses-{}_space-ACPC_electrodes.tsv'.format(subject,
+                                                                            subject_path.session)
+        channel_file = 'sub-{}_ses-{}_task-{}_channels.tsv'.format(subject, subject_path.session, bids_path.task)
+        # Load the coordinates:
+        coordinates_df = pd.read_csv(Path(subject_path.directory, coordinates_file), sep='\t')
+        channels_df = pd.read_csv(Path(subject_path.directory, channel_file), sep='\t')
+
+        # Get the position:
+        position = coordinates_df.loc[coordinates_df['name'].isin(
+            subject_channels), ['x', 'y', 'z']].to_numpy()
+        # Get the types of the channels:
+        subject_channel_type = channels_df.loc[channels_df['name'].isin(subject_channels),
+        ['name', 'type']].set_index('name').to_dict()['type']
+        subject_channel_type = {"-".join([subject, ch]): subject_channel_type[ch] for ch in subject_channel_type.keys()}
+        channels_types.update(subject_channel_type)
+        # Create the montage:
+        montage = mne.channels.make_dig_montage(ch_pos=dict(zip(["-".join([subject, ch]) for ch in subject_channels],
+                                                                position)),
+                                                coord_frame="ras")
+        # we need to go from scanner RAS back to surface RAS (requires recon-all)
+        convert_montage_to_mri(montage, "sub-" + subject, subjects_dir=ev.fs_directory)
+        # Add estimated fiducials
+        montage.add_estimated_fiducials("sub-" + subject, fs_dir)
+        # Fetch the transformation from mri -> mni
+        mri_mni_trans = mne.read_talxfm("sub-" + subject, fs_dir)
+        # Extract the channel position from the montage:
+        ch_pos = montage.get_positions()['ch_pos']
+        # Apply affine transformation to each:
+        for ind, ch in enumerate(ch_pos.keys()):
+            mni_coords[ch] = apply_trans(mri_mni_trans, ch_pos[ch] * 1000) / 1000
+
+    # Create the montage:
+    montage = mne.channels.make_dig_montage(ch_pos=mni_coords,
+                                            coord_frame='mni_tal')
+    # Make sure that the channel types are in lower case:
+    channels_types = {ch: channels_types[ch].lower() for ch in channels_types}
+    # Project the montage to the surface:
+    montage = project_montage_to_surf(montage, channels_types, "fsaverage", fsaverage_dir)
+    # Add the MNI fiducials
+    montage.add_mni_fiducials(fsaverage_dir)
+    # In mne-python, plotting electrodes on the brain requires some additional info about the channels:
+    info = mne.create_info(ch_names=channels, ch_types=list(channels_types.values()), sfreq=100)
+    # Add the montage:
+    info.set_montage(montage)
+
+    return info
 
 
 def compute_dprime(hits, misses, false_alarms, correct_rejections):
