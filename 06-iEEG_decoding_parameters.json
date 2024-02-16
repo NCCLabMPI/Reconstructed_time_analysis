@@ -9,10 +9,10 @@
   "min_ntrials": 80,
   "kfold": 2,
   "n_jobs": 8,
-  "n_perm": 100,
+  "n_perm": 1048,
   "alpha": 0.05,
   "dur_threshold": 0.05,
-  "n_bootsstrap": 100,
+  "n_bootsstrap": 10,
   "ci": 0.95,
   "rois": [
       ["ctx_lh_G_and_S_cingul-Ant",

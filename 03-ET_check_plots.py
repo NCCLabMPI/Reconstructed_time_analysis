@@ -120,7 +120,7 @@ def check_plots(parameters_file, subjects, session="1", task="prp"):
     # =========================================================================
     # Plot the results:
     # Create the save directory:
-    save_dir = Path(ev.bids_root, "derivatives", "check_plots", "figures")
+    save_dir = Path(ev.bids_root, "derivatives", "check_plots", task, "figures")
     if not os.path.isdir(save_dir):
         os.makedirs(save_dir)
 

@@ -8,6 +8,7 @@ from scipy.stats import mannwhitneyu
 from helper_function.helper_general import baseline_scaling, extract_first_bout
 import environment_variables as ev
 from pingouin import ttest
+from scipy.ndimage import uniform_filter1d
 from helper_function.helper_plotter import plot_ts_ci
 
 # Set the font size:
@@ -72,31 +73,33 @@ def univariate_latency(parameters_file, subjects, data_root, session="1", task="
         ch_latencies = {}
         for ch in tr_epochs.ch_names:
             # Extract the data:
-            data_tr = np.squeeze(tr_epochs.get_data(picks=ch))
-            data_ti = np.squeeze(ti_epochs.get_data(picks=ch))
+            data_tr = uniform_filter1d(np.squeeze(tr_epochs.get_data(picks=ch)), size=20, axis=-1)
+            data_ti = uniform_filter1d(np.squeeze(ti_epochs.get_data(picks=ch)), size=20, axis=-1)
             # Compute a sliding mann whitney u:
-            res = mannwhitneyu(data_tr, data_ti, alternative="two-sided", axis=1)
+            res = mannwhitneyu(data_tr, data_ti, alternative="two-sided", axis=0)
             # Isolate bouts that are significant for n ms or more:
             onset, offset = extract_first_bout(times, np.array(res.pvalue),
                                                param["alpha"],
                                                param["dur_threshold"])
-            # Plot the channel results:
-            fig, ax = plt.subplots()
-            plot_ts_ci(data_tr, epochs.times, ev.colors["task_relevance"]["Relevant non-target"],
-                       plot_ci=True, ax=ax, label="Relevant non-target")
-            plot_ts_ci(data_ti, epochs.times, ev.colors["task_relevance"]["Irrelevant"],
-                       plot_ci=True, ax=ax, label="Irrelevant")
-            ax.legend()
-            ax.set_ylabel("HGP (norm.)")
-            ax.set_xlabel("Time (sec.)")
-            fig.savefig(Path(save_dir, "sub-{}_ch-{}_trti.svg".format(sub, ch.replace("*", ""))),
-                        transparent=True, dpi=300)
-            fig.savefig(Path(save_dir, "sub-{}_ch-{}_trti.png".format(sub, ch.replace("*", ""))),
-                        transparent=True, dpi=300)
-            plt.close()
             if onset is not None:
                 # Store the channel latency
-                ch_latencies["-".join([sub, ch])] = [onset, offset]
+                ch_latencies["-".join([sub, ch])] = [onset, offset]            # Plot the channel results:
+                fig, ax = plt.subplots()
+                plot_ts_ci(data_tr, epochs.times, ev.colors["task_relevance"]["Relevant non-target"],
+                           plot_ci=True, ax=ax, label="Relevant non-target")
+                plot_ts_ci(data_ti, epochs.times, ev.colors["task_relevance"]["Irrelevant"],
+                           plot_ci=True, ax=ax, label="Irrelevant")
+                ax.axvline(onset, color=ev.colors["soa"]["0.0"])
+                ax.axvline(offset, color=ev.colors["soa_offset_locked"]["0.0"])
+                ax.legend()
+                ax.set_ylabel("HGP (norm.)")
+                ax.set_xlabel("Time (sec.)")
+                fig.savefig(Path(save_dir, "sub-{}_ch-{}_trti.svg".format(sub, ch.replace("*", ""))),
+                            transparent=True, dpi=300)
+                fig.savefig(Path(save_dir, "sub-{}_ch-{}_trti.png".format(sub, ch.replace("*", ""))),
+                            transparent=True, dpi=300)
+                plt.close()
+
 
 
 if __name__ == "__main__":

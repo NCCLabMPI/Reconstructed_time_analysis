@@ -114,20 +114,20 @@ def decoding(parameters_file, subjects, data_root, session="1", task="dur", anal
                                                          param["dur_threshold"])
 
             # Repeating the same but subsampling the electrodes:
-            scores_bootsstrap = []
-            for i in range(param["n_bootsstrap"]):
-                scores_bootsstrap.append(np.mean(cross_val_multiscore(time_res,
-                                                                      data[:, np.random.choice(data.shape[1],
-                                                                                               data.shape[1],
-                                                                                               replace=True), :],
-                                                                      labels,
-                                                                      cv=param["kfold"], n_jobs=param["n_jobs"]),
-                                                 axis=0))
+            # scores_bootsstrap = []
+            # for i in range(param["n_bootsstrap"]):
+            #    scores_bootsstrap.append(np.mean(cross_val_multiscore(time_res,
+            #                                                          data[:, np.random.choice(data.shape[1],
+            #                                                                                   data.shape[1],
+            #                                                                                   replace=True), :],
+            #                                                          labels,
+            #                                                          cv=param["kfold"], n_jobs=param["n_jobs"]),
+            #                                     axis=0))
             # Compute the confidence interval:
-            ci = (((1 - param["ci"]) / 2) * 100, ((1 - ((1 - param["ci"]) / 2))) * 100)
-            ci_low, ci_up = np.percentile(np.array(scores_bootsstrap), ci, axis=0)
+            #ci = (((1 - param["ci"]) / 2) * 100, ((1 - ((1 - param["ci"]) / 2))) * 100)
+            #ci_low, ci_up = np.percentile(np.array(scores_bootsstrap), ci, axis=0)
             # Add to the dictionary:
-            scores_ci_dict[tsk] = np.array([ci_low, ci_up])
+            #scores_ci_dict[tsk] = np.array([ci_low, ci_up])
 
         # Plot the results:
         fig, ax = plt.subplots()
@@ -136,9 +136,9 @@ def decoding(parameters_file, subjects, data_root, session="1", task="dur", anal
             upci = uniform_filter1d(scores_ci_dict[tsk][0], size=10, axis=-1)
             lowci = uniform_filter1d(scores_ci_dict[tsk][0], size=10, axis=-1)
             ax.plot(times, score, color=ev.colors["task_relevance"][tsk], label=tsk)
-            ax.fill_between(times, upci, lowci,
-                            color=ev.colors["task_relevance"][tsk],
-                            alpha=.3)
+            #ax.fill_between(times, lowci, upci,
+            #                color=ev.colors["task_relevance"][tsk],
+            #                alpha=.3)
             if decoding_latencies[tsk][1] is not None:
                 ax.axvline(decoding_latencies[tsk][1], color=ev.colors["task_relevance"][tsk])
         ax.legend()
