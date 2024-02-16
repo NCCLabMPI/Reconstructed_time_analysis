@@ -1,10 +1,13 @@
 
 bids_root = r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\bids"
 raw_root = r"P:\2023-0357-ReconTime\03_data\raw_data"
+fs_directory = r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\bids\derivatives\fs"
 colors = {
     "task_relevance": {
         "non-target": [104/255, 142/255, 38/255],
-        "irrelevant": [81/255, 37/255, 0/255]
+        "Relevant non-target": [104/255, 142/255, 38/255],
+        "irrelevant": [81/255, 37/255, 0/255],
+        "Irrelevant": [81/255, 37/255, 0/255]
     },
     "soa": {
         "0.0": [0.40392157, 0.,         0.05098039],
@@ -82,4 +85,12 @@ subjects_lists_et = {
     "introspection": [
         "SX105", "SX106", "SX108", "SX109", "SX110", "SX113", "SX114", "SX115", "SX116", "SX118"
     ]
+}
+
+subjects_lists_ecog = {
+    "dur": [
+         "SE103", "SE106", "SE107", "SE108", "SE109", "SE110", "SE112", "SE113", "SE115", "SE119", "SE120",
+         "SF102", "SF104", "SF105", "SF106", "SF107", "SF109", "SF110", "SF112", "SF113", "SF116", "SF117",
+         "SF119", "SF120", "SF121", "SF122"
+     ]
 }
