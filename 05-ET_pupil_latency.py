@@ -272,12 +272,6 @@ if __name__ == "__main__":
     parameters = (
         r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis"
         r"\05-ET_pupil_latency_parameters.json")
-
-    # Subjects lists:
-    subjects_list_prp = ["SX102", "SX103", "SX105", "SX106", "SX107", "SX108", "SX109", "SX110", "SX111", "SX112",
-                         "SX113", "SX114", "SX115", "SX116", "SX118", "SX119", "SX120", "SX121", "SX123"]
-    subjects_list_intro = ["SX101", "SX105", "SX106", "SX108", "SX109", "SX110", "SX113", "SX114",
-                           "SX115", "SX116", "SX118"]
     # ==================================================================================
     # Introspection analysis:
     task = "introspection"
