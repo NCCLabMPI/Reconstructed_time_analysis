@@ -9,9 +9,9 @@ from helper_function.helper_plotter import plot_within_subject_boxplot, soa_boxp
 import environment_variables as ev
 from helper_function.helper_general import load_beh_data, compute_dprime
 
-SMALL_SIZE = 12
-MEDIUM_SIZE = 12
-BIGGER_SIZE = 12
+SMALL_SIZE = 14
+MEDIUM_SIZE = 16
+BIGGER_SIZE = 18
 dpi = 300
 plt.rcParams['svg.fonttype'] = 'none'
 plt.rc('font', size=SMALL_SIZE)  # controls default text sizes
