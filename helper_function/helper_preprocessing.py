@@ -117,7 +117,10 @@ def annotate_nan(raw, nan_annotation="BAD_nan", eyes=None):
         offsets = raw.times[np.where(nan_diff == -1)[0]]
         # Compute duration:
         if onsets.shape[0] > 0:
-            assert onsets.shape[0] == offsets.shape[0], "Different numbers of onsets and offsets!"
+            if onsets.shape[0] == offsets.shape[0] + 1:
+                offsets = raw.times[-1]
+            else:
+                raise Exception("Different numbers of onsets and offsets!")
             duration = offsets - onsets
             # Create annotations accordingly:
             nan_annotations = mne.Annotations(
@@ -141,7 +144,7 @@ def load_raw_eyetracker(bids_root, subject, session, task, beh_file_name,
     raw root to extract additional information. For a few subjects, some triggers weren't received by the eyetracker
     and therefore, the logs need to be aligned back to the eyetracker trigger to avoid any mismatch, which is what this
     function does. In addition, loading the calibration results.
-    :param files_root: (Path or string) path to the eyetracking files
+    :param bids_root: (Path or string) path to the eyetracking files
     :param subject: (string) name of the subject
     :param session: (string) session
     :param task: (string) task
@@ -180,7 +183,10 @@ def load_raw_eyetracker(bids_root, subject, session, task, beh_file_name,
             # Extract the run ID:
             run_i = int(re.search(r'run-(\d{2})', fl).group(1))
             # Extract the corresponding part of the log file:
-            run_log = log_file[log_file["block"] == run_i].reset_index(drop=True)
+            if log_file["is_practice"].to_list()[0] == 1:
+                run_log = log_file
+            else:
+                run_log = log_file[log_file["block"] == run_i].reset_index(drop=True)
 
             try:
                 raw = mne.io.read_raw_eyelink(Path(et_root, fl), verbose=verbose)
@@ -556,8 +562,8 @@ def epoch_data(raw, events, event_dict, events_of_interest=None, metadata_column
     :param events_of_interest: (list of strings) list of events that we wish to epochs. The name must match strings
     found in the event_dict keys
     :param metadata_column: (list of strings) name of the meta data table columns. The event descriptions must be
-    encoded as \ separated values. Each string in the event dict key corresponds to a specific parameter from the
-    experiment. These are then parsed as a meta data table accordingly
+    encoded as backward slash separated values. Each string in the event dict key corresponds to a specific parameter
+    from the experiment. These are then parsed as a meta data table accordingly
     :param tmin: (float) time from which to epoch (relative to event onset)
     :param tmax: (float) time until which to epoch (relative to event onset)
     :param baseline: (None or tuple) time to use as baseline. If set to None, no baseline correction applied
