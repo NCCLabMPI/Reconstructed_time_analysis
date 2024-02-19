@@ -75,7 +75,7 @@ def ascii2mne_batch(raw_root, subjects, bids_root, task, session="1", convert_ex
 
 
 def beh2bids_batch(raw_root, subjects, bids_root, task, session="1",
-                   beh_fn_template="sub-{}_ses-{}_run-{}_task-{}_events.csv", run="all"):
+                   beh_fn_template="sub-{}_ses-{}_run-{}_task-{}_events.csv", run="all", remove_practice=True):
     # Loop through each subject
     for subject in subjects:
         # Get the subject directory:
@@ -96,7 +96,8 @@ def beh2bids_batch(raw_root, subjects, bids_root, task, session="1",
         log_df = log_df[~log_df['is_duplicate']]
         # For some participants, there was a bug in the code such that the practice table were saved alongside the
         # prp. Removing any such trials:
-        log_df = log_df[log_df["is_practice"] == 0]
+        if remove_practice:
+            log_df = log_df[log_df["is_practice"] == 0]
         # Create the bids directory for that subject:
         if subject == "SX122":  # The subject SX122 was misnamed, it was actually SX116
             save_dir = Path(bids_root, "sub-" + "SX116", "ses-" + session, "beh")
@@ -130,11 +131,11 @@ if __name__ == "__main__":
     # ===========================================
     # visual:
     beh2bids_batch(ev.raw_root, subjects_list_prp, ev.bids_root, "visual", session="1",
-                   beh_fn_template="sub-{}_ses-{}_run-{}_task-{}_events.csv", run="0")
+                   beh_fn_template="sub-{}_ses-{}_run-{}_task-{}_events.csv", run="0", remove_practice=False)
     # ===========================================
     # auditory:
     beh2bids_batch(ev.raw_root, subjects_list_prp, ev.bids_root, "auditory", session="1",
-                   beh_fn_template="sub-{}_ses-{}_run-{}_task-{}_events.csv", run="0")
+                   beh_fn_template="sub-{}_ses-{}_run-{}_task-{}_events.csv", run="0", remove_practice=False)
     # ===========================================
     # Introspection:
     beh2bids_batch(ev.raw_root, subjects_list_introspection, ev.bids_root, "introspection", session="2",
