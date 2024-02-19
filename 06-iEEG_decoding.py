@@ -225,7 +225,7 @@ def decoding(parameters_file, subjects, data_root, session="1", task="dur", anal
     sig_latencies = latencies_table.loc[latencies_table["offset tr-ti"] > 0]
     rois_colors = get_cmap_rgb_values(sig_latencies["offset tr-ti"].to_numpy(), cmap="jet", center=None)
     fig, ax = plt.subplots()
-    for i, roi_name in list(sig_latencies["roi"].unique()):
+    for i, roi_name in enumerate(list(sig_latencies["roi"].unique())):
         # Extract the data of each task:
         tr_scores = roi_scores[roi_name]["Relevant non-target"]
         ti_scores = roi_scores[roi_name]["Irrelevant"]
