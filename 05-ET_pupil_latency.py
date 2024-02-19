@@ -151,8 +151,10 @@ def pupil_latency(parameters_file, subjects, session="1", task="prp", analysis_n
     for lock in param["lock"]:
         if lock == "onset":
             boxplot_ylim = [0, 1.5]
+            pupil_size_ylim = [-50, 150]
         else:
             boxplot_ylim = None
+            pupil_size_ylim = [-50, 50]
         # ===========================================================
         # Per SOA:
         if lock == "onset":  # For the offset locked trials, we need to plot separately per stimuli durations:
@@ -173,7 +175,8 @@ def pupil_latency(parameters_file, subjects, session="1", task="prp", analysis_n
                                                                              as_index=False)[
                 ["latency", "latency_aud"]].mean()
             fig = plot_pupil_latency(evks, times, latencies, ev.colors["soa_{}_locked".format(lock)],
-                                     boxplot_ylim=boxplot_ylim)
+                                     boxplot_ylim=boxplot_ylim, pupil_size_ylim=pupil_size_ylim,
+                                     figsize=[8.3, 11.7/2])
             fig.savefig(Path(save_dir, "pupil_latency_{}.svg".format(lock)), transparent=True, dpi=300)
             fig.savefig(Path(save_dir, "pupil_latency_{}.png".format(lock)), transparent=True, dpi=300)
             plt.close()
@@ -200,14 +203,19 @@ def pupil_latency(parameters_file, subjects, session="1", task="prp", analysis_n
                     as_index=False)[["latency",
                                      "latency_aud"]].mean()
                 fig = plot_pupil_latency(evks, times, latencies, ev.colors["soa_{}_locked".format(lock)],
-                                         boxplot_ylim=boxplot_ylim)
+                                         boxplot_ylim=boxplot_ylim, pupil_size_ylim=pupil_size_ylim,
+                                         figsize=[8.3, 11.7/2])
                 fig.savefig(Path(save_dir, "pupil_latency_{}-{}.svg".format(lock, task)), transparent=True, dpi=300)
                 fig.savefig(Path(save_dir, "pupil_latency_{}-{}.png".format(lock, task)), transparent=True, dpi=300)
                 plt.close()
 
         # ===========================================================
         # Separately for each durations:
-        for duration in param["duration"]:
+        for dur_i, duration in enumerate(param["duration"]):
+            if dur_i == 2:
+                plot_legend = True
+            else:
+                plot_legend = False
             evks = {soa: [] for soa in soas}
             for soa in soas:
                 # Loop through each subject:
@@ -227,7 +235,9 @@ def pupil_latency(parameters_file, subjects, session="1", task="prp", analysis_n
                                                                                as_index=False)[["latency",
                                                                                                 "latency_aud"]].mean())
             fig = plot_pupil_latency(evks, times, latencies, ev.colors["soa_{}_locked".format(lock)],
-                                     boxplot_ylim=boxplot_ylim)
+                                     boxplot_ylim=boxplot_ylim, pupil_size_ylim=pupil_size_ylim,
+                                     plot_legend=plot_legend,
+                                     figsize=[8.3, 11.7/4])
             fig.savefig(Path(save_dir, "pupil_latency_{}-{}.svg".format(lock, duration)),
                         transparent=True, dpi=300)
             fig.savefig(Path(save_dir, "pupil_latency_{}-{}.png".format(lock, duration)),
@@ -237,7 +247,11 @@ def pupil_latency(parameters_file, subjects, session="1", task="prp", analysis_n
         # ===========================================================
         # Separately for each durations and task relevance:
         for task in param["task_relevance"]:
-            for duration in param["duration"]:
+            for dur_i, duration in enumerate(param["duration"]):
+                if dur_i == 2:
+                    plot_legend = True
+                else:
+                    plot_legend = False
                 evks = {soa: [] for soa in soas}
                 for soa in soas:
                     # Loop through each subject:
@@ -259,7 +273,9 @@ def pupil_latency(parameters_file, subjects, session="1", task="prp", analysis_n
                                                                            as_index=False)[["latency",
                                                                                             "latency_aud"]].mean())
                 fig = plot_pupil_latency(evks, times, latencies, ev.colors["soa_{}_locked".format(lock)],
-                                         boxplot_ylim=boxplot_ylim)
+                                         boxplot_ylim=boxplot_ylim, pupil_size_ylim=pupil_size_ylim,
+                                         plot_legend=plot_legend,
+                                         figsize=[8.3, 11.7/4])
                 fig.savefig(Path(save_dir, "pupil_latency_{}-{}-{}.svg".format(lock, task, duration)),
                             transparent=True, dpi=300)
                 fig.savefig(Path(save_dir, "pupil_latency_{}-{}-{}.png".format(lock, task, duration)),
