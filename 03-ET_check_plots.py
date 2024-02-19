@@ -277,5 +277,3 @@ if __name__ == "__main__":
     # Introspection analysis:
     task = "introspection"
     check_plots(parameters, ev.subjects_lists_et[task], task=task, session=["2", "3"])
-
-
