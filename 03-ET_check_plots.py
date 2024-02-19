@@ -10,6 +10,7 @@ import environment_variables as ev
 from helper_function.helper_plotter import soa_boxplot
 import matplotlib.image as mpimg
 import matplotlib.patches as patches
+from scipy.ndimage import uniform_filter1d
 
 # Set the font size:
 SMALL_SIZE = 12
@@ -71,15 +72,14 @@ def check_plots(parameters_file, subjects, session="1", task="prp"):
         epochs.pick(param["picks"])
 
         # Loop through each relevant condition:
-        for task_rel in param["task_relevance"]:
-            for duration in param["durations"]:
-                for lock in param["locks"]:
-                    for soa in epochs.metadata["SOA"].unique():
-                        for window in param["windows"]:
-                            # Extract data locked to the visual stimulus:
-                            epochs_cropped = epochs.copy().crop(param["windows"][window][0],
-                                                                param["windows"][window][1])
-
+        for window in param["windows"]:
+            # Extract data locked to the visual stimulus:
+            epochs_cropped = epochs.copy().crop(param["windows"][window][0],
+                                                param["windows"][window][1])
+            for task_rel in param["task_relevance"]:
+                for duration in param["durations"]:
+                    for lock in param["locks"]:
+                        for soa in epochs.metadata["SOA"].unique():
                             # Extract the data and average across left and right eye:
                             fixation_data = np.mean(
                                 epochs_cropped.copy()["/".join([task_rel, duration, lock, soa])].pick(["fixdist_left",
@@ -92,7 +92,7 @@ def check_plots(parameters_file, subjects, session="1", task="prp"):
                                     copy=False),
                                 axis=1)
                             # Compute the fixation proportion:
-                            fix_prop = np.mean(np.mean(fixation_data < param["fixdist_thresh_deg"], axis=1))
+                            fix_prop = np.median(np.mean(fixation_data < param["fixdist_thresh_deg"], axis=1))
                             # Compute the proportion of trials in which participants blinked:
                             blink_trials = len(np.where(np.any(blinks_data, axis=1))[0]) / blinks_data.shape[0]
 
