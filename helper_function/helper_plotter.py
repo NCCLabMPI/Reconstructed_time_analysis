@@ -312,7 +312,8 @@ def plot_ts_ci(data, times, color, plot_ci=True, ax=None, label="", clusters=Non
     return ax
 
 
-def plot_pupil_latency(evoked_dict, times, latencies_df, colors, pupil_size_ylim=None, boxplot_ylim=None):
+def plot_pupil_latency(evoked_dict, times, latencies_df, colors, pupil_size_ylim=None, boxplot_ylim=None,
+                       plot_legend=True, figsize=None):
     """
 
     :param evoked_dict:
@@ -322,6 +323,8 @@ def plot_pupil_latency(evoked_dict, times, latencies_df, colors, pupil_size_ylim
     :param boxplot_ylim:
     :return:
     """
+    if figsize:
+        figsize = [10, 11.7 / 4]
     fig = plt.figure(figsize=[10, 11.7 / 4], constrained_layout=True)
     spec = fig.add_gridspec(ncols=4, nrows=1)
     ax1 = fig.add_subplot(spec[0, 0:3])
@@ -341,7 +344,8 @@ def plot_pupil_latency(evoked_dict, times, latencies_df, colors, pupil_size_ylim
                    linestyle="--",
                    color=colors[soa], linewidth=2, zorder=10)
     ax1.set_ylim(pupil_size_ylim)
-    ax1.legend()
+    if plot_legend:
+        ax1.legend()
     ax1.set_xlabel("Time (sec.)")
     ax1.set_ylabel("Pupil size (norm.)")
     # Plot the latency as a function of SOA:
