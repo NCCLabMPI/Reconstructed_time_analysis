@@ -893,7 +893,7 @@ onset_event_table2 = all_event_table2 %>% filter(SOA_lock == "onset")
 tr_onset_event_table2 = onset_event_table2 %>% filter(task_relevance == "non-target")
 
 # Set the number of iterations:
-iterations <- 100
+iterations <- 1000
 
 # Pre-allocate to store the pvalues
 p_values <- numeric()
@@ -921,7 +921,7 @@ for (i in 1:iterations) {
   p_values <- c(p_values, p_value)
 }
 
-hist(p_values, main="P-values", xlab="P-val", ylab="Frequncy", col="lightblue", border="black")
+hist(p_values, main="P-values", xlab="P-val", ylab="Frequncy", border="black")
 
 ```
 
