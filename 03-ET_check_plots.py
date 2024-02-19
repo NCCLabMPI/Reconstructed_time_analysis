@@ -92,7 +92,7 @@ def check_plots(parameters_file, subjects, session="1", task="prp"):
                                     copy=False),
                                 axis=1)
                             # Compute the fixation proportion:
-                            fix_prop = np.median(np.mean(fixation_data < param["fixdist_thresh_deg"], axis=1))
+                            fix_prop = np.mean(np.mean(fixation_data < param["fixdist_thresh_deg"], axis=1))
                             # Compute the proportion of trials in which participants blinked:
                             blink_trials = len(np.where(np.any(blinks_data, axis=1))[0]) / blinks_data.shape[0]
 
