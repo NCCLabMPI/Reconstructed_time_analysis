@@ -414,7 +414,7 @@ plt.close(fig_ti)
 # ========================================================================
 # Plot regression between iT2 and RT2:
 markers = ["v", "^", ">"]
-fig_size = [8.3, 8.3]
+fig_size = [8.3*2, 8.3]
 fig, ax = plt.subplots(nrows=1, ncols=2, sharex=True, sharey=True, figsize=fig_size)
 
 # Loop through onset and offset locked:
@@ -447,7 +447,7 @@ fig.savefig(Path(save_root, "RT-vs-iRTaudio.svg"), transparent=True, dpi=dpi)
 fig.savefig(Path(save_root, "RT-vs-iRTaudio.png"), transparent=True, dpi=dpi)
 plt.close(fig)
 
-fig_size = [8.3/2, 8.3]
+fig_size = [8.3, 8.3]
 fig, ax = plt.subplots(nrows=1, ncols=1, sharex=True, sharey=True, figsize=fig_size)
 cond_df = data_df[(data_df["task_relevance"] == 'target') & (data_df["zRT_vis"].notna())]
 r, p = pearsonr(x=cond_df['ziRT_vis'], y=cond_df['zRT_vis'])
