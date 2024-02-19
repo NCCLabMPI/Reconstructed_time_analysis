@@ -4,7 +4,7 @@ import numpy as np
 from pathlib import Path
 import matplotlib.pyplot as plt
 import seaborn as sns
-from scipy.stats import zscore
+from scipy.stats import zscore, pearsonr
 from helper_function.helper_plotter import plot_within_subject_boxplot, soa_boxplot
 import environment_variables as ev
 from helper_function.helper_general import load_beh_data, compute_dprime
@@ -315,15 +315,23 @@ data_df["iRT_aud"] = data_df["iRT_aud"] * 0.001
 data_df["iRT_vis"] = data_df["iRT_vis"] * 0.001
 # Z score RT and iRT separately for each subject:
 data_df["zRT_aud"] = np.zeros(data_df.shape[0])
+data_df["zRT_vis"] = np.zeros(data_df.shape[0])
 data_df["ziRT_aud"] = np.zeros(data_df.shape[0])
 data_df["ziRT_vis"] = np.zeros(data_df.shape[0])
+
+# Replace all 0 values by 0.001
+data_df.loc[data_df["iRT_aud"] == 0, "iRT_aud"] = 0.001
+data_df.loc[data_df["iRT_vis"] == 0, "iRT_vis"] = 0.001
+
 for sub_id in data_df["sub_id"].unique():
     data_df.loc[data_df["sub_id"] == sub_id, "zRT_aud"] = (
         zscore(np.log(data_df.loc[data_df["sub_id"] == sub_id, "RT_aud"])))
+    data_df.loc[data_df["sub_id"] == sub_id, "zRT_vis"] = (
+        zscore(np.log(data_df.loc[data_df["sub_id"] == sub_id, "RT_vis"]), nan_policy='omit'))
     data_df.loc[data_df["sub_id"] == sub_id, "ziRT_aud"] = (
-        zscore(np.log(data_df.loc[data_df["sub_id"] == sub_id, "iRT_aud"])))
+        zscore(np.log(data_df.loc[data_df["sub_id"] == sub_id, "iRT_aud"]), nan_policy='omit'))
     data_df.loc[data_df["sub_id"] == sub_id, "ziRT_vis"] = (
-        zscore(np.log(data_df.loc[data_df["sub_id"] == sub_id, "iRT_vis"])))
+        zscore(np.log(data_df.loc[data_df["sub_id"] == sub_id, "iRT_vis"]), nan_policy='omit'))
 
 # ========================================================================
 # Plot RT and iT:
@@ -404,7 +412,7 @@ plt.close(fig_tr)
 plt.close(fig_ti)
 
 # ========================================================================
-# Plot regression between iT and RT:
+# Plot regression between iT2 and RT2:
 markers = ["v", "^", ">"]
 fig_size = [8.3, 8.3]
 fig, ax = plt.subplots(nrows=1, ncols=2, sharex=True, sharey=True, figsize=fig_size)
@@ -412,9 +420,19 @@ fig, ax = plt.subplots(nrows=1, ncols=2, sharex=True, sharey=True, figsize=fig_s
 # Loop through onset and offset locked:
 for i, lock in enumerate(data_df["SOA_lock"].unique()):
     for ii, soa in enumerate(sorted(list((data_df["SOA"].unique())))):
-        sns.regplot(x="ziRT_aud", y="zRT_aud", data=data_df[(data_df["SOA_lock"] == lock) & (data_df["SOA"] == soa)],
-                    ax=ax[i], color=ev.colors["soa_{}_locked".format(lock)][str(soa)],
-                    scatter_kws={'alpha': 0.5, 's': 7.5}, label=soa, marker=markers[ii])
+        cond_df = data_df[(data_df["SOA_lock"] == lock) & (data_df["SOA"] == soa)]
+        # Compute the regression coefficient:
+        r, p = pearsonr(x=cond_df['ziRT_aud'], y=cond_df['zRT_aud'])
+        if p < 0.001:
+            sns.regplot(x="ziRT_aud", y="zRT_aud", data=cond_df,
+                        ax=ax[i], color=ev.colors["soa_{}_locked".format(lock)][str(soa)],
+                        scatter_kws={'alpha': 0.5, 's': 7.5}, label=str(soa) + " (r={:.2f}, p<.0011)".format(r),
+                        marker=markers[ii])
+        else:
+            sns.regplot(x="ziRT_aud", y="zRT_aud", data=cond_df,
+                        ax=ax[i], color=ev.colors["soa_{}_locked".format(lock)][str(soa)],
+                        scatter_kws={'alpha': 0.5, 's': 7.5}, label=str(soa) + " (r={:.2f}, p={:.3f})".format(r, p),
+                        marker=markers[ii])
 ax[0].set_title("Onset locked")
 ax[0].set_xlabel("")
 ax[0].set_ylabel("")
@@ -423,8 +441,30 @@ ax[1].set_title("Offset locked")
 ax[1].set_xlabel("")
 ax[1].set_ylabel("")
 ax[1].legend()
-fig.supxlabel("z-score iT")
-fig.supylabel("z-score RT")
-fig.savefig(Path(save_root, "RT-vs-iRT.svg"), transparent=True, dpi=dpi)
-fig.savefig(Path(save_root, "RT-vs-iRT.png"), transparent=True, dpi=dpi)
+fig.supxlabel("z-score iT audio")
+fig.supylabel("z-score RT audio")
+fig.savefig(Path(save_root, "RT-vs-iRTaudio.svg"), transparent=True, dpi=dpi)
+fig.savefig(Path(save_root, "RT-vs-iRTaudio.png"), transparent=True, dpi=dpi)
+plt.close(fig)
+
+fig_size = [8.3/2, 8.3]
+fig, ax = plt.subplots(nrows=1, ncols=1, sharex=True, sharey=True, figsize=fig_size)
+cond_df = data_df[(data_df["task_relevance"] == 'target') & (data_df["zRT_vis"].notna())]
+r, p = pearsonr(x=cond_df['ziRT_vis'], y=cond_df['zRT_vis'])
+if p < 0.001:
+    sns.regplot(x="ziRT_vis", y="zRT_vis", data=data_df[(data_df["task_relevance"] == 'target')],
+                ax=ax, color=[72/255, 169/255, 166/255],
+                scatter_kws={'alpha': 0.5, 's': 7.5}, label="r={:.2f}, p<.001".format(r))
+else:
+    sns.regplot(x="ziRT_vis", y="zRT_vis", data=data_df[(data_df["task_relevance"] == 'target')],
+                ax=ax, color=[72/255, 169/255, 166/255],
+                scatter_kws={'alpha': 0.5, 's': 7.5}, label="r={:.2f}, p={:.3f}".format(r, p))
+ax.set_title("")
+ax.set_xlabel("")
+ax.set_ylabel("")
+ax.legend()
+fig.supxlabel("z-score iT vis")
+fig.supylabel("z-score RT vis")
+fig.savefig(Path(save_root, "RT-vs-iRTvis.svg"), transparent=True, dpi=dpi)
+fig.savefig(Path(save_root, "RT-vs-iRTvis.png"), transparent=True, dpi=dpi)
 plt.close(fig)
