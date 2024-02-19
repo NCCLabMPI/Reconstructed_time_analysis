@@ -357,3 +357,45 @@ def plot_pupil_latency(evoked_dict, times, latencies_df, colors, pupil_size_ylim
     plt.suptitle("Pupil peak latency")
     return fig
 
+
+def plot_decoding_accuray(times, data, ci, pvals, smooth_ms=50, color=None, alpha=0.05, ax=None, pval_height=0.05,
+                          label="", ylim=None):
+    """
+    This function plots decoding results
+    :param times:
+    :param data:
+    :param ci:
+    :param pvals:
+    :param smooth_ms:
+    :param color:
+    :param alpha:
+    :param ax:
+    :param pval_height:
+    :param label:
+    :param ylim:
+    :return:
+    """
+    from scipy.ndimage import uniform_filter1d
+    # Compute the smoothing window:
+    smooth_samp = int((smooth_ms*0.001)/(times[1] - times[0]))
+
+    # Smooth the data and CI:
+    data = uniform_filter1d(data, size=smooth_samp, axis=-1)
+    upci = uniform_filter1d(ci[1, :], size=smooth_samp, axis=-1)
+    lowci = uniform_filter1d(ci[0, :], size=smooth_samp, axis=-1)
+    # Convert the pvalues for scatter:
+    pvals = np.squeeze((pvals < alpha).astype(float))
+    pvals[pvals == 0] = np.nan
+    pvals[pvals == 1] = pval_height
+
+    # Plot the score:
+    ax.plot(times, data, color=color, label=label)
+    # Plot the CI:
+    ax.fill_between(times, lowci, upci,
+                    color=color,
+                    alpha=.3)
+    ax.set_ylim(ylim)
+    # Plot the p values:
+    ax.scatter(times, pvals, marker='^', color=color, transform=plt.gca().get_xaxis_transform())
+
+    return ax
