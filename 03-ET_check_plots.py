@@ -104,7 +104,7 @@ def check_plots(parameters_file, subjects, session="1", task="prp"):
                                 else:
                                     tone_ts = float(soa)
 
-                                if tone_ts >= 1.0 and lock == "offset":
+                                if tone_ts >= 0.5 and lock == "offset":
                                     blinks_before = np.mean(
                                         epochs.copy().crop(tone_ts - 0.5,
                                                            tone_ts)["/".join([task_rel, duration, lock, soa])].pick(
