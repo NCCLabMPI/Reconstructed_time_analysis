@@ -7,6 +7,8 @@ from helper_function.helper_general import get_event_ts
 from helper_function.helper_general import cousineau_morey_correction
 import environment_variables as ev
 from mne.stats import bootstrap_confidence_interval
+from scipy.ndimage import uniform_filter1d
+
 
 font = {'size': 12}
 matplotlib.rc('font', **font)
@@ -202,9 +204,111 @@ def plot_within_subject_boxplot(data_df, within_column, between_column, dependen
     return ax, bplot, lineplot
 
 
+def plot_within_subject_boxplot(data_df, within_column, between_column, dependent_variable, positions=None,
+                                ax=None, cousineau_correction=True, title="", xlabel="", ylabel="", xlim=None,
+                                width=0.1, face_colors=None, edge_colors=None, xlabel_fontsize=9,
+                                plot_avg_line=False, style="boxplot", plot_single_sub=True,
+                                avg_line_color=None, zorder=1, alpha=1):
+    """
+    This function generates within subject design boxplot with line plots connecting each subjects dots across
+    conditions. Further offers the option to apply Cousineau Morey correction. Importantly, data must be passed before
+    averaging. The within subject averaging occurs in the function directly!
+    :param data_df: (data frame) contains the data to plot
+    :param within_column: (string) name of the column containing the within subject labels. This should contain in
+    most cases the subject ID but in general whatever unit the measurement was repeated in
+    :param between_column: (string) name of the column containing the label of the experimental condition for which
+    we want to display the variance between.
+    :param dependent_variable: (string) name of the column containing the dependent variable to plot (reaction time...)
+    :param ax: (matplotlib ax object) ax on which to plot the image.
+    :param positions: (None or string or array-like) x axis position for the boxplot. If string,the value within the
+    data frame of that particular column are taken as position. The value in that column must be numerical. Handy if you
+    have a column encoding a continuous value that you want to plot along.
+    :param cousineau_correction: (bool) whether to apply cousineau Morey correction.
+    :param title: (string) title of the plot
+    :param xlabel: (string) xlabel
+    :param ylabel: (string) ylabel
+    :param xlim: (list) limits for the x axis
+    :return:
+    """
+    if avg_line_color is None:
+        avg_line_color = [0, 0, 0]
+    if cousineau_correction:
+        data_df = cousineau_morey_correction(data_df, within_column, between_column, dependent_variable)
+
+    # Average the data within subject and condition for the boxplot:
+    avg_data = data_df.groupby([within_column, between_column])[dependent_variable].mean().reset_index()
+    # Convert to 2D arrays for the line plot:
+    try:
+        avg_data_2d = np.array([avg_data[avg_data[between_column] == cond][dependent_variable].to_numpy()
+                                for cond in avg_data[between_column].unique()]).T
+    except ValueError:
+        avg_data_2d = np.zeros((len(avg_data[within_column].unique()), len(avg_data[between_column].unique())))
+        for sub_i, sub in enumerate(avg_data[within_column].unique()):
+            for cond_i, cond in enumerate(avg_data[between_column].unique()):
+                try:
+                    avg_data_2d[sub_i, cond_i] = avg_data.loc[(avg_data[within_column] == sub) &
+                                                              (avg_data[between_column] == cond),
+                    dependent_variable].values
+                except ValueError:
+                    print("WARNING: missing value for sub-{} in condition {}".format(sub, cond))
+                    avg_data_2d[sub_i, cond_i] = np.nan
+    bplot = None
+    lineplot = None
+    if ax is None:
+        fig, ax = plt.subplots(nrows=1, ncols=1, sharex=True, sharey=True, figsize=[14, 14])
+    if isinstance(positions, str):
+        positions = avg_data[between_column].unique()
+        if isinstance(positions[0], str):
+            positions = [float(pos) for pos in positions]
+    elif positions is None:
+        positions = range(0, len(avg_data[between_column].unique()))
+    # Check if there are NaNs in the data:
+    if np.isnan(np.min(avg_data_2d)):
+        nan_inds = np.where(np.isnan(avg_data_2d))
+        for row_ind in nan_inds[0]:
+            for col_ind in nan_inds[1]:
+                avg_data_2d[row_ind, col_ind] = np.mean(avg_data_2d[col_ind])
+    if style == "boxplot":
+        bplot = ax.boxplot(avg_data_2d, patch_artist=True, notch=False,
+                           positions=positions, widths=width,
+                           medianprops=dict(color="black", linewidth=1.5), zorder=zorder)
+    elif style == "errorbar":
+        for pos_i, pos in enumerate(positions):
+            ax.errorbar(pos, np.mean(avg_data_2d[:, pos_i], axis=0),
+                        yerr=np.std(avg_data_2d[:, pos_i], axis=0) / np.sqrt(avg_data_2d.shape[0]),
+                        color=face_colors[pos_i], fmt="o", zorder=zorder, alpha=alpha)
+    else:
+        raise Exception("The only supported styles are boxplot or error bars")
+    if plot_single_sub:
+        avg_line_color = np.mean(np.array(face_colors), axis=0)
+        lineplot = ax.plot(positions, avg_data_2d.T, ':', linewidth=0.5,
+                           color=avg_line_color, alpha=0.5, zorder=zorder)
+    if plot_avg_line:
+        avg_line_color = np.mean(np.array(face_colors), axis=0)
+        ax.plot(positions, np.mean(avg_data_2d, axis=0), '-', linewidth=2, color=avg_line_color, alpha=alpha,
+                zorder=zorder)
+    ax.tick_params(axis='x', labelrotation=45, labelsize=xlabel_fontsize)
+    ax.set_title(title)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+
+    if xlim is not None:
+        ax.set_xlim(xlim)
+
+    if style == "boxplot":
+        if face_colors is not None:
+            for i, patch in enumerate(bplot['boxes']):
+                patch.set_facecolor(face_colors[i])
+        if edge_colors is not None:
+            for i, patch in enumerate(bplot['boxes']):
+                patch.set_edgecolor(edge_colors[i])
+    return ax, bplot, lineplot
+
+
 def soa_boxplot(data_df, dependent_variable, fig_size=None, lock_column="SOA_lock", subject_column="sub_id",
                 between_column="onset_SOA", ax=None, fig=None, colors_onset_locked=None, colors_offset_locked=None,
-                cousineau_correction=True):
+                cousineau_correction=True, plot_avg_line=False, style="boxplot", plot_single_sub=True,
+                avg_line_color=None, zorder=0, alpha=1):
     """
     This function plots the PRP study data in a standardized format, so that it can be used across experiments and data
     types. It is not super well documented, but it is not meant to be reuused as highly specific to this design.
@@ -232,7 +336,9 @@ def soa_boxplot(data_df, dependent_variable, fig_size=None, lock_column="SOA_loc
                                           title="",
                                           xlabel="", ylabel="",
                                           xlim=[-0.1, 0.6], width=0.1,
-                                          face_colors=colors_onset_locked)
+                                          face_colors=colors_onset_locked, plot_avg_line=plot_avg_line, style=style,
+                                          plot_single_sub=plot_single_sub, avg_line_color=avg_line_color, zorder=zorder,
+                                          alpha=alpha)
     # Loop through each duration to plot the offset locked SOA separately:
     for i, dur in enumerate(sorted(list(data_df["duration"].unique()))):
         _, _, _ = plot_within_subject_boxplot(data_df[(data_df[lock_column] == 'offset')
@@ -244,7 +350,10 @@ def soa_boxplot(data_df, dependent_variable, fig_size=None, lock_column="SOA_loc
                                               title="",
                                               xlabel="", ylabel="",
                                               xlim=[dur - 0.1, dur + 0.6], width=0.1,
-                                              face_colors=colors_offset_locked)
+                                              face_colors=colors_offset_locked, plot_avg_line=plot_avg_line,
+                                              style=style, plot_single_sub=plot_single_sub,
+                                              avg_line_color=avg_line_color, zorder=zorder,
+                                              alpha=alpha)
         ax[i + 1].yaxis.set_visible(False)
     # Remove the spines:
     for i in [0, 1, 2]:
@@ -313,7 +422,7 @@ def plot_ts_ci(data, times, color, plot_ci=True, ax=None, label="", clusters=Non
 
 
 def plot_pupil_latency(evoked_dict, times, latencies_df, colors, pupil_size_ylim=None, boxplot_ylim=None,
-                       plot_legend=True, figsize=None):
+                       plot_legend=True, figsize=None, smooth_ms=0):
     """
 
     :param evoked_dict:
@@ -323,21 +432,26 @@ def plot_pupil_latency(evoked_dict, times, latencies_df, colors, pupil_size_ylim
     :param boxplot_ylim:
     :return:
     """
-    if figsize:
+    if figsize is None:
         figsize = [10, 11.7 / 4]
-    fig = plt.figure(figsize=[10, 11.7 / 4], constrained_layout=True)
+    fig = plt.figure(figsize=figsize, constrained_layout=True)
     spec = fig.add_gridspec(ncols=4, nrows=1)
     ax1 = fig.add_subplot(spec[0, 0:3])
     ax2 = fig.add_subplot(spec[0, 3])
 
     for soa in evoked_dict.keys():
         # Plot the evoked pupil response:
-        plot_ts_ci(np.array(evoked_dict[soa]), times, colors[soa], plot_ci=False, ax=ax1, label=soa)
+        if smooth_ms == 0:
+            data = np.array(evoked_dict[soa])
+        else:
+            smooth_samp = int((smooth_ms * 0.001) / (times[1] - times[0]))
+            data = uniform_filter1d(np.array(evoked_dict[soa]), size=smooth_samp, axis=-1)
+        plot_ts_ci(data, times, colors[soa], plot_ci=False, ax=ax1, label=soa)
         # Extract the mean latencies:
         lat = np.mean(latencies_df[latencies_df["SOA"] == soa]["latency"].to_numpy())
         # Plot the latency:
-        ax1.vlines(x=latencies_df[latencies_df["SOA"] == soa]["SOA_locked"].to_numpy()[0], ymin=0,
-                   ymax=5, linestyle="-",
+        ax1.vlines(x=latencies_df[latencies_df["SOA"] == soa]["SOA_locked"].to_numpy()[0], ymin=pupil_size_ylim[0],
+                   ymax=pupil_size_ylim[1], linestyle="-",
                    color=colors[soa], linewidth=2, zorder=10)
         ax1.vlines(x=lat, ymin=0,
                    ymax=np.mean(np.array(evoked_dict[soa]), axis=0)[np.argmin(np.abs(times - lat))],
@@ -352,7 +466,7 @@ def plot_pupil_latency(evoked_dict, times, latencies_df, colors, pupil_size_ylim
     plot_within_subject_boxplot(latencies_df, "sub_id", "SOA", "latency_aud",
                                 positions="SOA", ax=ax2, cousineau_correction=False, title="", xlabel="SOA",
                                 ylabel=r'$\tau_{\mathrm{audio}}$', xlim=[-0.1, 0.6], width=0.1,
-                                face_colors=[colors[soa] for soa in list(evoked_dict.keys())])
+                                face_colors=[colors[soa] for soa in np.sort(list(evoked_dict.keys()))])
     ax2.set_ylim(boxplot_ylim)
     plt.suptitle("Pupil peak latency")
     return fig
@@ -375,9 +489,8 @@ def plot_decoding_accuray(times, data, ci, pvals, smooth_ms=50, color=None, alph
     :param ylim:
     :return:
     """
-    from scipy.ndimage import uniform_filter1d
     # Compute the smoothing window:
-    smooth_samp = int((smooth_ms*0.001)/(times[1] - times[0]))
+    smooth_samp = int((smooth_ms * 0.001) / (times[1] - times[0]))
 
     # Smooth the data and CI:
     data = uniform_filter1d(data, size=smooth_samp, axis=-1)
