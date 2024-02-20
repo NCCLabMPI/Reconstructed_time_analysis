@@ -78,7 +78,6 @@ def pupil_amplitude(parameters_file, subjects, session="1", task="prp", analysis
     ax.boxplot([drop_log_df[col].to_numpy() for col in cols], labels=cols)
     ax.axhline(param["drop_trials_threshold"], linestyle="--", color="r")
     ax.set_ylabel("Proportion dropped trials")
-    ax.set_xlabel("Reason")
     plt.xticks(rotation=45)
     plt.tight_layout()
     fig.savefig(Path(save_dir, "drop_log.svg"), transparent=True, dpi=300)
