@@ -42,8 +42,6 @@ def decoding(parameters_file, subjects, data_root, session="1", task="dur", anal
     times = []
     # Loop through each ROI:
     for ii, roi in enumerate(param["rois"]):
-        if ii > 5:
-            continue
         # Create the directory to save the results in:
         roi_name = roi[0].replace("ctx_lh_", "")
         roi_results[roi_name] = {
@@ -72,7 +70,7 @@ def decoding(parameters_file, subjects, data_root, session="1", task="dur", anal
             epochs.crop(param["crop"][0], param["crop"][1])
             # Extract the conditions of interest:
             epochs = epochs[param["conditions"]]
-            epochs.decimate(20)
+            epochs.decimate(5)
             times = epochs.times
             # Extract only the channels in the correct ROI:
             roi_channels = get_roi_channels(epochs.get_montage(), "sub-" + sub,
@@ -267,7 +265,7 @@ def decoding(parameters_file, subjects, data_root, session="1", task="dur", anal
     ).reset_index(drop=True)
     latencies_table.to_csv(Path(Path(ev.bids_root, "derivatives", analysis_name, task),
                                 "latency_table.csv"))
-    latencies_table = latencies_table[latencies_table["onset"] is not None]
+    latencies_table = latencies_table[~latencies_table["onset"].isna()]
 
     # ====================================================================================================
     # Plot the brain:
@@ -315,7 +313,7 @@ def decoding(parameters_file, subjects, data_root, session="1", task="dur", anal
     fig, ax = plt.subplots()
     for i, roi_name in enumerate(list(latencies_table["roi"].unique())):
         # Extract the data of each task:
-        ax.plot(times, roi_results[roi_name]["offset_diff"], color=rois_colors[i], label=roi_name)
+        ax.plot(times, roi_results[roi_name]["scores_diff"], color=rois_colors[i], label=roi_name)
     ax.set_xlabel("Time (sec.)")
     ax.set_ylabel("Accuracy difference")
     ax.set_title("Difference in decoding accuracy (TR - TI)")
@@ -334,6 +332,6 @@ if __name__ == "__main__":
         r"\06-iEEG_decoding_parameters.json")
     # ==================================================================================
     # Decoding analysis of the COGITATE data:
-    decoding(parameters, ["SF102", "SF104", "SF105", "SF106", "SF107"], ev.bids_root,
+    decoding(parameters, ev.subjects_lists_ecog["dur"], ev.bids_root,
              session="V1", task="Dur", analysis_name="decoding",
              task_conditions=["Relevant non-target", "Irrelevant"])
