@@ -144,21 +144,35 @@ plt.close(fig2)
 # ========================================================================================================
 # Figure 5:
 # ==================================
-# Figure 5a:
 
+# Option 1:
+# Figure 5a:
+colors_onset = [ev.colors["soa_onset_locked"][str(soa)] for soa in np.sort(data_df["SOA"].unique())]
+colors_offset = [ev.colors["soa_offset_locked"][str(soa)] for soa in np.sort(data_df["SOA"].unique())]
 # Target:
 d = 1.5
+# RT vis:
 fig_ta, ax_ta = soa_boxplot(data_df[data_df["task_relevance"] == 'target'],
-                            "RT_aud",
-                            fig_size=[8.3 / 3, 11.7 / 2])
+                            "RT_vis",
+                            colors_onset_locked=[[0.5, 0.5, 0.5]] * 4, colors_offset_locked=[[0.5, 0.5, 0.5]] * 4,
+                            fig_size=[8.3 / 3, 11.7 / 2], cousineau_correction=False, plot_avg_line=True,
+                            style="errorbar", plot_single_sub=False, avg_line_color=[0.5, 0.5, 0.5], zorder=0,
+                            alpha=0.5)
+# RT audio
+soa_boxplot(data_df[data_df["task_relevance"] == 'target'],
+            "RT_aud", ax=ax_ta,
+            colors_onset_locked=colors_onset, colors_offset_locked=colors_offset,
+            fig_size=[8.3 / 3, 11.7 / 2], zorder=10000)
+for ax in ax_ta:
+    ax.axhline(0.64, linestyle="--", color=[0.7, 0.7, 0.7], alpha=0.5)
 # Task relevant:
 fig_tr, ax_tr = soa_boxplot(data_df[data_df["task_relevance"] == 'non-target'],
                             "RT_aud",
-                            fig_size=[8.3 / 3, 11.7 / 2])
+                            colors_onset_locked=colors_onset, colors_offset_locked=colors_offset,)
 # Task irrelevant:
 fig_ti, ax_ti = soa_boxplot(data_df[data_df["task_relevance"] == 'irrelevant'],
                             "RT_aud",
-                            fig_size=[8.3 / 3, 11.7 / 2])
+                            colors_onset_locked=colors_onset, colors_offset_locked=colors_offset,)
 # Set the y limit to be the same for both plots:
 lims = [[ax_tr[0].get_ylim()[0], ax_ti[0].get_ylim()[0]], [ax_tr[0].get_ylim()[1], ax_ti[0].get_ylim()[1]]]
 max_lims = [min(min(lims)), max(max(lims))]
@@ -171,16 +185,131 @@ fig_ti.suptitle("Irrelevant non-target")
 fig_ta.text(0.5, 0, 'Time (sec.)', ha='center', va='center')
 fig_tr.text(0.5, 0, 'Time (sec.)', ha='center', va='center')
 fig_ti.text(0.5, 0, 'Time (sec.)', ha='center', va='center')
-fig_ta.text(0, 0.5, 'Reaction time (sec.)', ha='center', va='center', fontsize=18, rotation=90)
-fig_tr.text(0, 0.5, 'Reaction time (sec.)', ha='center', va='center', fontsize=18, rotation=90)
-fig_ti.text(0, 0.5, 'Reaction time (sec.)', ha='center', va='center', fontsize=18, rotation=90)
+fig_ta.text(0, 0.5, 'Corrected RT (sec.)', ha='center', va='center', fontsize=18, rotation=90)
+fig_tr.text(0, 0.5, 'Corrected RT (sec.)', ha='center', va='center', fontsize=18, rotation=90)
+fig_ti.text(0, 0.5, 'Corrected RT (sec.)', ha='center', va='center', fontsize=18, rotation=90)
 # Save the figures:
-fig_ta.savefig(Path(save_root, "figure5a_target.svg"), transparent=True, dpi=dpi)
-fig_ta.savefig(Path(save_root, "figure5a_target.png"), transparent=True, dpi=dpi)
-fig_tr.savefig(Path(save_root, "figure5a_tr.svg"), transparent=True, dpi=dpi)
-fig_tr.savefig(Path(save_root, "figure5a_tr.png"), transparent=True, dpi=dpi)
-fig_ti.savefig(Path(save_root, "figure5a_ti.svg"), transparent=True, dpi=dpi)
-fig_ti.savefig(Path(save_root, "figure5a_ti.png"), transparent=True, dpi=dpi)
+fig_ta.savefig(Path(save_root, "figure5a_target_option1.svg"), transparent=True, dpi=dpi)
+fig_ta.savefig(Path(save_root, "figure5a_target_option1.png"), transparent=True, dpi=dpi)
+fig_tr.savefig(Path(save_root, "figure5a_tr_option1.svg"), transparent=True, dpi=dpi)
+fig_tr.savefig(Path(save_root, "figure5a_tr_option1.png"), transparent=True, dpi=dpi)
+fig_ti.savefig(Path(save_root, "figure5a_ti_option1.svg"), transparent=True, dpi=dpi)
+fig_ti.savefig(Path(save_root, "figure5a_ti_option1.png"), transparent=True, dpi=dpi)
+plt.close(fig_ta)
+plt.close(fig_tr)
+plt.close(fig_ti)
+
+# Option 2:
+# Figure 5a:
+colors_onset = [ev.colors["soa_onset_locked"][str(soa)] for soa in np.sort(data_df["SOA"].unique())]
+colors_offset = [ev.colors["soa_offset_locked"][str(soa)] for soa in np.sort(data_df["SOA"].unique())]
+# Target:
+d = 1.5
+# RT vis:
+fig_ta, ax_ta = soa_boxplot(data_df[data_df["task_relevance"] == 'target'],
+                            "RT_vis",
+                            colors_onset_locked=[[0.5, 0.5, 0.5]] * 4, colors_offset_locked=[[0.5, 0.5, 0.5]] * 4,
+                            fig_size=[8.3 / 3, 11.7 / 2], cousineau_correction=False, plot_avg_line=True,
+                            style="errorbar", plot_single_sub=False, avg_line_color=[0.5, 0.5, 0.5], zorder=0,
+                            alpha=0.5)
+
+# RT audio
+soa_boxplot(data_df[data_df["task_relevance"] == 'target'],
+            "RT_aud", ax=ax_ta,
+            colors_onset_locked=colors_onset, colors_offset_locked=colors_offset,
+            fig_size=[8.3 / 3, 11.7 / 2], zorder=10000, cousineau_correction=False, plot_avg_line=True,
+            style="errorbar")
+for ax in ax_ta:
+    ax.axhline(0.64, linestyle="--", color=[0.7, 0.7, 0.7], alpha=0.5)
+# Task relevant:
+fig_tr, ax_tr = soa_boxplot(data_df[data_df["task_relevance"] == 'non-target'],
+                            "RT_aud",
+                            colors_onset_locked=colors_onset, colors_offset_locked=colors_offset,
+                            cousineau_correction=False, plot_avg_line=True, style="errorbar")
+# Task irrelevant:
+fig_ti, ax_ti = soa_boxplot(data_df[data_df["task_relevance"] == 'irrelevant'],
+                            "RT_aud",
+                            colors_onset_locked=colors_onset, colors_offset_locked=colors_offset,
+                            cousineau_correction=False, plot_avg_line=True, style="errorbar")
+# Set the y limit to be the same for both plots:
+lims = [[ax_tr[0].get_ylim()[0], ax_ti[0].get_ylim()[0]], [ax_tr[0].get_ylim()[1], ax_ti[0].get_ylim()[1]]]
+max_lims = [min(min(lims)), max(max(lims))]
+ax_tr[0].set_ylim(max_lims)
+ax_ti[0].set_ylim(max_lims)
+# Axes decoration:
+fig_ta.suptitle("Target")
+fig_tr.suptitle("Relevant non-target")
+fig_ti.suptitle("Irrelevant non-target")
+fig_ta.text(0.5, 0, 'Time (sec.)', ha='center', va='center')
+fig_tr.text(0.5, 0, 'Time (sec.)', ha='center', va='center')
+fig_ti.text(0.5, 0, 'Time (sec.)', ha='center', va='center')
+fig_ta.text(0, 0.5, 'RT (sec.)', ha='center', va='center', fontsize=18, rotation=90)
+fig_tr.text(0, 0.5, 'RT (sec.)', ha='center', va='center', fontsize=18, rotation=90)
+fig_ti.text(0, 0.5, 'RT (sec.)', ha='center', va='center', fontsize=18, rotation=90)
+# Save the figures:
+fig_ta.savefig(Path(save_root, "figure5a_target_option2.svg"), transparent=True, dpi=dpi)
+fig_ta.savefig(Path(save_root, "figure5a_target_option2.png"), transparent=True, dpi=dpi)
+fig_tr.savefig(Path(save_root, "figure5a_tr_option2.svg"), transparent=True, dpi=dpi)
+fig_tr.savefig(Path(save_root, "figure5a_tr_option2.png"), transparent=True, dpi=dpi)
+fig_ti.savefig(Path(save_root, "figure5a_ti_option2.svg"), transparent=True, dpi=dpi)
+fig_ti.savefig(Path(save_root, "figure5a_ti_option2.png"), transparent=True, dpi=dpi)
+plt.close(fig_ta)
+plt.close(fig_tr)
+plt.close(fig_ti)
+
+# Option 3:
+# Figure 5a:
+colors_onset = [ev.colors["soa_onset_locked"][str(soa)] for soa in np.sort(data_df["SOA"].unique())]
+colors_offset = [ev.colors["soa_offset_locked"][str(soa)] for soa in np.sort(data_df["SOA"].unique())]
+# Target:
+d = 1.5
+# RT vis:
+fig_ta, ax_ta = soa_boxplot(data_df[data_df["task_relevance"] == 'target'],
+                            "RT_vis",
+                            colors_onset_locked=[[0.5, 0.5, 0.5]] * 4, colors_offset_locked=[[0.5, 0.5, 0.5]] * 4,
+                            fig_size=[8.3 / 3, 11.7 / 2], cousineau_correction=True, plot_avg_line=True,
+                            style="errorbar", plot_single_sub=False, avg_line_color=[0.5, 0.5, 0.5], zorder=0,
+                            alpha=0.5)
+
+# RT audio
+soa_boxplot(data_df[data_df["task_relevance"] == 'target'],
+            "RT_aud", ax=ax_ta,
+            colors_onset_locked=colors_onset, colors_offset_locked=colors_offset,
+            fig_size=[8.3 / 3, 11.7 / 2], zorder=10000, cousineau_correction=True, plot_avg_line=True,
+            style="errorbar")
+for ax in ax_ta:
+    ax.axhline(0.64, linestyle="--", color=[0.7, 0.7, 0.7], alpha=0.5)
+# Task relevant:
+fig_tr, ax_tr = soa_boxplot(data_df[data_df["task_relevance"] == 'non-target'],
+                            "RT_aud",
+                            colors_onset_locked=colors_onset, colors_offset_locked=colors_offset,
+                            cousineau_correction=True, plot_avg_line=True, style="errorbar")
+# Task irrelevant:
+fig_ti, ax_ti = soa_boxplot(data_df[data_df["task_relevance"] == 'irrelevant'],
+                            "RT_aud",
+                            colors_onset_locked=colors_onset, colors_offset_locked=colors_offset,
+                            cousineau_correction=True, plot_avg_line=True, style="errorbar")
+# Set the y limit to be the same for both plots:
+lims = [[ax_tr[0].get_ylim()[0], ax_ti[0].get_ylim()[0]], [ax_tr[0].get_ylim()[1], ax_ti[0].get_ylim()[1]]]
+max_lims = [min(min(lims)), max(max(lims))]
+ax_tr[0].set_ylim(max_lims)
+ax_ti[0].set_ylim(max_lims)
+# Axes decoration:
+fig_ta.suptitle("Target")
+fig_tr.suptitle("Relevant non-target")
+fig_ti.suptitle("Irrelevant non-target")
+fig_ta.text(0.5, 0, 'Time (sec.)', ha='center', va='center')
+fig_tr.text(0.5, 0, 'Time (sec.)', ha='center', va='center')
+fig_ti.text(0.5, 0, 'Time (sec.)', ha='center', va='center')
+fig_ta.text(0, 0.5, 'Corrected RT (sec.)', ha='center', va='center', fontsize=18, rotation=90)
+fig_tr.text(0, 0.5, 'Corrected RT (sec.)', ha='center', va='center', fontsize=18, rotation=90)
+# Save the figures:
+fig_ta.savefig(Path(save_root, "figure5a_target_option3.svg"), transparent=True, dpi=dpi)
+fig_ta.savefig(Path(save_root, "figure5a_target_option3.png"), transparent=True, dpi=dpi)
+fig_tr.savefig(Path(save_root, "figure5a_tr_option3.svg"), transparent=True, dpi=dpi)
+fig_tr.savefig(Path(save_root, "figure5a_tr_option3.png"), transparent=True, dpi=dpi)
+fig_ti.savefig(Path(save_root, "figure5a_ti_option3.svg"), transparent=True, dpi=dpi)
+fig_ti.savefig(Path(save_root, "figure5a_ti_option3.png"), transparent=True, dpi=dpi)
 plt.close(fig_ta)
 plt.close(fig_tr)
 plt.close(fig_ti)
@@ -336,19 +465,29 @@ for sub_id in data_df["sub_id"].unique():
 # ========================================================================
 # Plot RT and iT:
 # Extract the colors:
-onset_lock_rt = [ev.colors["soa_onset_locked"][str(soa)] for soa in list(data_df["SOA"].unique())]
-offset_lock_rt = [ev.colors["soa_offset_locked"][str(soa)] for soa in list(data_df["SOA"].unique())]
-onset_lock_it = [ev.colors["soa_onset_locked_iRT"][str(soa)] for soa in list(data_df["SOA"].unique())]
-offset_lock_it = [ev.colors["soa_offset_locked_iRT"][str(soa)] for soa in list(data_df["SOA"].unique())]
+onset_lock_rt = [ev.colors["soa_onset_locked"][str(soa)] for soa in list(np.sort(data_df["SOA"].unique()))]
+offset_lock_rt = [ev.colors["soa_offset_locked"][str(soa)] for soa in list(np.sort(data_df["SOA"].unique()))]
+onset_lock_it = [ev.colors["soa_onset_locked_iRT"][str(soa)] for soa in list(np.sort(data_df["SOA"].unique()))]
+offset_lock_it = [ev.colors["soa_offset_locked_iRT"][str(soa)] for soa in list(np.sort(data_df["SOA"].unique()))]
 d = 1.5
 
+colors_onset = [ev.colors["soa_onset_locked"][str(soa)] for soa in np.sort(data_df["SOA"].unique())]
+colors_offset = [ev.colors["soa_offset_locked"][str(soa)] for soa in np.sort(data_df["SOA"].unique())]
 # ========================================
 # Target:
 # RT:
 fig_ta, ax_ta = soa_boxplot(data_df[data_df["task_relevance"] == 'target'],
-                            "RT_aud", colors_onset_locked=onset_lock_rt,
+                            "RT_vis",
+                            colors_onset_locked=[[0.5, 0.5, 0.5]] * 4, colors_offset_locked=[[0.5, 0.5, 0.5]] * 4,
+                            fig_size=[8.3 / 3, 11.7 / 2], cousineau_correction=False, plot_avg_line=True,
+                            style="errorbar", plot_single_sub=False, avg_line_color=[0.5, 0.5, 0.5], zorder=0,
+                            alpha=0.5)
+soa_boxplot(data_df[data_df["task_relevance"] == 'target'],
+                            "RT_aud", ax=ax_ta, colors_onset_locked=onset_lock_rt,
                             colors_offset_locked=offset_lock_rt,
-                            fig_size=[8.3 / 3, 11.7 / 2])
+                            fig_size=[8.3 / 3, 11.7 / 2], zorder=10000)
+for ax in ax_ta:
+    ax.axhline(0.64, linestyle="--", color=[0.7, 0.7, 0.7], alpha=0.5)
 # IT:
 fig_ta, ax_ta = soa_boxplot(data_df[data_df["task_relevance"] == 'target'],
                             "iRT_aud",
@@ -414,7 +553,7 @@ plt.close(fig_ti)
 # ========================================================================
 # Plot regression between iT2 and RT2:
 markers = ["v", "^", ">"]
-fig_size = [8.3*2, 8.3]
+fig_size = [8.3, 8.3]
 fig, ax = plt.subplots(nrows=1, ncols=2, sharex=True, sharey=True, figsize=fig_size)
 
 # Loop through onset and offset locked:
@@ -447,17 +586,17 @@ fig.savefig(Path(save_root, "RT-vs-iRTaudio.svg"), transparent=True, dpi=dpi)
 fig.savefig(Path(save_root, "RT-vs-iRTaudio.png"), transparent=True, dpi=dpi)
 plt.close(fig)
 
-fig_size = [8.3, 8.3]
+fig_size = [8.3 / 2, 8.3]
 fig, ax = plt.subplots(nrows=1, ncols=1, sharex=True, sharey=True, figsize=fig_size)
 cond_df = data_df[(data_df["task_relevance"] == 'target') & (data_df["zRT_vis"].notna())]
 r, p = pearsonr(x=cond_df['ziRT_vis'], y=cond_df['zRT_vis'])
 if p < 0.001:
     sns.regplot(x="ziRT_vis", y="zRT_vis", data=data_df[(data_df["task_relevance"] == 'target')],
-                ax=ax, color=[72/255, 169/255, 166/255],
+                ax=ax, color=[72 / 255, 169 / 255, 166 / 255],
                 scatter_kws={'alpha': 0.5, 's': 7.5}, label="r={:.2f}, p<.001".format(r))
 else:
     sns.regplot(x="ziRT_vis", y="zRT_vis", data=data_df[(data_df["task_relevance"] == 'target')],
-                ax=ax, color=[72/255, 169/255, 166/255],
+                ax=ax, color=[72 / 255, 169 / 255, 166 / 255],
                 scatter_kws={'alpha': 0.5, 's': 7.5}, label="r={:.2f}, p={:.3f}".format(r, p))
 ax.set_title("")
 ax.set_xlabel("")
