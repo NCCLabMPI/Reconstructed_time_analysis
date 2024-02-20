@@ -36,6 +36,7 @@ def check_plots(parameters_file, subjects, session="1", task="prp"):
         param = json.load(json_file)
     # Prepare a dataframe to store the fixation proportion:
     check_values = pd.DataFrame()
+    blinks_bfreafter = pd.DataFrame()
     # Prepare a list to store the fixation heatmaps:
     fixation_heatmaps = []
     # Loop through each subject:
@@ -72,7 +73,7 @@ def check_plots(parameters_file, subjects, session="1", task="prp"):
         epochs.pick(param["picks"])
 
         # Loop through each relevant condition:
-        for window in param["windows"]:
+        for win_i, window in enumerate(param["windows"]):
             # Extract data locked to the visual stimulus:
             epochs_cropped = epochs.copy().crop(param["windows"][window][0],
                                                 param["windows"][window][1])
@@ -96,6 +97,54 @@ def check_plots(parameters_file, subjects, session="1", task="prp"):
                             # Compute the proportion of trials in which participants blinked:
                             blink_trials = len(np.where(np.any(blinks_data, axis=1))[0]) / blinks_data.shape[0]
 
+                            # In addition, compute the blinks proportion 1 sec before and after the tone:
+                            if win_i == 0:
+                                if lock == "offset":
+                                    tone_ts = float(duration) + float(soa)
+                                else:
+                                    tone_ts = float(soa)
+
+                                if tone_ts >= 1.0 and lock == "offset":
+                                    blinks_before = np.mean(
+                                        epochs.copy().crop(tone_ts - 0.5,
+                                                           tone_ts)["/".join([task_rel, duration, lock, soa])].pick(
+                                            ["blink_left",
+                                             "blink_right"]).get_data(
+                                            copy=False),
+                                        axis=1)
+                                    blinks_before = (len(np.where(np.any(blinks_before, axis=1))[0]) /
+                                                     blinks_before.shape[0])
+                                    blinks_after = np.mean(
+                                        epochs.copy().crop(tone_ts,
+                                                           tone_ts + 0.5)["/".join([task_rel, duration, lock, soa])].pick(
+                                            ["blink_left",
+                                             "blink_right"]).get_data(
+                                            copy=False),
+                                        axis=1)
+                                    blinks_after = (len(np.where(np.any(blinks_after, axis=1))[0]) /
+                                                    blinks_after.shape[0])
+                                else:
+                                    blinks_before = 0
+                                    blinks_after = np.mean(
+                                        epochs.copy().crop(tone_ts,
+                                                           tone_ts + 0.5)["/".join([task_rel, duration, lock, soa])].pick(
+                                            ["blink_left",
+                                             "blink_right"]).get_data(
+                                            copy=False),
+                                        axis=1)
+                                    blinks_after = (len(np.where(np.any(blinks_after, axis=1))[0]) /
+                                                    blinks_after.shape[0])
+                                blinks_bfreafter = pd.concat([blinks_bfreafter, pd.DataFrame({
+                                    "sub_id": sub,
+                                    "task_relevance": task_rel,
+                                    "duration": float(duration),
+                                    "SOA_lock": lock,
+                                    "soa": float(soa),
+                                    "onset_SOA": float(soa) + float(duration)
+                                    if lock == "offset" else float(soa),
+                                    "blinks_before": blinks_before,
+                                    "blinks_after": blinks_after
+                                }, index=[0])])
                             # Add to data frame using pd.concat:
                             check_values = pd.concat([check_values,
                                                       pd.DataFrame({"sub_id": sub,
@@ -110,12 +159,14 @@ def check_plots(parameters_file, subjects, session="1", task="prp"):
                                                                     "blink_trials": blink_trials},
                                                                    index=[0])])
     check_values = check_values.reset_index(drop=True)
+    blinks_bfreafter = blinks_bfreafter.reset_index(drop=True)
     # Create the save directory:
     save_dir = Path(ev.bids_root, "derivatives", "check_plots", task, "data")
     if not os.path.isdir(save_dir):
         os.makedirs(save_dir)
     # Save the peak latencies:
     check_values.to_csv(Path(save_dir, "check_values.csv"))
+    blinks_bfreafter.to_csv(Path(save_dir, "blinks_bfreafter.csv"))
 
     # =========================================================================
     # Plot the results:
@@ -217,6 +268,91 @@ def check_plots(parameters_file, subjects, session="1", task="prp"):
         plt.close(fig_all)
         plt.close(fig_tr)
         plt.close(fig_ti)
+
+    # Plot the blinks rate before and after:
+    # Before:
+    fig_all, ax_all = soa_boxplot(blinks_bfreafter,
+                                  "blinks_before",
+                                  fig_size=[figure_height, figure_height * param["screen_res"][1] /
+                                            param["screen_res"][0]], cousineau_correction=False)
+    # Task relevant:
+    fig_tr, ax_tr = soa_boxplot(blinks_bfreafter[blinks_bfreafter["task_relevance"] == 'non-target'],
+                                "blinks_before",
+                                fig_size=[figure_height, figure_height * param["screen_res"][1] /
+                                          param["screen_res"][0]], cousineau_correction=False)
+    # Task irrelevant:
+    fig_ti, ax_ti = soa_boxplot(blinks_bfreafter[blinks_bfreafter["task_relevance"] == 'irrelevant'],
+                                "blinks_before",
+                                fig_size=[figure_height, figure_height * param["screen_res"][1] /
+                                          param["screen_res"][0]], cousineau_correction=False)
+    # Set the y limit to be the same for both plots:
+    lims = [[ax_all[0].get_ylim()[0], ax_tr[0].get_ylim()[0], ax_ti[0].get_ylim()[0]],
+            [ax_all[0].get_ylim()[1], ax_tr[0].get_ylim()[1], ax_ti[0].get_ylim()[1]]]
+    max_lims = [min(min(lims)), max(max(lims))]
+    ax_all[0].set_ylim(max_lims)
+    ax_tr[0].set_ylim(max_lims)
+    ax_ti[0].set_ylim(max_lims)
+    # Axes decoration:
+    fig_all.suptitle("Blinked trials before tone")
+    fig_tr.suptitle("Blinked trials before tone")
+    fig_ti.suptitle("Blinked trials before tone")
+    fig_all.text(0.5, 0, 'Time (sec.)', ha='center', va='center')
+    fig_tr.text(0.5, 0, 'Time (sec.)', ha='center', va='center')
+    fig_ti.text(0.5, 0, 'Time (sec.)', ha='center', va='center')
+    fig_all.text(0, 0.5, 'Blinked trials (prop.)', ha='center', va='center', fontsize=18, rotation=90)
+    fig_tr.text(0, 0.5, 'Blinked trials (prop.)', ha='center', va='center', fontsize=18, rotation=90)
+    fig_ti.text(0, 0.5, 'Blinked trials (prop.)', ha='center', va='center', fontsize=18, rotation=90)
+    fig_all.savefig(Path(save_dir, "blink_rate_before.svg"), transparent=True, dpi=dpi)
+    fig_all.savefig(Path(save_dir, "blink_rate_before.png"), transparent=True, dpi=dpi)
+    fig_tr.savefig(Path(save_dir, "blink_rate_before_tr.svg"), transparent=True, dpi=dpi)
+    fig_tr.savefig(Path(save_dir, "blink_rate_before_tr.png"), transparent=True, dpi=dpi)
+    fig_ti.savefig(Path(save_dir, "blink_rate_before_ti.svg"), transparent=True, dpi=dpi)
+    fig_ti.savefig(Path(save_dir, "blink_rate_before_ti.png"), transparent=True, dpi=dpi)
+    plt.close(fig_all)
+    plt.close(fig_tr)
+    plt.close(fig_ti)
+
+    # After:
+    fig_all, ax_all = soa_boxplot(blinks_bfreafter,
+                                  "blinks_after",
+                                  fig_size=[figure_height, figure_height * param["screen_res"][1] /
+                                            param["screen_res"][0]], cousineau_correction=False)
+    # Task relevant:
+    fig_tr, ax_tr = soa_boxplot(blinks_bfreafter[blinks_bfreafter["task_relevance"] == 'non-target'],
+                                "blinks_after",
+                                fig_size=[figure_height, figure_height * param["screen_res"][1] /
+                                          param["screen_res"][0]], cousineau_correction=False)
+    # Task irrelevant:
+    fig_ti, ax_ti = soa_boxplot(blinks_bfreafter[blinks_bfreafter["task_relevance"] == 'irrelevant'],
+                                "blinks_after",
+                                fig_size=[figure_height, figure_height * param["screen_res"][1] /
+                                          param["screen_res"][0]], cousineau_correction=False)
+    # Set the y limit to be the same for both plots:
+    lims = [[ax_all[0].get_ylim()[0], ax_tr[0].get_ylim()[0], ax_ti[0].get_ylim()[0]],
+            [ax_all[0].get_ylim()[1], ax_tr[0].get_ylim()[1], ax_ti[0].get_ylim()[1]]]
+    max_lims = [min(min(lims)), max(max(lims))]
+    ax_all[0].set_ylim(max_lims)
+    ax_tr[0].set_ylim(max_lims)
+    ax_ti[0].set_ylim(max_lims)
+    # Axes decoration:
+    fig_all.suptitle("Blinked trials after tone")
+    fig_tr.suptitle("Blinked trials after tone")
+    fig_ti.suptitle("Blinked trials after tone")
+    fig_all.text(0.5, 0, 'Time (sec.)', ha='center', va='center')
+    fig_tr.text(0.5, 0, 'Time (sec.)', ha='center', va='center')
+    fig_ti.text(0.5, 0, 'Time (sec.)', ha='center', va='center')
+    fig_all.text(0, 0.5, 'Blinked trials (prop.)', ha='center', va='center', fontsize=18, rotation=90)
+    fig_tr.text(0, 0.5, 'Blinked trials (prop.)', ha='center', va='center', fontsize=18, rotation=90)
+    fig_ti.text(0, 0.5, 'Blinked trials (prop.)', ha='center', va='center', fontsize=18, rotation=90)
+    fig_all.savefig(Path(save_dir, "blink_rate_after.svg"), transparent=True, dpi=dpi)
+    fig_all.savefig(Path(save_dir, "blink_rate_after.png"), transparent=True, dpi=dpi)
+    fig_tr.savefig(Path(save_dir, "blink_rate_after_tr.svg"), transparent=True, dpi=dpi)
+    fig_tr.savefig(Path(save_dir, "blink_rate_after_tr.png"), transparent=True, dpi=dpi)
+    fig_ti.savefig(Path(save_dir, "blink_rate_after_ti.svg"), transparent=True, dpi=dpi)
+    fig_ti.savefig(Path(save_dir, "blink_rate_after_ti.png"), transparent=True, dpi=dpi)
+    plt.close(fig_all)
+    plt.close(fig_tr)
+    plt.close(fig_ti)
 
     # Plot the dwell time image:
     hists = np.nanmean(np.array(fixation_heatmaps), axis=0)
