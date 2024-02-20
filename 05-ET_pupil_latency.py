@@ -6,12 +6,23 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 from helper_function.helper_general import (baseline_scaling, max_percentage_index, equate_epochs_events,
                                             reject_bad_epochs, format_drop_logs)
-from helper_function.helper_plotter import plot_pupil_latency
+from helper_function.helper_plotter import plot_pupil_latency, soa_boxplot
 import environment_variables as ev
 import pandas as pd
 
 # Set the font size:
-plt.rcParams.update({'font.size': 14})
+SMALL_SIZE = 14
+MEDIUM_SIZE = 16
+BIGGER_SIZE = 18
+dpi = 300
+plt.rcParams['svg.fonttype'] = 'none'
+plt.rc('font', size=SMALL_SIZE)  # controls default text sizes
+plt.rc('axes', titlesize=SMALL_SIZE)  # fontsize of the axes title
+plt.rc('axes', labelsize=MEDIUM_SIZE)  # fontsize of the x and y labels
+plt.rc('xtick', labelsize=SMALL_SIZE)  # fontsize of the tick labels
+plt.rc('ytick', labelsize=SMALL_SIZE)  # fontsize of the tick labels
+plt.rc('legend', fontsize=SMALL_SIZE)  # legend fontsize
+plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
 
 def pupil_latency(parameters_file, subjects, session="1", task="prp", analysis_name="pupil_latency",
@@ -61,13 +72,60 @@ def pupil_latency(parameters_file, subjects, session="1", task="prp", analysis_n
                               eyes=param["eyes"],
                               exlude_beh=param["exlude_beh"],
                               remove_blinks=param["remove_blinks"],
-                              blinks_window=param["blinks_window"])
+                              blinks_window=param["blinks_window"],
+                              events_bound_blinks=param["events_bound_blinks"])
 
         # Extract the relevant channels:
         epochs.pick(param["picks"])
         # Baseline correction:
         baseline_scaling(epochs, correction_method=param["baseline"], baseline=param["baseline_window"])
         subjects_epochs[sub] = epochs
+
+    # If the bad trials were rejected, plot the reaction time to investigate any potential differences due to blinks
+    if reject_bad_trials:
+        beh_data = []
+        for sub in subjects_epochs.keys():
+            metadata = subjects_epochs[sub].metadata.copy()
+            metadata["sub_id"] = sub
+            metadata["onset_SOA"] = np.zeros(metadata.shape[0])
+            metadata["duration"] = metadata["duration"].astype(float)
+            metadata.loc[metadata["SOA_lock"] == "onset", "onset_SOA"] = (
+                metadata.loc[metadata["SOA_lock"] == "onset", "SOA"].astype(float))
+            metadata.loc[metadata["SOA_lock"] == "offset", "onset_SOA"] = (
+                metadata.loc[metadata["SOA_lock"] == "offset", "SOA"].astype(float) +
+                metadata.loc[metadata["SOA_lock"] == "offset", "duration"].astype(float))
+            beh_data.append(metadata)
+        beh_data = pd.concat(beh_data).reset_index(drop=True)
+        colors_onset = [ev.colors["soa_onset_locked"][str(soa)] for soa in np.sort(beh_data["SOA"].unique())]
+        colors_offset = [ev.colors["soa_offset_locked"][str(soa)] for soa in np.sort(beh_data["SOA"].unique())]
+        # Task relevant:
+        fig_tr, ax_tr = soa_boxplot(beh_data[beh_data["task relevance"] == 'non-target'],
+                                    "RT_aud",
+                                    colors_onset_locked=colors_onset, colors_offset_locked=colors_offset)
+        # Task irrelevant:
+        fig_ti, ax_ti = soa_boxplot(beh_data[beh_data["task relevance"] == 'irrelevant'],
+                                    "RT_aud",
+                                    colors_onset_locked=colors_onset, colors_offset_locked=colors_offset, )
+        # Set the y limit to be the same for both plots:
+        lims = [[ax_tr[0].get_ylim()[0], ax_ti[0].get_ylim()[0]], [ax_tr[0].get_ylim()[1], ax_ti[0].get_ylim()[1]]]
+        max_lims = [min(min(lims)), max(max(lims))]
+        ax_tr[0].set_ylim(max_lims)
+        ax_ti[0].set_ylim(max_lims)
+        # Axes decoration:
+        fig_tr.suptitle("Relevant non-target")
+        fig_ti.suptitle("Irrelevant non-target")
+        fig_tr.text(0.5, 0, 'Time (sec.)', ha='center', va='center')
+        fig_ti.text(0.5, 0, 'Time (sec.)', ha='center', va='center')
+        fig_tr.text(0, 0.5, 'Corrected RT (sec.)', ha='center', va='center', fontsize=18, rotation=90)
+        fig_ti.text(0, 0.5, 'Corrected RT (sec.)', ha='center', va='center', fontsize=18, rotation=90)
+        # Save the figures:
+        fig_tr.savefig(Path(save_dir, "RT_aud_tr.svg"), transparent=True, dpi=dpi)
+        fig_tr.savefig(Path(save_dir, "RT_aud_tr.png"), transparent=True, dpi=dpi)
+        fig_ti.savefig(Path(save_dir, "RT_aud_ti.svg"), transparent=True, dpi=dpi)
+        fig_ti.savefig(Path(save_dir, "RT_aud_ti.png"), transparent=True, dpi=dpi)
+        plt.close(fig_tr)
+        plt.close(fig_ti)
+
     # Extract the times of the first subject (assuming that it is the same for all subjects, which it should be):
     times = subjects_epochs[subjects[0]].times
 
@@ -80,7 +138,7 @@ def pupil_latency(parameters_file, subjects, session="1", task="prp", analysis_n
     ax.boxplot([drop_log_df[col].to_numpy() for col in cols], labels=cols)
     ax.axhline(param["drop_trials_threshold"], linestyle="--", color="r")
     ax.set_ylabel("Proportion dropped trials")
-    ax.set_xlabel("Reason")
+    plt.xticks(rotation=45)
     plt.tight_layout()
     fig.savefig(Path(save_dir, "drop_log.svg"), transparent=True, dpi=300)
     fig.savefig(Path(save_dir, "drop_log.png"), transparent=True, dpi=300)
@@ -154,7 +212,7 @@ def pupil_latency(parameters_file, subjects, session="1", task="prp", analysis_n
             pupil_size_ylim = [-50, 150]
         else:
             boxplot_ylim = None
-            pupil_size_ylim = [-50, 50]
+            pupil_size_ylim = [-50, 100]
         # ===========================================================
         # Per SOA:
         if lock == "onset":  # For the offset locked trials, we need to plot separately per stimuli durations:
@@ -176,7 +234,7 @@ def pupil_latency(parameters_file, subjects, session="1", task="prp", analysis_n
                 ["latency", "latency_aud"]].mean()
             fig = plot_pupil_latency(evks, times, latencies, ev.colors["soa_{}_locked".format(lock)],
                                      boxplot_ylim=boxplot_ylim, pupil_size_ylim=pupil_size_ylim,
-                                     figsize=[8.3, 11.7/2])
+                                     figsize=[8.3, 11.7 / 3])
             fig.savefig(Path(save_dir, "pupil_latency_{}.svg".format(lock)), transparent=True, dpi=300)
             fig.savefig(Path(save_dir, "pupil_latency_{}.png".format(lock)), transparent=True, dpi=300)
             plt.close()
@@ -204,7 +262,7 @@ def pupil_latency(parameters_file, subjects, session="1", task="prp", analysis_n
                                      "latency_aud"]].mean()
                 fig = plot_pupil_latency(evks, times, latencies, ev.colors["soa_{}_locked".format(lock)],
                                          boxplot_ylim=boxplot_ylim, pupil_size_ylim=pupil_size_ylim,
-                                         figsize=[8.3, 11.7/2])
+                                         figsize=[8.3, 11.7 / 3])
                 fig.savefig(Path(save_dir, "pupil_latency_{}-{}.svg".format(lock, task)), transparent=True, dpi=300)
                 fig.savefig(Path(save_dir, "pupil_latency_{}-{}.png".format(lock, task)), transparent=True, dpi=300)
                 plt.close()
@@ -288,13 +346,6 @@ if __name__ == "__main__":
     parameters = (
         r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis"
         r"\05-ET_pupil_latency_parameters.json")
-    # ==================================================================================
-    # Introspection analysis:
-    task = "introspection"
-    pupil_latency(parameters, ev.subjects_lists_et[task], task=task, session=["2", "3"],
-                  analysis_name="pupil_latency", reject_bad_trials=True)
-    pupil_latency(parameters, ev.subjects_lists_et[task], task=task, session=["2", "3"],
-                  analysis_name="pupil_latency_no_rej", reject_bad_trials=False)
 
     # ==================================================================================
     # PRP analysis:
@@ -303,3 +354,12 @@ if __name__ == "__main__":
                   analysis_name="pupil_latency", reject_bad_trials=True)
     pupil_latency(parameters, ev.subjects_lists_et[task], task=task, session="1",
                   analysis_name="pupil_latency_no_rej", reject_bad_trials=False)
+
+    # ==================================================================================
+    # Introspection analysis:
+    task = "introspection"
+    pupil_latency(parameters, ev.subjects_lists_et[task], task=task, session=["2", "3"],
+                  analysis_name="pupil_latency", reject_bad_trials=True)
+    pupil_latency(parameters, ev.subjects_lists_et[task], task=task, session=["2", "3"],
+                  analysis_name="pupil_latency_no_rej", reject_bad_trials=False)
+
