@@ -368,6 +368,21 @@ if __name__ == "__main__":
     preprocessing_summary.to_csv(Path(save_dir, "participants_visual.csv"))
 
     # ==================================================================================
+    # PRP preprocessing:
+    task = "prp"
+    preprocessing_summary = {subject: {"drop_logs": None, "proportion_bad": None}
+                             for subject in ev.subjects_lists_et[task]}
+    for sub in  ev.subjects_lists_et[task]:
+        print("Preprocessing subject {}".format(sub))
+        prop_bad, drop_logs = preprocessing(sub, parameters_file, session="1", task="prp")
+        preprocessing_summary[sub]["proportion_bad"] = np.mean(prop_bad)
+        preprocessing_summary[sub]["drop_logs"] = [item[0] if len(item) > 0 else '' for item in drop_logs]
+    preprocessing_summary = format_summary_table(preprocessing_summary)
+    # Save the data frame:
+    save_dir = Path(ev.bids_root, "derivatives", "preprocessing")
+    preprocessing_summary.to_csv(Path(save_dir, "participants_prp.csv"))
+
+    # ==================================================================================
     # Introspection preprocessing:
     task = "introspection"
     # Session 2:
@@ -395,18 +410,3 @@ if __name__ == "__main__":
     # Save the data frame:
     save_dir = Path(ev.bids_root, "derivatives", "preprocessing")
     preprocessing_summary.to_csv(Path(save_dir, "participants_introspection_ses-3.csv"))
-
-    # ==================================================================================
-    # PRP preprocessing:
-    task = "prp"
-    preprocessing_summary = {subject: {"drop_logs": None, "proportion_bad": None}
-                             for subject in ev.subjects_lists_et[task]}
-    for sub in  ev.subjects_lists_et[task]:
-        print("Preprocessing subject {}".format(sub))
-        prop_bad, drop_logs = preprocessing(sub, parameters_file, session="1", task="prp")
-        preprocessing_summary[sub]["proportion_bad"] = np.mean(prop_bad)
-        preprocessing_summary[sub]["drop_logs"] = [item[0] if len(item) > 0 else '' for item in drop_logs]
-    preprocessing_summary = format_summary_table(preprocessing_summary)
-    # Save the data frame:
-    save_dir = Path(ev.bids_root, "derivatives", "preprocessing")
-    preprocessing_summary.to_csv(Path(save_dir, "participants_prp.csv"))
