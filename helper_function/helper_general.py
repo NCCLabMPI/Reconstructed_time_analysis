@@ -333,18 +333,31 @@ def equate_epochs_events(epochs_list):
 
         # Create the new events dictionary:
         new_evts = dict(zip(evts_names, list(range(len(evts_names)))))
+        trial_conditions_bfre = []
+        for i in epochs_list[0].events[:, 2]:
+            trial_conditions_bfre.append([key for key in epochs_list[0].event_id.keys()
+                                     if epochs_list[0].event_id[key] == i])
 
         # Loop through each epochs:
         for epo in epochs_list:
+            epo_new_events = epo.events.copy()
+            epo_new_events[:, 2] = np.array([np.nan] * epo_new_events.shape[0])
             for evts in new_evts.keys():
                 if evts in epo.event_id.keys():
                     # Extract the epoch id:
                     evt_id = epo.event_id[evts]
                     evt_ind = np.where(epo.events[:, 2] == evt_id)[0]
                     if len(evt_ind) > 0:
-                        epo.events[evt_ind, 2] = new_evts[evts]
+                        epo_new_events[evt_ind, 2] = new_evts[evts]
             # Replace the event dictionary:
             epo.event_id = new_evts
+            epo.events = epo_new_events
+        trial_conditions_after = []
+        for i in epochs_list[0].events[:, 2]:
+            trial_conditions_after.append([key for key in epochs_list[0].event_id.keys()
+                                          if epochs_list[0].event_id[key] == i])
+        assert np.all([trial_conditions_after[i] == cond for i, cond in enumerate(trial_conditions_bfre)]), \
+            "The trial description got messed up!!!!"
     return epochs_list
 
 
@@ -453,7 +466,7 @@ def beh_exclusion(data_df):
 
 
 def reject_bad_epochs(epochs, baseline_window=None, z_thresh=2, eyes=None, remove_blinks=True, blinks_window=None,
-                      remove_nan=False, exlude_beh=True):
+                      remove_nan=False, exlude_beh=True, events_bound_blinks=True):
     """
     This function rejects epochs based on the zscore of the baseline. For some trials, there may be artifacts
     in the baseline, in which case baseline correction will spread the artifact. Such epochs are discarded.
@@ -465,6 +478,7 @@ def reject_bad_epochs(epochs, baseline_window=None, z_thresh=2, eyes=None, remov
     :param blinks_window:
     :param remove_nan:
     :param exlude_beh:
+    :param events_bound_blinks:
     return:
         - epochs:
         - inds
@@ -486,7 +500,7 @@ def reject_bad_epochs(epochs, baseline_window=None, z_thresh=2, eyes=None, remov
             # Drop these epochs:
             epochs.drop(inds, reason="baseline_artifact", verbose="ERROR")
         print("{} out of {} ({:.2f}%) trials were rejected based on behavior.".format(len(inds), ntrials_orig,
-                                                                               (len(inds) / ntrials_orig) * 100))
+                                                                                      (len(inds) / ntrials_orig) * 100))
     # Extract the data:
     if z_thresh is not None:
         baseline_data = epochs.copy().crop(tmin=baseline_window[0],
@@ -506,22 +520,58 @@ def reject_bad_epochs(epochs, baseline_window=None, z_thresh=2, eyes=None, remov
                                                                                (len(inds) / len(
                                                                                    baseline_zscore)) * 100))
     if remove_blinks:
-        # Extract the blinks channels:
-        blink_data = np.squeeze(epochs.copy().crop(tmin=blinks_window[0],
-                                                   tmax=blinks_window[1]).get_data(picks=["_".join(["blink", eye])
-                                                                                          for eye in eyes]))
-        if blink_data.shape[1] == 2:
-            # Combine both eyes data:
-            blink_data = np.logical_and(blink_data[:, 0, :], blink_data[:, 1, :]).astype(float)
-        # Find the trials in which we have blinks:
-        blink_inds = np.where(np.any(blink_data, axis=1))[0]
+        # Events bound blinks detects blinks that occur within a specified time window around the events of interest.
+        # In our experiment, the critical visual events are the onset and offset of visual stimuli, depending on the
+        # tone locking.
+        if events_bound_blinks:
+            metadata = epochs.metadata.copy().reset_index(drop=True)
+            blink_inds = []
+            # Find blinks around the onset of the visual events:
+            onset_epochs = epochs["onset"]
+            trial_inds = list(metadata[metadata["SOA_lock"] == "onset"].index)
+            # Extract the data:
+            blink_data = np.squeeze(onset_epochs.copy().crop(tmin=blinks_window[0],
+                                                             tmax=blinks_window[1]).get_data(
+                picks=["_".join(["blink", eye])
+                       for eye in eyes]))
+            if blink_data.shape[1] == 2:
+                # Combine both eyes data:
+                blink_data = np.logical_and(blink_data[:, 0, :], blink_data[:, 1, :]).astype(float)
+            # Find the trials in which we have blinks:
+            blink_inds.extend([trial_inds[i] for i in np.where(np.any(blink_data, axis=1))[0]])
+
+            # For the offset locked trials, this needs to be done separately for each stimulus duration:
+            for dur in epochs.metadata["duration"].unique():
+                epo = epochs["/".join(["offset", dur])]
+                trial_inds = list(metadata[(metadata["SOA_lock"] == "offset") & (metadata["duration"] == dur)].index)
+                # Extract the data:
+                blink_data = np.squeeze(epo.copy().crop(tmin=blinks_window[0],
+                                                        tmax=blinks_window[1]).get_data(
+                    picks=["_".join(["blink", eye])
+                           for eye in eyes]))
+                if blink_data.shape[1] == 2:
+                    # Combine both eyes data:
+                    blink_data = np.logical_and(blink_data[:, 0, :], blink_data[:, 1, :]).astype(float)
+                # Find the trials in which we have blinks:
+                blink_inds.extend([trial_inds[i] for i in np.where(np.any(blink_data, axis=1))[0]])
+
+        else:
+            # Extract the blinks channels:
+            blink_data = np.squeeze(epochs.copy().crop(tmin=blinks_window[0],
+                                                       tmax=blinks_window[1]).get_data(picks=["_".join(["blink", eye])
+                                                                                              for eye in eyes]))
+            if blink_data.shape[1] == 2:
+                # Combine both eyes data:
+                blink_data = np.logical_and(blink_data[:, 0, :], blink_data[:, 1, :]).astype(float)
+            # Find the trials in which we have blinks:
+            blink_inds = np.where(np.any(blink_data, axis=1))[0]
         if len(blink_inds) > 0:
             # Drop these epochs:
             epochs.drop(blink_inds, reason="blinks", verbose="ERROR")
         # Print the proportion of dropped epochs:
         print("{} out of {} ({:.2f}%) trials had blinks within.".format(len(blink_inds), blink_data.shape[0],
                                                                         (len(blink_inds) /
-                                                                            blink_data.shape[0]) * 100,
+                                                                         blink_data.shape[0]) * 100,
                                                                         blinks_window))
     if remove_nan:
         data = epochs.get_data(copy=True)
@@ -531,12 +581,12 @@ def reject_bad_epochs(epochs, baseline_window=None, z_thresh=2, eyes=None, remov
             epochs.drop(nan_inds, reason="NaN", verbose="ERROR")
         # Print the proportion of dropped epochs:
         print("{} out of {} ({:.2f}%) trials had NaN.".format(len(nan_inds), data.shape[0],
-                                                                        (len(nan_inds) /
-                                                                            data.shape[0]) * 100,
-                                                                        blinks_window))
+                                                              (len(nan_inds) /
+                                                               data.shape[0]) * 100,
+                                                              blinks_window))
     ntrials_final = len(epochs)
 
-    return epochs, 1 - ntrials_final/ntrials_orig
+    return epochs, 1 - ntrials_final / ntrials_orig
 
 
 def max_percentage_index(data, thresh_percent):
