@@ -73,7 +73,10 @@ def pupil_latency(parameters_file, subjects, session="1", task="prp", analysis_n
                               exlude_beh=param["exlude_beh"],
                               remove_blinks=param["remove_blinks"],
                               blinks_window=param["blinks_window"],
-                              events_bound_blinks=param["events_bound_blinks"])
+                              events_bound_blinks=param["events_bound_blinks"],
+                              remove_fixdist=param["remove_fixdist"],
+                              fixdist_thresh_deg=param["fixdist_thresh_deg"],
+                              fixdist_prop_trhesh=param["fixdist_prop_trhesh"])
 
         # Extract the relevant channels:
         epochs.pick(param["picks"])

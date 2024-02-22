@@ -55,7 +55,10 @@ def pupil_amplitude(parameters_file, subjects, session="1", task="prp", analysis
                               eyes=param["eyes"],
                               exlude_beh=param["exlude_beh"],
                               remove_blinks=param["remove_blinks"],
-                              blinks_window=param["blinks_window"])
+                              blinks_window=param["blinks_window"],
+                              remove_fixdist=param["remove_fixdist"],
+                              fixdist_thresh_deg=param["fixdist_thresh_deg"],
+                              fixdist_prop_trhesh=param["fixdist_prop_trhesh"])
         # Decimate
         epochs.decimate(int(epochs.info["sfreq"] / param["decim_freq"]))
 
