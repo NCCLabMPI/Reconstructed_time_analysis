@@ -37,7 +37,7 @@
     "eyes": ["left", "right"]
   },
   "interpolate_blinks": {
-    "buffer": [0.05, 0.2],
+    "buffer": [0.02, 0.02],
     "interpolate_gaze": true
   },
   "extract_eyelink_events": {
