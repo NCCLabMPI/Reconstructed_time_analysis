@@ -10,10 +10,11 @@ from sklearn.preprocessing import StandardScaler
 from mne.decoding import (SlidingEstimator, cross_val_multiscore)
 from mne.stats.cluster_level import _pval_from_histogram
 import environment_variables as ev
-from scipy.ndimage import uniform_filter1d
+from joblib import Parallel, delayed
+from tqdm import tqdm
 import pickle
 from helper_function.helper_general import extract_first_bout, create_super_subject, get_roi_channels, \
-    get_cmap_rgb_values
+    get_cmap_rgb_values, moving_average
 from helper_function.helper_plotter import plot_decoding_accuray
 import pandas as pd
 
@@ -42,8 +43,12 @@ def decoding(parameters_file, subjects, data_root, session="1", task="dur", anal
     times = []
     # Loop through each ROI:
     for ii, roi in enumerate(param["rois"]):
+
         # Create the directory to save the results in:
         roi_name = roi[0].replace("ctx_lh_", "")
+        print("=========================================")
+        print("ROI")
+        print(roi_name)
         roi_results[roi_name] = {
             "scores_ti": None, "scores_tr": None, "scores_diff": None,
             "ci_tr": None, "ci_ti": None, "ci_diff": None,
@@ -68,10 +73,10 @@ def decoding(parameters_file, subjects, data_root, session="1", task="dur", anal
                 d['coord_frame'] = FIFF.FIFFV_COORD_MRI
             # Crop if needed:
             epochs.crop(param["crop"][0], param["crop"][1])
+            times = epochs.times
             # Extract the conditions of interest:
             epochs = epochs[param["conditions"]]
-            epochs.decimate(5)
-            times = epochs.times
+
             # Extract only the channels in the correct ROI:
             roi_channels = get_roi_channels(epochs.get_montage(), "sub-" + sub,
                                             roi, ev.fs_directory,
@@ -97,6 +102,10 @@ def decoding(parameters_file, subjects, data_root, session="1", task="dur", anal
         # Equate the trial matrices:
         data_tr, labels_tr = create_super_subject(tr_epochs, param["targets_column"],
                                                   n_trials=param["min_ntrials"])
+        # Smooth the data.
+        window_size = int((param["mvavg_window_ms"] * 0.001) / (times[1] - times[0]))
+        data_tr = moving_average(data_tr, window_size, axis=-1, overlapping=False)
+        times = moving_average(times, window_size, axis=-1, overlapping=False)
         n_channels_tr = data_tr.shape[1]
 
         # ============================
@@ -105,7 +114,8 @@ def decoding(parameters_file, subjects, data_root, session="1", task="dur", anal
         # Equate the trial matrices:
         data_ti, labels_ti = create_super_subject(ti_epochs, param["targets_column"],
                                                   n_trials=param["min_ntrials"])
-        n_channels_ti = data_tr.shape[1]
+        data_ti = moving_average(data_ti, window_size, axis=-1, overlapping=False)
+        n_channels_ti = data_ti.shape[1]
 
         assert n_channels_ti == n_channels_tr, ("The number of channels does not match between task relevances "
                                                 "conditions!")
@@ -114,14 +124,20 @@ def decoding(parameters_file, subjects, data_root, session="1", task="dur", anal
         # ==============================================================================================================
         # 2. Decoding:
         # ============================
+        print("=" * 20)
+        print("Decoding in task relevant")
         # Task relevant:
         roi_results[roi_name]["scores_tr"] = np.mean(
-            cross_val_multiscore(time_res, data_tr, labels_tr, cv=param["kfold"], n_jobs=param["n_jobs"]),
+            cross_val_multiscore(time_res, data_tr, labels_tr, cv=param["kfold"], n_jobs=param["n_jobs"],
+                                 verbose="ERROR"),
             axis=0)
         # ============================
         # Task irrelevant:
+        print("=" * 20)
+        print("Decoding in task irrelevant")
         roi_results[roi_name]["scores_ti"] = np.mean(
-            cross_val_multiscore(time_res, data_ti, labels_ti, cv=param["kfold"], n_jobs=param["n_jobs"]),
+            cross_val_multiscore(time_res, data_ti, labels_ti, cv=param["kfold"], n_jobs=param["n_jobs"],
+                                 verbose="ERROR"),
             axis=0)
 
         # Compute the difference in decoding accuracy between the task relevant and irrelevant condition:
@@ -131,14 +147,16 @@ def decoding(parameters_file, subjects, data_root, session="1", task="dur", anal
         # 3. Permutation
         # ============================
         # Task relevant:
-        scores_perm_tr = []
-        for i in range(param["n_perm"]):
-            score_ = cross_val_multiscore(time_res, data_tr,
-                                          labels_tr[np.random.choice(labels_tr.shape[0], labels_tr.shape[0],
-                                                                     replace=False)],
-                                          cv=param["kfold"], n_jobs=param["n_jobs"])
-            scores_perm_tr.append(np.mean(score_, axis=0))
-        scores_perm_tr = np.array(scores_perm_tr)
+        print("=" * 20)
+        print("Permutation task relevant")
+        scores_perm_tr = Parallel(n_jobs=param["n_jobs"])(delayed(cross_val_multiscore)(
+            time_res, data_tr,
+            labels_tr[np.random.choice(labels_tr.shape[0], labels_tr.shape[0],
+                                       replace=False)],
+            cv=param["kfold"], n_jobs=1,
+            verbose="ERROR"
+        ) for i in tqdm(range(param["n_perm"])))
+        scores_perm_tr = np.array([np.mean(scr, axis=0) for scr in scores_perm_tr])
         # Compute the p value:
         pvals = []
         for t in range(roi_results[roi_name]["scores_tr"].shape[0]):
@@ -147,15 +165,16 @@ def decoding(parameters_file, subjects, data_root, session="1", task="dur", anal
 
         # ============================
         # Task irrelevant:
-        scores_perm_ti = []
-        for i in range(param["n_perm"]):
-            score_ = cross_val_multiscore(time_res, data_ti,
-                                          labels_ti[np.random.choice(labels_ti.shape[0], labels_ti.shape[0],
-                                                                     replace=False)],
-                                          cv=param["kfold"], n_jobs=param["n_jobs"])
-            scores_perm_ti.append(np.mean(score_, axis=0))
-        scores_perm_ti = np.array(scores_perm_ti)
-
+        print("=" * 20)
+        print("Permutation task irrelevant")
+        scores_perm_ti = Parallel(n_jobs=param["n_jobs"])(delayed(cross_val_multiscore)(
+            time_res, data_ti,
+            labels_tr[np.random.choice(labels_ti.shape[0], labels_ti.shape[0],
+                                       replace=False)],
+            cv=param["kfold"], n_jobs=1,
+            verbose="ERROR"
+        ) for i in tqdm(range(param["n_perm"])))
+        scores_perm_ti = np.array([np.mean(scr, axis=0) for scr in scores_perm_ti])
         # Compute the p value:
         pvals = []
         for t in range(roi_results[roi_name]["scores_ti"].shape[0]):
@@ -180,6 +199,8 @@ def decoding(parameters_file, subjects, data_root, session="1", task="dur", anal
         # ==============================================================================================================
         # 4. Bootstrap:
         # ============================
+        print("=" * 20)
+        print("Bootstrapping")
         # Compute confidence interval for the time series by bootstrapping the electrodes:
         scores_bootsstrap_tr = []
         scores_bootsstrap_ti = []
@@ -187,9 +208,11 @@ def decoding(parameters_file, subjects, data_root, session="1", task="dur", anal
         for i in range(param["n_bootsstrap"]):
             ch_inds = np.random.choice(n_channels_tr, n_channels_tr, replace=True)
             score_bootstrap_tr = np.mean(cross_val_multiscore(time_res, data_tr[:, ch_inds, :], labels_tr,
-                                                              cv=param["kfold"], n_jobs=param["n_jobs"]), axis=0)
+                                                              cv=param["kfold"], n_jobs=param["n_jobs"],
+                                                              verbose="ERROR"), axis=0)
             score_bootstrap_ti = np.mean(cross_val_multiscore(time_res, data_ti[:, ch_inds, :], labels_ti,
-                                                              cv=param["kfold"], n_jobs=param["n_jobs"]), axis=0)
+                                                              cv=param["kfold"], n_jobs=param["n_jobs"],
+                                                              verbose="ERROR"), axis=0)
             # Compute the difference:
             score_bootsstrap_diff = score_bootstrap_tr - score_bootstrap_ti
             # Add everything the to the lists:
@@ -277,7 +300,7 @@ def decoding(parameters_file, subjects, data_root, session="1", task="dur", anal
     onset_colors = get_cmap_rgb_values(latencies_table["onset"].to_numpy(), cmap="Reds", center=None)
     # Plot the brain:
     Brain = mne.viz.get_brain_class()
-    brain = Brain('fsaverage', hemi='lh', surf='inflated',  subjects_dir=ev.fs_directory, size=(800, 600))
+    brain = Brain('fsaverage', hemi='lh', surf='inflated', subjects_dir=ev.fs_directory, size=(800, 600))
     # Loop through each label:
     for roi_i, roi in enumerate(latencies_table["roi"].to_list()):
         # Find the corresponding label:
