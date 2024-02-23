@@ -12,6 +12,134 @@ from math import atan2, degrees
 import mne
 from mne_bids import convert_montage_to_mri
 from matplotlib import colormaps
+from math import ceil
+from sklearn.model_selection import StratifiedKFold
+from mne.stats.cluster_level import _pval_from_histogram
+from joblib import Parallel, delayed
+from tqdm import tqdm
+
+
+def compute_pseudotrials(data, labels, n_trials=5):
+    """
+    This function computes pseudotrials, i.e. averaging every n trials together
+    :param data:
+    :param n_trials:
+    :param labels:
+    :return:
+    """
+    # Randomize the order of the trials:
+    inds = np.random.choice(labels.shape[0], labels.shape[0], replace=False)
+    data = data[inds, ...]
+    labels = labels[inds]
+
+    labels_u = np.unique(labels)
+    data_pseudotrials = []
+    labels_pseudotrials = []
+    for lbl in labels_u:
+        # Select the data of the corresponding label:
+        data_lbl = data[np.where(labels == lbl)[0], ...]
+        # Get the dimensions:
+        num_trials, num_channels, num_times = data_lbl.shape
+
+        # Calculate the number of n_trials
+        n_pseudotrials = num_trials // n_trials
+
+        # Reshape the matrix to combine trials for averaging
+        reshaped_data = data_lbl[:n_pseudotrials * n_trials, :, :]
+        reshaped_data = reshaped_data.reshape((n_pseudotrials, n_trials, num_channels, num_times))
+
+        # Average trials along the second axis (axis=1)
+        data_pseudotrials.append(np.mean(reshaped_data, axis=1))
+        labels_pseudotrials.extend([lbl] * n_pseudotrials)
+    # Combine the data:
+    data_pseudotrials = np.concatenate(data_pseudotrials, axis=0)
+    labels_pseudotrials = np.array(labels_pseudotrials)
+
+    return data_pseudotrials, labels_pseudotrials
+
+
+def compute_ci(data, axis=0, interval=0.95):
+    """
+    This function computes confidence interval from the data by taking the upper and lower percentile of the empirical
+    distribution
+    :param data: (np array) contains the data on which to compute the ci
+    :param axis: (int) axis along which to compute the CI
+    :param interval: (float) confidence interval (between 0 and 1)
+    :return:
+    """
+    ci = (((1 - interval) / 2) * 100, (1 - ((1 - interval) / 2)) * 100)
+    return np.percentile(data, ci, axis=axis)
+
+
+def decoding_label_shuffle(estimator, test_data, test_labels):
+    return estimator.score(test_data,
+                           test_labels[np.random.choice(test_data.shape[0], test_data.shape[0], replace=False)])
+
+
+def estimate_decoding_duration(data, labels, times, estimator, n_bootrstrap=100, n_perm=1000, n_jobs=1,
+                               kfolds=5, alpha=0.05, min_dur_ms=50, random_seed=None):
+    """
+    This function estimates for how long the information decodable from. The algorithm functions by performing the
+    decoding, then computing an empirical null by shuffling labels of the test fold (for computation speed). The
+    first bout of decoding that is superior to chance for a duration x s taken as the decoding duration. This is
+    repeated by bootstrapping the features to get estimate of the variance of the decoding duration.
+    :param data:
+    :param labels:
+    :param times:
+    :param estimator:
+    :param n_bootrstrap:
+    :param n_perm:
+    :param n_jobs:
+    :param kfolds:
+    :param alpha:
+    :param min_dur_ms:
+    :param random_seed:
+    :return:
+    """
+    if random_seed is not None:
+        np.random.seed(random_seed)
+
+    # Create cross validation iterator:
+    skf = StratifiedKFold(n_splits=kfolds)
+    # Loop through each bootstrap iterations:
+    scores = []
+    pvals = []
+    onsets = []
+    offsets = []
+    durations = []
+    for i in tqdm(range(n_bootrstrap)):
+        # Loop through cross validation folds:
+        scr = []
+        scr_perm = []
+        data_boot = data[:, np.random.choice(data.shape[1], data.shape[1], replace=True), :]
+        for train_index, test_index in skf.split(data, labels):
+            # Training:
+            estimator.fit(data_boot[train_index, :, :], labels[train_index])
+            # Test:
+            scr.append(estimator.score(data_boot[test_index, :, :], labels[test_index]))
+            scr_perm.append(Parallel(n_jobs=n_jobs)(delayed(decoding_label_shuffle)(estimator,
+                                                                                    data_boot[test_index, :, :],
+                                                                                    labels[test_index]
+                                                                                    ) for i in
+                                                    range(ceil(n_perm / kfolds))))
+        # Convert the results to arrays:
+        scr = np.array(scr)
+        scores.append(np.mean(scr, axis=0))
+        scr_perm = np.array(scr_perm)
+        # Compute the p values:
+        pvals.append(_pval_from_histogram(np.mean(scr, axis=0), scr_perm, 1))
+        # Extract the bout of significance:
+        onset, offset = extract_first_bout(times, pvals[-1], alpha, min_dur_ms)
+        onsets.append(onset)
+        offsets.append(offset)
+        if onset is not None:
+            durations.append(offset - onset)
+        else:
+            durations.append(0)
+    # Compute the confidence interval of the decoding scores:
+    ci = compute_ci(scores, axis=0, interval=0.95)
+    return (np.array(scores), np.array(pvals), ci, np.array(onsets), np.array(offsets),
+            np.array(durations))
 
 
 def get_cmap_rgb_values(values, cmap=None, center=None):
@@ -336,7 +464,7 @@ def equate_epochs_events(epochs_list):
         trial_conditions_bfre = []
         for i in epochs_list[0].events[:, 2]:
             trial_conditions_bfre.append([key for key in epochs_list[0].event_id.keys()
-                                     if epochs_list[0].event_id[key] == i])
+                                          if epochs_list[0].event_id[key] == i])
 
         # Loop through each epochs:
         for epo in epochs_list:
@@ -355,7 +483,7 @@ def equate_epochs_events(epochs_list):
         trial_conditions_after = []
         for i in epochs_list[0].events[:, 2]:
             trial_conditions_after.append([key for key in epochs_list[0].event_id.keys()
-                                          if epochs_list[0].event_id[key] == i])
+                                           if epochs_list[0].event_id[key] == i])
         assert np.all([trial_conditions_after[i] == cond for i, cond in enumerate(trial_conditions_bfre)]), \
             "The trial description got messed up!!!!"
     return epochs_list
@@ -444,19 +572,11 @@ def beh_exclusion(data_df):
     trial_orig = list(data_df.index)
     # 1. Remove all trials with no auditory responses:
     data_df_clean = data_df[data_df["RT_aud"].notna()]
-    # 2. Remove each trial in which the reaction time exceeds the max reaction time:
-    # 2.1. Calculate the max threshold:
-    max_win_trials = data_df_clean[(data_df_clean["SOA_lock"] == "offset") &
-                                   (data_df_clean["duration"].to_numpy().astype(float) == 1.5) &
-                                   (data_df_clean["SOA"].to_numpy().astype(float) == 0.466)]
-    max_rt_aud = np.mean(max_win_trials["stim_jit"].to_numpy() + 2 - (1.5 + 0.466))
-    # 2.2. Remove all trials with RT higher than that:
-    data_df_clean = data_df_clean[data_df_clean["RT_aud"] <= max_rt_aud]
-    # 3. Remove trials where the RT is lower than threshold:
+    # 2. Remove trials where the RT is lower than threshold:
     data_df_clean = data_df_clean[data_df_clean["RT_aud"] >= 0.1]
-    # 4. Remove trials with false alarm to the visual stimulus:
+    # 3. Remove trials with false alarm to the visual stimulus:
     data_df_clean = data_df_clean[data_df_clean["trial_response_vis"] != "fa"]
-    # 5. Remove incorrect auditory responses:
+    # 4. Remove incorrect auditory responses:
     data_df_clean = data_df_clean[data_df_clean["trial_accuracy_aud"] == 1]
     # Fetch the removed indices:
     trial_final = list(data_df_clean.index)
@@ -466,7 +586,8 @@ def beh_exclusion(data_df):
 
 
 def reject_bad_epochs(epochs, baseline_window=None, z_thresh=2, eyes=None, remove_blinks=True, blinks_window=None,
-                      remove_nan=False, exlude_beh=True, events_bound_blinks=True):
+                      remove_nan=False, exlude_beh=True, events_bound_blinks=True, remove_fixdist=True,
+                      fixdist_thresh_deg=6, fixdist_prop_trhesh=0.7):
     """
     This function rejects epochs based on the zscore of the baseline. For some trials, there may be artifacts
     in the baseline, in which case baseline correction will spread the artifact. Such epochs are discarded.
@@ -519,6 +640,24 @@ def reject_bad_epochs(epochs, baseline_window=None, z_thresh=2, eyes=None, remov
         print("{} out of {} ({:.2f}%) trials had artifact in baseline.".format(len(inds), len(baseline_zscore),
                                                                                (len(inds) / len(
                                                                                    baseline_zscore)) * 100))
+    # Remove trials based on fixation distance from center:
+    if remove_fixdist is not None:
+        # Extract the fixation distance data:
+        fix_dist_data = epochs.copy().crop(tmin=0,
+                                           tmax=epochs.times[-1]).get_data(picks=["_".join(["fixdist", eye])
+                                                                                  for eye in eyes])
+        # Average across both eyes:
+        fix_dist_data = np.mean(fix_dist_data, axis=1)
+        # Compute the proportion of fixation within each trial:
+        fix_prop = np.mean(fix_dist_data < fixdist_thresh_deg, axis=1)
+        # Find the trials that exceed threshold:
+        inds = np.where(fix_prop < fixdist_prop_trhesh)[0]
+        if len(inds) > 0:
+            # Drop these epochs:
+            epochs.drop(inds, reason="fixation_distance", verbose="ERROR")
+        # Print the proportion of dropped epochs:
+        print("In {} out of {} ({:.2f}%), pariticipant did not fixate.".format(len(inds), len(fix_prop),
+                                                                               (len(inds) / len(fix_prop)) * 100))
     if remove_blinks:
         # Events bound blinks detects blinks that occur within a specified time window around the events of interest.
         # In our experiment, the critical visual events are the onset and offset of visual stimuli, depending on the

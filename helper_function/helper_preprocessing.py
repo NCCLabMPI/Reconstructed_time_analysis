@@ -117,10 +117,12 @@ def annotate_nan(raw, nan_annotation="BAD_nan", eyes=None):
         offsets = raw.times[np.where(nan_diff == -1)[0]]
         # Compute duration:
         if onsets.shape[0] > 0:
-            if onsets.shape[0] == offsets.shape[0] + 1:
-                offsets = raw.times[-1]
-            else:
-                raise Exception("Different numbers of onsets and offsets!")
+            if onsets.shape[0] != offsets.shape[0]:
+                if onsets.shape[0] == offsets.shape[0] + 1:
+                    offsets = raw.times[-1]
+
+                else:
+                    raise Exception("Different numbers of onsets and offsets!")
             duration = offsets - onsets
             # Create annotations accordingly:
             nan_annotations = mne.Annotations(

@@ -228,7 +228,6 @@ def plot_within_subject_boxplot(data_df, within_column, between_column, dependen
 
 def soa_boxplot(data_df, dependent_variable, fig_size=None, lock_column="SOA_lock", subject_column="sub_id",
                 between_column="onset_SOA", ax=None, fig=None, colors_onset_locked=None, colors_offset_locked=None,
-                cousineau_correction=True, plot_avg_line=False, style="boxplot", plot_single_sub=True,
                 avg_line_color=None, zorder=0, alpha=1):
     """
     This function plots the PRP study data in a standardized format, so that it can be used across experiments and data
@@ -253,13 +252,13 @@ def soa_boxplot(data_df, dependent_variable, fig_size=None, lock_column="SOA_loc
     # Onset locked data:
     _, _, _ = plot_within_subject_boxplot(data_df[data_df[lock_column] == 'onset'],
                                           subject_column, between_column, dependent_variable,
-                                          positions=between_column, ax=ax[0], cousineau_correction=cousineau_correction,
+                                          positions=between_column, ax=ax[0], cousineau_correction=False,
                                           title="",
                                           xlabel="", ylabel="",
                                           xlim=[-0.1, 0.6], width=0.1,
-                                          face_colors=colors_onset_locked, plot_avg_line=plot_avg_line, style=style,
-                                          plot_single_sub=plot_single_sub, avg_line_color=avg_line_color, zorder=zorder,
-                                          alpha=alpha)
+                                          face_colors=colors_onset_locked, plot_avg_line=True,
+                                          style="errorbar", plot_single_sub=False, avg_line_color=avg_line_color,
+                                          zorder=zorder, alpha=alpha)
     # Loop through each duration to plot the offset locked SOA separately:
     for i, dur in enumerate(sorted(list(data_df["duration"].unique()))):
         _, _, _ = plot_within_subject_boxplot(data_df[(data_df[lock_column] == 'offset')
@@ -267,12 +266,12 @@ def soa_boxplot(data_df, dependent_variable, fig_size=None, lock_column="SOA_loc
                                               between_column,
                                               dependent_variable,
                                               positions=between_column, ax=ax[i + 1],
-                                              cousineau_correction=cousineau_correction,
+                                              cousineau_correction=False,
                                               title="",
                                               xlabel="", ylabel="",
                                               xlim=[dur - 0.1, dur + 0.6], width=0.1,
-                                              face_colors=colors_offset_locked, plot_avg_line=plot_avg_line,
-                                              style=style, plot_single_sub=plot_single_sub,
+                                              face_colors=colors_offset_locked, plot_avg_line=True,
+                                              style="errorbar", plot_single_sub=False,
                                               avg_line_color=avg_line_color, zorder=zorder,
                                               alpha=alpha)
         ax[i + 1].yaxis.set_visible(False)
@@ -393,14 +392,12 @@ def plot_pupil_latency(evoked_dict, times, latencies_df, colors, pupil_size_ylim
     return fig
 
 
-def plot_decoding_accuray(times, data, ci, pvals, smooth_ms=50, color=None, alpha=0.05, ax=None, pval_height=0.05,
-                          label="", ylim=None):
+def plot_decoding_accuray(times, data, ci, smooth_ms=50, color=None, ax=None, label="", ylim=None):
     """
     This function plots decoding results
     :param times:
     :param data:
     :param ci:
-    :param pvals:
     :param smooth_ms:
     :param color:
     :param alpha:
@@ -417,10 +414,6 @@ def plot_decoding_accuray(times, data, ci, pvals, smooth_ms=50, color=None, alph
     data = uniform_filter1d(data, size=smooth_samp, axis=-1)
     upci = uniform_filter1d(ci[1, :], size=smooth_samp, axis=-1)
     lowci = uniform_filter1d(ci[0, :], size=smooth_samp, axis=-1)
-    # Convert the pvalues for scatter:
-    pvals = np.squeeze((pvals < alpha).astype(float))
-    pvals[pvals == 0] = np.nan
-    pvals[pvals == 1] = pval_height
 
     # Plot the score:
     ax.plot(times, data, color=color, label=label)
@@ -429,7 +422,5 @@ def plot_decoding_accuray(times, data, ci, pvals, smooth_ms=50, color=None, alph
                     color=color,
                     alpha=.3)
     ax.set_ylim(ylim)
-    # Plot the p values:
-    ax.scatter(times, pvals, marker='^', color=color, transform=plt.gca().get_xaxis_transform())
 
     return ax
