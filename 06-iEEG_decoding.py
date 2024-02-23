@@ -14,7 +14,7 @@ from joblib import Parallel, delayed
 from tqdm import tqdm
 import pickle
 from helper_function.helper_general import extract_first_bout, create_super_subject, get_roi_channels, \
-    get_cmap_rgb_values, moving_average
+    get_cmap_rgb_values, moving_average, estimate_decoding_duration, compute_ci, compute_pseudotrials
 from helper_function.helper_plotter import plot_decoding_accuray
 import pandas as pd
 
@@ -38,23 +38,16 @@ def decoding(parameters_file, subjects, data_root, session="1", task="dur", anal
     # Load all subjects data:
     subjects_epochs = {}
     # Prepare a table to store the onsets and offsets in each roi:
-    latencies_table = []
     roi_results = {}
     times = []
     # Loop through each ROI:
     for ii, roi in enumerate(param["rois"]):
-
         # Create the directory to save the results in:
         roi_name = roi[0].replace("ctx_lh_", "")
         print("=========================================")
         print("ROI")
         print(roi_name)
-        roi_results[roi_name] = {
-            "scores_ti": None, "scores_tr": None, "scores_diff": None,
-            "ci_tr": None, "ci_ti": None, "ci_diff": None,
-            "pval_tr": None, "pval_ti": None, "pval_diff": None,
-            "diff_onset": None, "diff_offset": None,
-            "n_channels": None}
+        roi_results[roi_name] = {}
 
         # Load each subjects' data:
         for sub in subjects:
@@ -107,7 +100,9 @@ def decoding(parameters_file, subjects, data_root, session="1", task="dur", anal
         data_tr = moving_average(data_tr, window_size, axis=-1, overlapping=False)
         times = moving_average(times, window_size, axis=-1, overlapping=False)
         n_channels_tr = data_tr.shape[1]
-
+        # Compute the pseudotrials:
+        if param["pseudotrials"] is not None:
+            data_tr, labels_tr = compute_pseudotrials(data_tr, labels_tr, param["pseudotrials"])
         # ============================
         # Task irrelevant:
         ti_epochs = {sub: subjects_epochs[sub][task_conditions[1]] for sub in subjects_epochs.keys()}
@@ -116,236 +111,94 @@ def decoding(parameters_file, subjects, data_root, session="1", task="dur", anal
                                                   n_trials=param["min_ntrials"])
         data_ti = moving_average(data_ti, window_size, axis=-1, overlapping=False)
         n_channels_ti = data_ti.shape[1]
+        # Compute the pseudotrials:
+        if param["pseudotrials"] is not None:
+            data_ti, labels_ti = compute_pseudotrials(data_ti, labels_ti, param["pseudotrials"])
 
         assert n_channels_ti == n_channels_tr, ("The number of channels does not match between task relevances "
                                                 "conditions!")
-        roi_results[roi_name]["n_channels"] = n_channels_tr
+        n_channels = n_channels_ti
 
         # ==============================================================================================================
-        # 2. Decoding:
+        # 2. Decoding and estimating durations:
         # ============================
         print("=" * 20)
         print("Decoding in task relevant")
         # Task relevant:
-        roi_results[roi_name]["scores_tr"] = np.mean(
-            cross_val_multiscore(time_res, data_tr, labels_tr, cv=param["kfold"], n_jobs=param["n_jobs"],
-                                 verbose="ERROR"),
-            axis=0)
+        scores_tr, pvals_tr, ci_tr, onsets_tr, offsets_tr, durations_tr = (
+            estimate_decoding_duration(data_tr, labels_tr, times, time_res, n_bootrstrap=param["n_bootsstrap"],
+                                       n_perm=param["n_perm"], n_jobs=param["n_jobs"], kfolds=param["kfold"],
+                                       alpha=param["alpha"], min_dur_ms=param["dur_threshold"], random_seed=42))
         # ============================
-        # Task irrelevant:
         print("=" * 20)
         print("Decoding in task irrelevant")
-        roi_results[roi_name]["scores_ti"] = np.mean(
-            cross_val_multiscore(time_res, data_ti, labels_ti, cv=param["kfold"], n_jobs=param["n_jobs"],
-                                 verbose="ERROR"),
-            axis=0)
-
-        # Compute the difference in decoding accuracy between the task relevant and irrelevant condition:
-        roi_results[roi_name]["scores_diff"] = roi_results[roi_name]["scores_tr"] - roi_results[roi_name]["scores_ti"]
-
-        # ==============================================================================================================
-        # 3. Permutation
-        # ============================
-        # Task relevant:
-        print("=" * 20)
-        print("Permutation task relevant")
-        scores_perm_tr = Parallel(n_jobs=param["n_jobs"])(delayed(cross_val_multiscore)(
-            time_res, data_tr,
-            labels_tr[np.random.choice(labels_tr.shape[0], labels_tr.shape[0],
-                                       replace=False)],
-            cv=param["kfold"], n_jobs=1,
-            verbose="ERROR"
-        ) for i in tqdm(range(param["n_perm"])))
-        scores_perm_tr = np.array([np.mean(scr, axis=0) for scr in scores_perm_tr])
-        # Compute the p value:
-        pvals = []
-        for t in range(roi_results[roi_name]["scores_tr"].shape[0]):
-            pvals.append(_pval_from_histogram([roi_results[roi_name]["scores_tr"][t]], scores_perm_tr[:, t], 1))
-        roi_results[roi_name]["pval_tr"] = np.array(pvals)
-
-        # ============================
         # Task irrelevant:
-        print("=" * 20)
-        print("Permutation task irrelevant")
-        scores_perm_ti = Parallel(n_jobs=param["n_jobs"])(delayed(cross_val_multiscore)(
-            time_res, data_ti,
-            labels_tr[np.random.choice(labels_ti.shape[0], labels_ti.shape[0],
-                                       replace=False)],
-            cv=param["kfold"], n_jobs=1,
-            verbose="ERROR"
-        ) for i in tqdm(range(param["n_perm"])))
-        scores_perm_ti = np.array([np.mean(scr, axis=0) for scr in scores_perm_ti])
-        # Compute the p value:
-        pvals = []
-        for t in range(roi_results[roi_name]["scores_ti"].shape[0]):
-            pvals.append(_pval_from_histogram([roi_results[roi_name]["scores_ti"][t]], scores_perm_tr[:, t], 1))
-        roi_results[roi_name]["pval_ti"] = np.array(pvals)
+        scores_ti, pvals_ti, ci_ti, onsets_ti, offsets_ti, durations_ti = (
+            estimate_decoding_duration(data_ti, labels_ti, times, time_res, n_bootrstrap=param["n_bootsstrap"],
+                                       n_perm=param["n_perm"], n_jobs=param["n_jobs"], kfolds=param["kfold"],
+                                       alpha=param["alpha"], min_dur_ms=param["dur_threshold"], random_seed=42))
 
-        # Compute the shuffled difference in accuracy:
-        scores_perm_diff = np.subtract(scores_perm_tr, scores_perm_ti)
-
-        # Compute the p values for the difference:
-        pvals = []
-        for t in range(roi_results[roi_name]["scores_diff"].shape[0]):
-            pvals.append(_pval_from_histogram([roi_results[roi_name]["scores_diff"][t]], scores_perm_diff[:, t], 1))
-        roi_results[roi_name]["pval_diff"] = np.array(pvals)
-        # Extract onset and offset of the difference:
-        onset, offset = extract_first_bout(times, roi_results[roi_name]["pval_diff"],
-                                           param["alpha"],
-                                           param["dur_threshold"])
-        roi_results[roi_name]["onset_diff"] = onset
-        roi_results[roi_name]["offset_diff"] = offset
+        # Compute the difference in duration between TR and TI:
+        duration_difference = durations_tr - durations_ti
+        # Compute the duration difference 95% CI:
+        dur_diff_ci = compute_ci(duration_difference, axis=0, interval=0.95)
 
         # ==============================================================================================================
-        # 4. Bootstrap:
-        # ============================
-        print("=" * 20)
-        print("Bootstrapping")
-        # Compute confidence interval for the time series by bootstrapping the electrodes:
-        scores_bootsstrap_tr = []
-        scores_bootsstrap_ti = []
-        scores_bootsstrap_diff = []
-        for i in range(param["n_bootsstrap"]):
-            ch_inds = np.random.choice(n_channels_tr, n_channels_tr, replace=True)
-            score_bootstrap_tr = np.mean(cross_val_multiscore(time_res, data_tr[:, ch_inds, :], labels_tr,
-                                                              cv=param["kfold"], n_jobs=param["n_jobs"],
-                                                              verbose="ERROR"), axis=0)
-            score_bootstrap_ti = np.mean(cross_val_multiscore(time_res, data_ti[:, ch_inds, :], labels_ti,
-                                                              cv=param["kfold"], n_jobs=param["n_jobs"],
-                                                              verbose="ERROR"), axis=0)
-            # Compute the difference:
-            score_bootsstrap_diff = score_bootstrap_tr - score_bootstrap_ti
-            # Add everything the to the lists:
-            scores_bootsstrap_tr.append(score_bootstrap_tr)
-            scores_bootsstrap_ti.append(score_bootstrap_ti)
-            scores_bootsstrap_diff.append(score_bootsstrap_diff)
-        scores_bootsstrap_tr = np.array(scores_bootsstrap_tr)
-        scores_bootsstrap_ti = np.array(scores_bootsstrap_ti)
-        scores_bootsstrap_diff = np.array(scores_bootsstrap_diff)
-        # Compute the 95% CI:
-        ci = (((1 - param["ci"]) / 2) * 100, (1 - ((1 - param["ci"]) / 2)) * 100)
-        roi_results[roi_name]["ci_tr"] = np.percentile(scores_bootsstrap_tr, ci, axis=0)
-        roi_results[roi_name]["ci_ti"] = np.percentile(scores_bootsstrap_ti, ci, axis=0)
-        roi_results[roi_name]["ci_diff"] = np.percentile(scores_bootsstrap_diff, ci, axis=0)
+        # 3. Package the results and save to pickle:
+        roi_results[roi_name]["scores_tr"] = scores_tr
+        roi_results[roi_name]["pvals_tr"] = pvals_tr
+        roi_results[roi_name]["ci_tr"] = ci_tr
+        roi_results[roi_name]["onsets_tr"] = onsets_tr
+        roi_results[roi_name]["offsets_tr"] = offsets_tr
+        roi_results[roi_name]["durations_tr"] = durations_tr
+        roi_results[roi_name]["pvals_ti"] = pvals_ti
+        roi_results[roi_name]["scores_ti"] = scores_ti
+        roi_results[roi_name]["pvals_ti"] = pvals_ti
+        roi_results[roi_name]["ci_ti"] = ci_ti
+        roi_results[roi_name]["onsets_ti"] = onsets_ti
+        roi_results[roi_name]["offsets_ti"] = offsets_ti
+        roi_results[roi_name]["durations_ti"] = durations_ti
+        roi_results[roi_name]["durations_difference"] = duration_difference
+        roi_results[roi_name]["durations_difference_ci"] = dur_diff_ci
+        roi_results[roi_name]["n_channels"] = n_channels
+
+        # Save results to file:
+        with open(Path(save_dir, 'results-{}.pkl'.format(roi_name)), 'wb') as f:
+            pickle.dump(roi_results[roi_name], f)
 
         # ==============================================================================================================
-        # 6. Plot single ROI results:
+        # 4. Plot results of this ROI
+        if np.all(dur_diff_ci > 0):
+            fig_dir = save_dir
+        else:
+            fig_dir = Path(save_dir, "no_diff")
+            if not os.path.isdir(fig_dir):
+                os.makedirs(fig_dir)
         # Plot decoding accuracy:
         fig, ax = plt.subplots()
         # Task relevant:
-        plot_decoding_accuray(times, roi_results[roi_name]["scores_tr"], roi_results[roi_name]["ci_tr"],
-                              roi_results[roi_name]["pval_tr"], smooth_ms=param["smooth_ms"], label=task_conditions[0],
-                              color=ev.colors["task_relevance"][task_conditions[0]], ax=ax, alpha=param["alpha"],
-                              pval_height=0.05, ylim=param["ylim"])
+        plot_decoding_accuray(times, np.mean(scores_tr, axis=0), ci_tr, smooth_ms=param["smooth_ms"],
+                              label=task_conditions[0],
+                              color=ev.colors["task_relevance"][task_conditions[0]], ax=ax, ylim=param["ylim"])
         # Task irrelevant:
-        plot_decoding_accuray(times, roi_results[roi_name]["scores_ti"], roi_results[roi_name]["ci_ti"],
-                              roi_results[roi_name]["pval_ti"], smooth_ms=param["smooth_ms"], label=task_conditions[0],
-                              color=ev.colors["task_relevance"][task_conditions[1]], ax=ax, alpha=param["alpha"],
-                              pval_height=0.1, ylim=param["ylim"])
+        plot_decoding_accuray(times, np.mean(scores_ti, axis=0), ci_ti,
+                              smooth_ms=param["smooth_ms"], label=task_conditions[1],
+                              color=ev.colors["task_relevance"][task_conditions[1]], ax=ax, ylim=param["ylim"])
         ax.legend()
+        ax.set_xlim([times[0], times[-1]])
         ax.set_xlabel("Time (sec.)")
         ax.set_ylabel("Accuracy")
         ax.set_title("Decoding over time in {} \n(# channels={})".format(roi_name,
                                                                          roi_results[roi_name]["n_channels"]))
-        fig.savefig(Path(save_dir, "{}_decoding.svg".format(roi_name)),
+        fig.savefig(Path(fig_dir, "{}_decoding.svg".format(roi_name)),
                     transparent=True, dpi=300)
-        fig.savefig(Path(save_dir, "{}_decoding.png".format(roi_name)),
-                    transparent=True, dpi=300)
-        plt.close()
-
-        # Plot the difference between task relevances:
-        fig, ax = plt.subplots()
-        plot_decoding_accuray(times, roi_results[roi_name]["scores_diff"], roi_results[roi_name]["ci_diff"],
-                              roi_results[roi_name]["pval_diff"], smooth_ms=param["smooth_ms"],
-                              color=ev.colors["task_relevance"][task_conditions[0]], ax=ax, alpha=param["alpha"],
-                              pval_height=0.05, ylim=None)
-        # Add the onset and offsets:
-        if roi_results[roi_name]["onset_diff"] is not None:
-            ax.axvline(roi_results[roi_name]["onset_diff"], color=ev.colors["soa_onset_locked"]["0"])
-            ax.axvline(roi_results[roi_name]["offset_diff"], color=ev.colors["soa_offset_locked"]["0"])
-        ax.legend()
-        ax.set_xlabel("Time (sec.)")
-        ax.set_ylabel("Accuracy")
-        ax.set_title("Decoding over time in {} \n(# channels={})".format(roi_name,
-                                                                         roi_results[roi_name]["n_channels"]))
-        fig.savefig(Path(save_dir, "{}_decoding_diff.svg".format(roi_name)),
-                    transparent=True, dpi=300)
-        fig.savefig(Path(save_dir, "{}_decoding_diff.png".format(roi_name)),
+        fig.savefig(Path(fig_dir, "{}_decoding.png".format(roi_name)),
                     transparent=True, dpi=300)
         plt.close()
 
     # Save results to file:
-    with open(Path(save_dir, 'roi_results.pkl'), 'wb') as f:
+    with open(Path(save_dir, 'results-all_roi.pkl'), 'wb') as f:
         pickle.dump(roi_results, f)
-    # Concatenate the table:
-    latencies_table = pd.concat(
-        [pd.DataFrame({
-            "roi": roi,
-            "onset": roi_results[roi]["onset_diff"],
-            "offset": roi_results[roi]["offset_diff"],
-        }, index=[0])
-            for roi in roi_results.keys()]
-    ).reset_index(drop=True)
-    latencies_table.to_csv(Path(Path(ev.bids_root, "derivatives", analysis_name, task),
-                                "latency_table.csv"))
-    latencies_table = latencies_table[~latencies_table["onset"].isna()]
-
-    # ====================================================================================================
-    # Plot the brain:
-    # ===============
-    # Read the annotations
-    annot = mne.read_labels_from_annot("fsaverage", parc='aparc.a2009s', subjects_dir=ev.fs_directory)
-    # Onset:
-    # Get colors for each label:
-    onset_colors = get_cmap_rgb_values(latencies_table["onset"].to_numpy(), cmap="Reds", center=None)
-    # Plot the brain:
-    Brain = mne.viz.get_brain_class()
-    brain = Brain('fsaverage', hemi='lh', surf='inflated', subjects_dir=ev.fs_directory, size=(800, 600))
-    # Loop through each label:
-    for roi_i, roi in enumerate(latencies_table["roi"].to_list()):
-        # Find the corresponding label:
-        lbl = [l for l in annot if l.name == roi + "-lh"]
-        brain.add_label(lbl[0], color=onset_colors[roi_i])
-    for view in views:
-        brain.show_view(view)
-        brain.save_image(Path(save_dir, "{}_{}.png".format("onset", view)))
-    brain.close()
-
-    # ===============
-    # offset:
-    # Get colors for each label:
-    offset_colors = get_cmap_rgb_values(latencies_table["offset"].to_numpy(), cmap="Blues", center=None)
-    # Plot the brain:
-    Brain = mne.viz.get_brain_class()
-    brain = Brain('fsaverage', hemi='lh', surf='inflated',
-                  subjects_dir=ev.fs_directory, size=(800, 600))
-    # Loop through each label:
-    for roi_i, roi in enumerate(latencies_table["roi"].to_list()):
-        # Find the corresponding label:
-        lbl = [l for l in annot if l.name == roi + "-lh"]
-        brain.add_label(lbl[0], color=offset_colors[roi_i])
-    for view in views:
-        brain.show_view(view)
-        brain.save_image(Path(save_dir, "{}_{}.png".format("offset", view)))
-    brain.close()
-
-    # ====================================================================================================
-    # Plot time series of difference between the two conditions:
-    # ===============
-    rois_colors = get_cmap_rgb_values(latencies_table["offset"].to_numpy(), cmap="jet", center=None)
-    fig, ax = plt.subplots()
-    for i, roi_name in enumerate(list(latencies_table["roi"].unique())):
-        # Extract the data of each task:
-        ax.plot(times, roi_results[roi_name]["scores_diff"], color=rois_colors[i], label=roi_name)
-    ax.set_xlabel("Time (sec.)")
-    ax.set_ylabel("Accuracy difference")
-    ax.set_title("Difference in decoding accuracy (TR - TI)")
-    ax.legend()
-    fig.savefig(Path(save_dir, "accuracy_difference_per_roi.svg"),
-                transparent=True, dpi=300)
-    fig.savefig(Path(save_dir, "accuracy_difference_per_roi.png"),
-                transparent=True, dpi=300)
-    plt.close()
 
 
 if __name__ == "__main__":
