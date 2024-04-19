@@ -1170,46 +1170,6 @@ write.csv(anova_results, file = file.path(save_dir, "Experiment2-iT1-RT2_offset_
 anova_results
 ```
 
-
-###  Control analysis: downsampling trials to Marti'S numbers
-[Not pre-regsitered]:
-In the study by Marti et al., 2012 (DOI: 10.1016/j.cognition.2010.01.003), they found not association between iRT and SOA, suggesting that participants are unaware of the PRP effect. In our experiment, we found that SOA impacts iRT, suggesting awareness (to some extent) of the PRP effect. Why are our results different? In Marti et al., the number of trials was much lower than in our experiment, due to the additional factors of task relevance and stimuli duration. In their study, they had only 40 observations per SOA and per subject. In our study, we had 40 trials per SOA x task relevance x duration. To investigate whether the discrepancy in findings is due to the discrepancy in trial numbers, we investigate the effect of SOA in task relevant trials, downsampling to 40 trials (ignoring duration, which has no effect on iRT). 
-
-```{r iRT downsampled}
-# Select task relevant onset locked trials only:
-onset_event_table2 = all_event_table2 %>% filter(SOA_lock == "onset")
-tr_onset_event_table2 = onset_event_table2 %>% filter(task_relevance == "non-target")
-# Set the number of iterations:
-iterations <- 1000
-# Pre-allocate to store the pvalues
-p_values <- numeric()
-for (i in 1:iterations) {
-  # Subsample the data
-  subsampled_df <- tr_onset_event_table2 %>%
-    group_by(sub_id, SOA) %>%
-    slice_sample(n = 40, replace = FALSE) %>%
-    ungroup()  # Remove grouping
-  
-  # auditory 
-  iRT_downsample_mdl = glmer(iRT_aud ~ f_SOA +
-                       (1*f_SOA | sub_id),
-                     family=Gamma(link="log"), data=subsampled_df)
-  
-  # Compute ANOVA:
-  anova_results = Anova(iRT_downsample_mdl)
-  Anova(iRT_downsample_mdl)
-
-  # Extract p-value for the effect of SOA
-  p_value <- anova_results["f_SOA", "Pr(>Chisq)"]
-
-  # Store the p-value
-  p_values <- c(p_values, p_value)
-}
-
-hist(p_values, main="P-values", xlab="P-val", ylab="Frequncy", border="black")
-
-```
-
 ### Control: relationship between introspective and objective RT
 [Not pre-registered]:
 In our data, we observe that despite the SOA effect on the iT being significant, the iT curve are much flatter than the RT curves, indicating that participants strongly underestimate their RT. Nonetheless, the iT is correlated with RT on a trial by trial basis. To quantify this two aspects of our data statistically, we compute Beta weights for the within and between SOA condition correlation of RT and iT. For that purpose, we compute two regressors: the mean RT per SOA condition and the deviation from mean RT on a trial by trial basis. We expect the mean RT per SOA to not explain a lot of variance, as the slope between mean RT and iT do not show a close association. On the other hand, participants iT still show a close association with RT overall, which should be reflected in a stronger correlation with the trial by trial deviation from the mean.
