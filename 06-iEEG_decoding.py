@@ -1,22 +1,19 @@
 import mne
 import os
 import json
-import numpy as np
 from pathlib import Path
 import matplotlib.pyplot as plt
 from sklearn.pipeline import make_pipeline
 from sklearn import svm
 from sklearn.preprocessing import StandardScaler
-from mne.decoding import (SlidingEstimator, cross_val_multiscore)
-from mne.stats.cluster_level import _pval_from_histogram
+from mne.decoding import SlidingEstimator
+from scipy.ndimage import gaussian_filter1d
 import environment_variables as ev
-from joblib import Parallel, delayed
-from tqdm import tqdm
+from mne.decoding import cross_val_multiscore
+import numpy as np
 import pickle
-from helper_function.helper_general import extract_first_bout, create_super_subject, get_roi_channels, \
-    get_cmap_rgb_values, moving_average, estimate_decoding_duration, compute_ci, compute_pseudotrials
-from helper_function.helper_plotter import plot_decoding_accuray
-import pandas as pd
+from helper_function.helper_general import create_super_subject, get_roi_channels, \
+    decoding_difference_duration, moving_average, compute_pseudotrials
 
 # Set the font size:
 plt.rcParams.update({'font.size': 14})
@@ -26,13 +23,13 @@ views = ['lateral', 'medial', 'rostral', 'caudal', 'ventral', 'dorsal']
 
 
 def decoding(parameters_file, subjects, data_root, session="1", task="dur", analysis_name="decoding",
-             task_conditions=None):
+             task_conditions=None, subname="all-dur"):
     # First, load the parameters:
     if task_conditions is None:
-        task_conditions = ["Relevant non-target", "Irrelevant"]
+        task_conditions = ["Relevant non-target", "Irrelevant", "Target"]
     with open(parameters_file) as json_file:
         param = json.load(json_file)
-    save_dir = Path(ev.bids_root, "derivatives", analysis_name, task)
+    save_dir = Path(ev.bids_root, "derivatives", analysis_name, task, subname)
     if not os.path.isdir(save_dir):
         os.makedirs(save_dir)
     # Load all subjects data:
@@ -40,8 +37,19 @@ def decoding(parameters_file, subjects, data_root, session="1", task="dur", anal
     # Prepare a table to store the onsets and offsets in each roi:
     roi_results = {}
     times = []
+    if param["rois"] == "all":
+        # Read the parcellation from the freesurfer fsaverage subject:
+        labels = mne.read_labels_from_annot("fsaverage", parc='aparc.a2009s', hemi='both', surf_name='pial',
+                                            annot_fname=None, regexp=None, subjects_dir=ev.fs_directory, sort=True,
+                                            verbose=None)
+        roi_names = list(set([lbl.name.replace("-lh", "").replace("-rh", "")
+                              for lbl in labels if "unknown" not in lbl.name]))
+        # Recreate the ROI pairs for the left and right hemisphere:
+        rois_list = [["ctx_lh_" + roi, "ctx_rh_" + roi] for roi in roi_names]
+    else:
+        rois_list = param["rois"]
     # Loop through each ROI:
-    for ii, roi in enumerate(param["rois"]):
+    for ii, roi in enumerate(rois_list):
         # Create the directory to save the results in:
         roi_name = roi[0].replace("ctx_lh_", "")
         print("=========================================")
@@ -97,6 +105,13 @@ def decoding(parameters_file, subjects, data_root, session="1", task="dur", anal
                                                   n_trials=param["min_ntrials"])
         # Smooth the data.
         window_size = int((param["mvavg_window_ms"] * 0.001) / (times[1] - times[0]))
+        # Smooth the data if needed:
+        if param["smooth_ms"] is not None:
+            smooth_samp = int((param["smooth_ms"] * 0.001) / (times[1] - times[0]))
+            data_tr = gaussian_filter1d(data_tr, smooth_samp, axis=-1)
+        else:
+            smooth_samp = 0
+
         data_tr = moving_average(data_tr, window_size, axis=-1, overlapping=False)
         times = moving_average(times, window_size, axis=-1, overlapping=False)
         n_channels_tr = data_tr.shape[1]
@@ -109,6 +124,9 @@ def decoding(parameters_file, subjects, data_root, session="1", task="dur", anal
         # Equate the trial matrices:
         data_ti, labels_ti = create_super_subject(ti_epochs, param["targets_column"],
                                                   n_trials=param["min_ntrials"])
+        # Smooth the data if needed:
+        if param["smooth_ms"] is not None:
+            data_ti = gaussian_filter1d(data_ti, smooth_samp, axis=-1)
         data_ti = moving_average(data_ti, window_size, axis=-1, overlapping=False)
         n_channels_ti = data_ti.shape[1]
         # Compute the pseudotrials:
@@ -117,84 +135,62 @@ def decoding(parameters_file, subjects, data_root, session="1", task="dur", anal
 
         assert n_channels_ti == n_channels_tr, ("The number of channels does not match between task relevances "
                                                 "conditions!")
-        n_channels = n_channels_ti
+
+        # ============================
+        # Targets:
+        target_epochs = {sub: subjects_epochs[sub][task_conditions[2]] for sub in subjects_epochs.keys()}
+        # Equate the trial matrices:
+        data_tar, labels_tar = create_super_subject(target_epochs, param["targets_column"],
+                                                    n_trials=param["min_ntargets"])
+        # Smooth the data if needed:
+        if param["smooth_ms"] is not None:
+            data_tar = gaussian_filter1d(data_tar, smooth_samp, axis=-1)
+        data_tar = moving_average(data_tar, window_size, axis=-1, overlapping=False)
+        n_channels_tar = data_tar.shape[1]
+        # Compute the pseudotrials:
+        if param["pseudotrials"] is not None:
+            data_ti, labels_ti = compute_pseudotrials(data_tar, labels_tar, param["pseudotrials"])
+
+        assert n_channels_ti == n_channels_tar, ("The number of channels does not match between task relevances "
+                                                 "conditions!")
+        n_channels = n_channels_tar
 
         # ==============================================================================================================
-        # 2. Decoding and estimating durations:
+        # 2. Decoding and estimating durations between task relevant and irrelevant:
         # ============================
         print("=" * 20)
-        print("Decoding in task relevant")
-        # Task relevant:
-        scores_tr, pvals_tr, ci_tr, onsets_tr, offsets_tr, durations_tr = (
-            estimate_decoding_duration(data_tr, labels_tr, times, time_res, n_bootrstrap=param["n_bootsstrap"],
-                                       n_perm=param["n_perm"], n_jobs=param["n_jobs"], kfolds=param["kfold"],
-                                       alpha=param["alpha"], min_dur_ms=param["dur_threshold"], random_seed=42))
-        # ============================
-        print("=" * 20)
-        print("Decoding in task irrelevant")
-        # Task irrelevant:
-        scores_ti, pvals_ti, ci_ti, onsets_ti, offsets_ti, durations_ti = (
-            estimate_decoding_duration(data_ti, labels_ti, times, time_res, n_bootrstrap=param["n_bootsstrap"],
-                                       n_perm=param["n_perm"], n_jobs=param["n_jobs"], kfolds=param["kfold"],
-                                       alpha=param["alpha"], min_dur_ms=param["dur_threshold"], random_seed=42))
+        print("Compute decoding difference duration: ")
+        scores_tr, scores_ti, decoding_diff, null_dist, pvals_diff, onset, offset, duration = (
+            decoding_difference_duration(data_tr, labels_tr, data_ti, labels_ti, times, time_res,
+                                         n_perm=param["n_perm"],
+                                         n_jobs=param["n_jobs"], kfolds=param["kfold"], alpha=param["alpha"],
+                                         min_dur_ms=param["dur_threshold"], random_seed=42, tail=1))
 
-        # Compute the difference in duration between TR and TI:
-        duration_difference = durations_tr - durations_ti
-        # Compute the duration difference 95% CI:
-        dur_diff_ci = compute_ci(duration_difference, axis=0, interval=0.95)
+        # Compute the decoding score for target trials:
+        print("=" * 20)
+        print("Compute decoding in target trials: ")
+        scores_targets = []
+        for i in range(5):
+            scores_targets.append(cross_val_multiscore(time_res, data_tar, labels_tar,
+                                                       cv=param["kfold"], n_jobs=param["n_jobs"]))
+        scores_targets = np.concatenate(scores_targets, axis=0)
 
         # ==============================================================================================================
         # 3. Package the results and save to pickle:
         roi_results[roi_name]["scores_tr"] = scores_tr
-        roi_results[roi_name]["pvals_tr"] = pvals_tr
-        roi_results[roi_name]["ci_tr"] = ci_tr
-        roi_results[roi_name]["onsets_tr"] = onsets_tr
-        roi_results[roi_name]["offsets_tr"] = offsets_tr
-        roi_results[roi_name]["durations_tr"] = durations_tr
-        roi_results[roi_name]["pvals_ti"] = pvals_ti
         roi_results[roi_name]["scores_ti"] = scores_ti
-        roi_results[roi_name]["pvals_ti"] = pvals_ti
-        roi_results[roi_name]["ci_ti"] = ci_ti
-        roi_results[roi_name]["onsets_ti"] = onsets_ti
-        roi_results[roi_name]["offsets_ti"] = offsets_ti
-        roi_results[roi_name]["durations_ti"] = durations_ti
-        roi_results[roi_name]["durations_difference"] = duration_difference
-        roi_results[roi_name]["durations_difference_ci"] = dur_diff_ci
+        roi_results[roi_name]["scores_targets"] = scores_targets
+        roi_results[roi_name]["decoding_diff"] = decoding_diff
+        roi_results[roi_name]["null_dist"] = null_dist
+        roi_results[roi_name]["pvals_diff"] = pvals_diff
+        roi_results[roi_name]["onset"] = onset
+        roi_results[roi_name]["offset"] = offset
+        roi_results[roi_name]["duration"] = duration
         roi_results[roi_name]["n_channels"] = n_channels
 
         # Save results to file:
         with open(Path(save_dir, 'results-{}.pkl'.format(roi_name)), 'wb') as f:
             pickle.dump(roi_results[roi_name], f)
-
-        # ==============================================================================================================
-        # 4. Plot results of this ROI
-        if np.all(dur_diff_ci > 0):
-            fig_dir = save_dir
-        else:
-            fig_dir = Path(save_dir, "no_diff")
-            if not os.path.isdir(fig_dir):
-                os.makedirs(fig_dir)
-        # Plot decoding accuracy:
-        fig, ax = plt.subplots()
-        # Task relevant:
-        plot_decoding_accuray(times, np.mean(scores_tr, axis=0), ci_tr, smooth_ms=param["smooth_ms"],
-                              label=task_conditions[0],
-                              color=ev.colors["task_relevance"][task_conditions[0]], ax=ax, ylim=param["ylim"])
-        # Task irrelevant:
-        plot_decoding_accuray(times, np.mean(scores_ti, axis=0), ci_ti,
-                              smooth_ms=param["smooth_ms"], label=task_conditions[1],
-                              color=ev.colors["task_relevance"][task_conditions[1]], ax=ax, ylim=param["ylim"])
-        ax.legend()
-        ax.set_xlim([times[0], times[-1]])
-        ax.set_xlabel("Time (sec.)")
-        ax.set_ylabel("Accuracy")
-        ax.set_title("Decoding over time in {} \n(# channels={})".format(roi_name,
-                                                                         roi_results[roi_name]["n_channels"]))
-        fig.savefig(Path(fig_dir, "{}_decoding.svg".format(roi_name)),
-                    transparent=True, dpi=300)
-        fig.savefig(Path(fig_dir, "{}_decoding.png".format(roi_name)),
-                    transparent=True, dpi=300)
-        plt.close()
 
     # Save results to file:
     with open(Path(save_dir, 'results-all_roi.pkl'), 'wb') as f:
@@ -202,12 +198,34 @@ def decoding(parameters_file, subjects, data_root, session="1", task="dur", anal
 
 
 if __name__ == "__main__":
-    # Set the parameters to use:
-    parameters = (
-        r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis"
-        r"\06-iEEG_decoding_parameters.json")
     # ==================================================================================
     # Decoding analysis of the COGITATE data:
+    # Across all durations:
+    parameters = (
+        r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis"
+        r"\06-iEEG_decoding_parameters_all-dur.json")
     decoding(parameters, ev.subjects_lists_ecog["dur"], ev.bids_root,
-             session="V1", task="Dur", analysis_name="decoding",
-             task_conditions=["Relevant non-target", "Irrelevant"])
+             session="V1", task="Dur", analysis_name="decoding", subname="all-dur",
+             task_conditions=["Relevant non-target", "Irrelevant", "Relevant target"])
+
+    # Short trials:
+    # parameters = (
+    #     r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis"
+    #     r"\06-iEEG_decoding_parameters_short.json")
+    # decoding(parameters, ev.subjects_lists_ecog["dur"], ev.bids_root,
+    #          session="V1", task="Dur", analysis_name="decoding", subname="short",
+    #          task_conditions=["Relevant non-target", "Irrelevant", "Relevant target"])
+    # Intermediate trials
+    # parameters = (
+    #     r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis"
+    #     r"\06-iEEG_decoding_parameters_int.json")
+    # decoding(parameters, ev.subjects_lists_ecog["dur"], ev.bids_root,
+    #          session="V1", task="Dur", analysis_name="decoding", subname="int",
+    #          task_conditions=["Relevant non-target", "Irrelevant", "Relevant target"])
+    # Long trials
+    # parameters = (
+    #     r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis"
+    #     r"\06-iEEG_decoding_parameters_long.json")
+    # decoding(parameters, ev.subjects_lists_ecog["dur"], ev.bids_root,
+    #          session="V1", task="Dur", analysis_name="decoding", subname="long",
+    #          task_conditions=["Relevant non-target", "Irrelevant", "Relevant target"])
