@@ -5,10 +5,10 @@ date: "2023-08-22"
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_knit$set(root.dir = "C:/Users/alexander.lepauvre/Documents/GitHub/Reconstructed_time_analysis/bids")
+# install all needed packages 
+pacman::p_load('dplyr', 'ggdist', 'ggeffects', 'ggpubr', 'lme4', 'emmeans', 'rstatix', 'car', 'rsq', 'sjPlot')
 library(lme4) # for the analysis
-library(tidyverse) # needed for data manipulation.
+# library(tidyverse) # needed for data manipulation.
 library(emmeans)
 library(lmerTest)
 ```
@@ -22,40 +22,204 @@ bids_root <- getwd()
 dir()
 
 ```
-
+# Experiment 1
 ##  Loading the data
-```{r Loading  data}
+```{r Loading and transform the data}
 # Generate the file name:
-full_path = file.path(bids_root, 'derivatives', 'pupil_latency', 'pupil_peak_latencies.csv')
-data <- read.csv(full_path)
+full_path = file.path(bids_root, 'bids', 'derivatives', 'pupil_latency_no_rej', 'prp', 'pupil_peak_latencies.csv')
+data_exp1 <- read.csv(full_path)
+# Remove the targets:
+data_exp1 = data_exp1 %>% filter(task != "target")
+# make latency aud of 0 a 0.001 (zeros cause errors in GLMM with gamma family)
+data_exp1$latency_aud[data_exp1$latency_aud == 0] = 0.001
 # Set the factors types:
-data$duration<-as.factor(data$duration)
-data$task<-as.factor(data$task)
-data$sub_id<-as.factor(data$sub_id)
-data$SOA_float<-as.numeric(data$SOA_float)
-data$latency_aud<-as.numeric(data$latency_aud)
-str(data)
-```
+# data task relevance and SOA lock numeric
+data_exp1 = data_exp1 %>% mutate(is_task_relevant = ifelse(task == 'non-target',1,0)) 
+data_exp1 = data_exp1 %>% mutate(is_onset = ifelse(SOA_lock == 'onset',1,0))
 
-## Full model
-The full model is applied to all the data
-```{r Full model:}
-fullmodel <- lmer(formula = latency_aud ~ 1 + task * duration * lock * SOA_float + (1 | sub_id),
-                  data = data)
-summary(fullmodel)
-anova(fullmodel)
+# make SOA and duration oridnal factors 
+data_exp1 = data_exp1 %>% mutate(f_SOA = factor(SOA, ordered = TRUE, levels = c("0", "0.116", "0.232", "0.466")))
+data_exp1 = data_exp1 %>% mutate(f_duration = factor(duration, ordered = TRUE, levels = c("0.5", "1", "1.5")))
+
+# center variables 
+data_exp1 = data_exp1 %>% mutate(c_task_relevant = is_task_relevant - mean(is_task_relevant))
+data_exp1 = data_exp1 %>% mutate(c_is_onset = is_onset - mean(is_onset))
+data_exp1 = data_exp1 %>% mutate(c_SOA = SOA - mean(SOA))
+data_exp1 = data_exp1 %>% mutate(c_duration = duration - mean(duration))
+
+# Create the directory to store the results:
+save_dir <- file.path(bids_root, 'bids', "derivatives", "pupil_latency", "prp")
+# Create the directory if it doesn't exist
+if (!file.exists(save_dir)) {
+  dir.create(save_dir, recursive = TRUE)
+}
 ```
 
 ## Onset model
 The full model is applied to all the data
 ```{r Onset model:}
 # Extract the onset data points only:
-onset_data = data %>% filter(lock == "onset")
+onset_data_exp1 = data_exp1 %>% filter(SOA_lock == "onset")
 
-onset_model <- lmer(formula = latency_aud ~ 1 + duration * task * SOA_float + (1 + duration * task * SOA_float | sub_id),
-                  data = onset_data)
-summary(onset_model)
-anova(onset_model)
+onset_model_exp1 <- glmer(formula = latency_aud ~ 1 + c_task_relevant * f_SOA + (1 | sub_id), 
+                          family=Gamma(link="log"), data = onset_data_exp1)
+summary(onset_model_exp1)
+anova_results <- Anova(onset_model_exp1)
+write.csv(anova_results, file = file.path(save_dir, "Experiment1-onset_mdl_anova.csv"), row.names = TRUE)
+anova_results
+plot(fitted(onset_model_exp1),residuals(onset_model_exp1))
+qqnorm(residuals(onset_model_exp1))
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+## Offset model
+The full model is applied to all the data
+```{r Offset model:}
+# Extract the onset data points only:
+offset_data_exp1 = data_exp1 %>% filter(SOA_lock == "offset")
+
+offset_model_exp1 <- glmer(formula = latency_aud ~ 1 + f_duration * c_task_relevant * f_SOA + (1 | sub_id),
+                  family=Gamma(link="log"), data = offset_data_exp1)
+summary(offset_model_exp1)
+anova_results <- Anova(offset_model_exp1)
+write.csv(anova_results, file = file.path(save_dir, "Experiment1-offset_mdl_anova.csv"), row.names = TRUE)
+anova_results
+plot(fitted(offset_model_exp1),residuals(offset_model_exp1))
+qqnorm(residuals(offset_model_exp1))
+
+```
+## Offset model separately for each T1 durations:
+Modelling pupil peak latency of offset trials separately for each T1 duration:
+```{r Offset model per duration:}
+# ========================================================
+# Short trials:
+offset_data_short_exp1 = offset_data_exp1 %>% filter(duration == 0.5)
+# Modelling:
+offset_model_short_exp1 <- glmer(formula = latency_aud ~ 1 + c_task_relevant * f_SOA + (1 | sub_id),
+                  family=Gamma(link="log"), data = offset_data_short_exp1)
+summary(offset_model_short_exp1)
+anova_results <- Anova(offset_model_short_exp1)
+write.csv(anova_results, file = file.path(save_dir, "Experiment1-offset_short_mdl_anova.csv"), row.names = TRUE)
+anova_results
+
+# ========================================================
+# Intermediate trials:
+offset_data_int_exp1 = offset_data_exp1 %>% filter(duration == 1.0)
+# Modelling:
+offset_model_int_exp1 <- glmer(formula = latency_aud ~ 1 + c_task_relevant * f_SOA + (1 | sub_id),
+                  family=Gamma(link="log"), data = offset_data_int_exp1)
+summary(offset_model_int_exp1)
+anova_results <- Anova(offset_model_int_exp1)
+write.csv(anova_results, file = file.path(save_dir, "Experiment1-offset_int_mdl_anova.csv"), row.names = TRUE)
+anova_results
+
+# ========================================================
+# Long trials:
+offset_data_long_exp1 = offset_data_exp1 %>% filter(duration == 1.5)
+# Modelling:
+offset_model_long_exp1 <- glmer(formula = latency_aud ~ 1 + c_task_relevant * f_SOA + (1 | sub_id),
+                  family=Gamma(link="log"), data = offset_data_long_exp1)
+summary(offset_model_long_exp1)
+anova_results <- Anova(offset_model_long_exp1)
+write.csv(anova_results, file = file.path(save_dir, "Experiment1-offset_long_mdl_anova.csv"), row.names = TRUE)
+anova_results
+```
+
+# Experiment 2
+##  Loading the data
+```{r Loading and transform the data}
+# Generate the file name:
+full_path = file.path(bids_root, 'bids', 'derivatives', 'pupil_latency', 'introspection', 'pupil_peak_latencies.csv')
+data_exp2 <- read.csv(full_path)
+# Remove the targets:
+data_exp2 = data_exp2 %>% filter(task != "target")
+# make latency aud of 0 a 0.001 (zeros cause errors in GLMM with gamma family)
+data_exp2$latency_aud[data_exp2$latency_aud == 0] = 0.001
+# Set the factors types:
+# data task relevance and SOA lock numeric
+data_exp2 = data_exp2 %>% mutate(is_task_relevant = ifelse(task == 'non-target',1,0)) 
+data_exp2 = data_exp2 %>% mutate(is_onset = ifelse(SOA_lock == 'onset',1,0))
+
+# make SOA and duration oridnal factors 
+data_exp2 = data_exp2 %>% mutate(f_SOA = factor(SOA, ordered = TRUE, levels = c("0", "0.116", "0.466")))
+data_exp2 = data_exp2 %>% mutate(f_duration = factor(duration, ordered = TRUE, levels = c("0.5", "1", "1.5")))
+
+# center variables 
+data_exp2 = data_exp2 %>% mutate(c_task_relevant = is_task_relevant - mean(is_task_relevant))
+data_exp2 = data_exp2 %>% mutate(c_is_onset = is_onset - mean(is_onset))
+data_exp2 = data_exp2 %>% mutate(c_SOA = SOA - mean(SOA))
+data_exp2 = data_exp2 %>% mutate(c_duration = duration - mean(duration))
+
+# Create the save dir
+save_dir <- file.path(bids_root, 'bids', "derivatives", "pupil_latency", "introspection")
+# Create the directory if it doesn't exist
+if (!file.exists(save_dir)) {
+  dir.create(save_dir, recursive = TRUE)
+}
+```
+
+## Onset model
+The full model is applied to all the data
+```{r Onset model:}
+# Extract the onset data points only:
+onset_data_exp2 = data_exp2 %>% filter(SOA_lock == "onset")
+
+onset_model_exp2 <- glmer(formula = latency_aud ~ 1 + c_task_relevant * f_SOA + (1 | sub_id),
+                  family=Gamma(link="log"), data = onset_data_exp2)
+summary(onset_model_exp2)
+anova_results <- Anova(onset_model_exp2)
+write.csv(anova_results, file = file.path(save_dir, "Experiment2-onset_mdl_anova.csv"), row.names = TRUE)
+anova_results
+plot(fitted(onset_model_exp2),residuals(onset_model_exp2))
+qqnorm(residuals(onset_model_exp2))
+```
+## Offset model
+The full model is applied to all the data
+```{r Offset model:}
+# Extract the onset data points only:
+offset_data_exp2 = data_exp2 %>% filter(SOA_lock == "offset")
+
+offset_model_exp2 <- glmer(formula = latency_aud ~ 1 + f_duration * c_task_relevant * f_SOA + (1 | sub_id),
+                  family=Gamma(link="log"), data = offset_data_exp2)
+summary(offset_model_exp2)
+anova_results <- Anova(offset_model_exp2)
+write.csv(anova_results, file = file.path(save_dir, "Experiment2-offset_mdl_anovas.csv"), row.names = TRUE)
+anova_results
+
+```
+
+## Offset model separately for each T1 durations:
+Modelling pupil peak latency of offset trials separately for each T1 duration:
+```{r Offset model per duration:}
+# ========================================================
+# Short trials:
+offset_data_short_exp2 = offset_data_exp2 %>% filter(duration == 0.5)
+# Modelling:
+offset_model_short_exp2 <- glmer(formula = latency_aud ~ 1 + c_task_relevant * f_SOA + (1 | sub_id),
+                  family=Gamma(link="log"), data = offset_data_short_exp2)
+summary(offset_model_short_exp2)
+anova_results <- Anova(offset_model_short_exp2)
+write.csv(anova_results, file = file.path(save_dir, "Experiment2-offset_short_mdl_anova.csv"), row.names = TRUE)
+anova_results
+
+# ========================================================
+# Intermediate trials:
+offset_data_int_exp2 = offset_data_exp2 %>% filter(duration == 1.0)
+# Modelling:
+offset_model_int_exp2 <- glmer(formula = latency_aud ~ 1 + c_task_relevant * f_SOA + (1 | sub_id),
+                  family=Gamma(link="log"), data = offset_data_int_exp2)
+summary(offset_model_int_exp2)
+anova_results <- Anova(offset_model_int_exp2)
+write.csv(anova_results, file = file.path(save_dir, "Experiment2-offset_long_mdl_anova.csv"), row.names = TRUE)
+anova_results
+
+# ========================================================
+# Long trials:
+offset_data_long_exp2 = offset_data_exp2 %>% filter(duration == 1.5)
+# Modelling:
+offset_model_long_exp2 <- glmer(formula = latency_aud ~ 1 + c_task_relevant * f_SOA + (1 | sub_id),
+                  family=Gamma(link="log"), data = offset_data_long_exp2)
+summary(offset_model_long_exp2)
+anova_results <- Anova(offset_model_long_exp2)
+write.csv(anova_results, file = file.path(save_dir, "Experiment2-offset_long_mdl_anova.csv"), row.names = TRUE)
+anova_results
+```
