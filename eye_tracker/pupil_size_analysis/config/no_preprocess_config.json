@@ -1,0 +1,166 @@
+{
+  "bids_root": "C:\\Users\\alexander.lepauvre\\Documents\\PhD\\Reconstructed_Time\\bids",
+  "visit": "1",
+  "task": "prp",
+  "session": "1",
+  "data_type": "eyetrack",
+  "preprocess_folder": "epochs",
+  "analyses_parameters": {
+    "tr_onset_500ms": {
+        "epoch_name": "visual_onset",
+        "picks": ["LPupil", "RPupil"],
+        "crop": [-0.3, 2.0],
+        "conditions": [
+        "non-target/onset/0.5"
+        ],
+        "remove_blinks": false,
+        "remove_saccades": false,
+        "baseline_mode": "mean",
+        "baseline_window": [null, -0.05],
+        "compared_condition": ["0", "0.116", "0.232", "0.466"]
+    },
+    "tr_offset_500ms": {
+        "epoch_name": "visual_onset",
+        "picks": ["LPupil", "RPupil"],
+        "crop": [-0.3, 2.0],
+        "conditions": [
+        "non-target/offset/0.5"
+        ],
+        "remove_blinks": false,
+        "remove_saccades": false,
+        "baseline_mode": "mean",
+        "baseline_window": [null, -0.05],
+        "compared_condition": ["0", "0.116", "0.232", "0.466"]
+    },
+    "ti_onset_500ms": {
+        "epoch_name": "visual_onset",
+        "picks": ["LPupil", "RPupil"],
+        "crop": [-0.3, 2.0],
+        "conditions": [
+        "non-target/onset/0.5"
+        ],
+        "remove_blinks": false,
+        "remove_saccades": false,
+        "baseline_mode": "mean",
+        "baseline_window": [null, -0.05],
+        "compared_condition": ["0", "0.116", "0.232", "0.466"]
+    },
+    "ti_offset_500ms": {
+        "epoch_name": "visual_onset",
+        "picks": ["LPupil", "RPupil"],
+        "crop": [-0.3, 2.0],
+        "conditions": [
+        "non-target/offset/0.5"
+        ],
+        "remove_blinks": false,
+        "remove_saccades": false,
+        "baseline_mode": "mean",
+        "baseline_window": [null, -0.05],
+        "compared_condition": ["0", "0.116", "0.232", "0.466"]
+    },
+    "tr_onset_1000ms": {
+        "epoch_name": "visual_onset",
+        "picks": ["LPupil", "RPupil"],
+        "crop": [-0.3, 2.0],
+        "conditions": [
+        "non-target/onset/1"
+        ],
+        "remove_blinks": false,
+        "remove_saccades": false,
+        "baseline_mode": "mean",
+        "baseline_window": [null, -0.05],
+        "compared_condition": ["0", "0.116", "0.232", "0.466"]
+    },
+    "tr_offset_1000ms": {
+        "epoch_name": "visual_onset",
+        "picks": ["LPupil", "RPupil"],
+        "crop": [-0.3, 2.0],
+        "conditions": [
+        "non-target/offset/1"
+        ],
+        "remove_blinks": false,
+        "remove_saccades": false,
+        "baseline_mode": "mean",
+        "baseline_window": [null, -0.05],
+        "compared_condition": ["0", "0.116", "0.232", "0.466"]
+    },
+    "ti_onset_1000ms": {
+        "epoch_name": "visual_onset",
+        "picks": ["LPupil", "RPupil"],
+        "crop": [-0.3, 2.0],
+        "conditions": [
+        "non-target/onset/1"
+        ],
+        "remove_blinks": false,
+        "remove_saccades": false,
+        "baseline_mode": "mean",
+        "baseline_window": [null, -0.05],
+        "compared_condition": ["0", "0.116", "0.232", "0.466"]
+    },
+    "ti_offset_1000ms": {
+        "epoch_name": "visual_onset",
+        "picks": ["LPupil", "RPupil"],
+        "crop": [-0.3, 2.0],
+        "conditions": [
+        "non-target/offset/1"
+        ],
+        "remove_blinks": false,
+        "remove_saccades": false,
+        "baseline_mode": "mean",
+        "baseline_window": [null, -0.05],
+        "compared_condition": ["0", "0.116", "0.232", "0.466"]
+    },
+    "tr_onset_1500ms": {
+        "epoch_name": "visual_onset",
+        "picks": ["LPupil", "RPupil"],
+        "crop": [-0.3, 2.0],
+        "conditions": [
+        "non-target/onset/1.5"
+        ],
+        "remove_blinks": false,
+        "remove_saccades": false,
+        "baseline_mode": "mean",
+        "baseline_window": [null, -0.05],
+        "compared_condition": ["0", "0.116", "0.232", "0.466"]
+    },
+    "tr_offset_1500ms": {
+        "epoch_name": "visual_onset",
+        "picks": ["LPupil", "RPupil"],
+        "crop": [-0.3, 2.0],
+        "conditions": [
+        "non-target/offset/1.5"
+        ],
+        "remove_blinks": false,
+        "remove_saccades": false,
+        "baseline_mode": "mean",
+        "baseline_window": [null, -0.05],
+        "compared_condition": ["0", "0.116", "0.232", "0.466"]
+    },
+    "ti_onset_1500ms": {
+        "epoch_name": "visual_onset",
+        "picks": ["LPupil", "RPupil"],
+        "crop": [-0.3, 2.0],
+        "conditions": [
+        "non-target/onset/1.5"
+        ],
+        "remove_blinks": false,
+        "remove_saccades": false,
+        "baseline_mode": "mean",
+        "baseline_window": [null, -0.05],
+        "compared_condition": ["0", "0.116", "0.232", "0.466"]
+    },
+    "ti_offset_1500ms": {
+        "epoch_name": "visual_onset",
+        "picks": ["LPupil", "RPupil"],
+        "crop": [-0.3, 2.0],
+        "conditions": [
+        "non-target/offset/1.5"
+        ],
+        "remove_blinks": false,
+        "remove_saccades": false,
+        "baseline_mode": "mean",
+        "baseline_window": [null, -0.05],
+        "compared_condition": ["0", "0.116", "0.232", "0.466"]
+    }
+  }
+}

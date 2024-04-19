@@ -1,3 +1,4 @@
 bids/
 .Rproj.user/
 *__pycache__*
+.idea/
