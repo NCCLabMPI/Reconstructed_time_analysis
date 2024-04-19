@@ -6,7 +6,7 @@ date: "2023-08-22"
 
 # housekeeping
 
-```{r huosekeeping}
+```{r housekeeping}
 
 # clear workspace
 rm(list = ls())
@@ -27,12 +27,15 @@ if (!('pacman' %in% installed.packages()))
 library(pacman)
 
 # install all needed packages 
-pacman::p_load('dplyr', 'ggdist', 'ggeffects', 'ggpubr', 'lme4', 'emmeans', 'rstatix', 'car', 'rsq', 'sjPlot')
+pacman::p_load('dplyr', 'ggdist', 'ggeffects', 'ggpubr', 'lme4', 'emmeans', 'rstatix', 'rsq', 'car', 'sjPlot', 'MuMIn')
 
 ```
 
-# details of subjects for experiment 1
+# Experiment 1
 
+## Experiment 2 preprocessing
+
+### Subjects list:
 ```{r subjects1}
 
 # vector of included subjects (experiment of subjects 104 was aborted because of technique issues, number 122 is missing because of error in subject number assignment [see below at experiment 2])
@@ -46,7 +49,7 @@ task = 'prp'
 
 ```
 
-# loading files for experiment 1
+### loading files for experiment 1
 
 ```{r loading1}
 
@@ -96,10 +99,21 @@ if ( exists('all_event_table')){
 }
 }
 
+# Create the directory to store the results:
+# Specify the desired directory path
+save_dir <- file.path(bids_root, "derivatives", "beh", "prp")
+
+# Create the directory if it doesn't exist
+if (!file.exists(save_dir)) {
+  dir.create(save_dir, recursive = TRUE)
+}
+
 ```
 
-# apply trial exclusion
-
+### apply trial exclusion
+[Pre-registered]:
+"For the analyses, subjects with low mean performances in the visual (<80% hits or >20% false alarms) or auditory task (<80% accuracy) will be excluded. Moreover, all participants will be between 18 and 35 years old, have reportedly normal or corrected-to-normal visual, and no hearing impairments.
+In addition, only task-relevant non-target, and task-irrelevant trials will be included. Moreover, trials with no or incorrect inaccurate, implausible short auditory RT (<100 ms), or false alarms on the visual task (non-target trials with a visual response) will be excluded from the analysis"
 ```{r trial_exclusion1}
 
 # store table without trial exclusion
@@ -107,10 +121,6 @@ raw_event_table = all_event_table
 
 # add response window column (time between tone and end of trial)
 all_event_table = all_event_table %>% mutate(resp_window = (2-onset_SOA)+stim_jit )
-
-# remove RTaud > mean response window for offset, long duration and long SOA (deviation from preregistration)
-max_RT = mean(all_event_table$resp_window[all_event_table$SOA == 0.466 & all_event_table$SOA_lock == 'offset' & all_event_table$duration == 1.5], na.rm = TRUE)
-all_event_table = all_event_table[all_event_table$RT_aud < max_RT, ]
 
 # remove RTaud < 100 ms
 all_event_table = all_event_table[all_event_table$RT_aud > 0.1, ]
@@ -132,8 +142,18 @@ all_event_table = all_event_table[all_event_table$task_relevance != 'target', ]
 
 ```
 
-# transfrom data
-
+### transfrom data
+[Pre-registered]:
+"
+Variables for the glmm:
+RT – raw (gamma identity link function)
+SOA – ordinal 
+onset/offset – binary, numeric, centered
+task-relevance – binary, numeric, centered
+duration – ordinal
+pitch – binary, numeric, centered
+category – nominal
+"
 ``` {r transform_data1}
 
 # make task relevance and SOA lock numeric
@@ -153,8 +173,7 @@ all_event_table = all_event_table %>% mutate(c_pitch = (pitch-1050)/100) # makes
 
 ```
 
-# test exclusion criteria
-
+### test exclusion criteria
 ```{R test_exclusion1}
 
 # after trials removal
@@ -192,8 +211,7 @@ print('perceptage of offset target trials removed')
 
 ```
 
-# performance experiment 1
-
+### performance experiment 1
 ``` {r perfromance1}
 
 # initialize data frame with all columns needed 
@@ -259,17 +277,19 @@ perf = perf %>% add_row(sub_num = 'sd',
                         RT_vis = sd(perf$RT_vis[1:n]),
                         RT_aud_raw = sd(perf$RT_aud_raw[1:n]),
                         RT_vis_raw = sd(perf$RT_vis_raw[1:n]))
-
+# Save performances to file:
+write.csv(perf, file = file.path(save_dir, "Experiment1-performances.csv"), row.names = TRUE)
 ```
 
 
-# main analysis experiment - model 1 
+## Experiment 1 analysis:
 
+### Full model:
+[Pre-registered]: 
+"general linear mixed effects analysis of SOA, onset/offset, and task-relevance (fixed effects, including interaction terms) on RTaud (dependent variable). As random effects, we will have intercepts for subjects and duration, including random slopes for the effects of SOA, onset/offset, and task relevance. "
 Generalized linear mixed effect model (GLMM)
-
 fixed effects: SOA (ordinal), SOA-Lock (as c_is_onset,  numeric, centered), Task-relevance (as is relevant, numeric, centered)
 random effects: Subject ID, Duration (ordinal)
-
 ```{r glmm1_epx1}
 
 # single trial level (as preregistered)
@@ -279,168 +299,199 @@ model1 = glmer(RT_aud ~ f_SOA*c_is_onset*c_task_relevant +
                      (1*f_SOA*c_is_onset*c_task_relevant | sub_id)+
                      (1*f_SOA*c_is_onset*c_task_relevant | f_duration),
                family=Gamma(link="identity"), data=all_event_table)
-
 summary(model1)
 
 # get chisquare and p values 
-Anova(model1)
-
+anova_results <- Anova(model1)
+write.csv(anova_results, file = file.path(save_dir, "Experiment1-full_mdl_anova.csv"), row.names = TRUE)
+anova_results
 # residual plots for visual inspection
 plot(fitted(model1),residuals(model1))
 qqnorm(residuals(model1))
-
 # get R square
 rsq.glmm(model1)
-
-
-# subject level model (mean of each cell for each subjects - no single trials) (not preregistered)
-
-subj_data = all_event_table %>% group_by(f_SOA, c_is_onset, c_task_relevant, sub_id, f_duration) %>%
-                                      summarise(RT_mean = mean(RT_aud, na.rm = TRUE))
-
-sub_model1 = glmer(RT_mean ~ f_SOA*c_is_onset*c_task_relevant +
-                     (1*f_SOA*c_is_onset*c_task_relevant | sub_id)+
-                     (1*f_SOA*c_is_onset*c_task_relevant | f_duration),
-               family=Gamma(link="identity"), data = subj_data)
-
-summary(sub_model1)
-
-# get chisquare and p values 
-Anova(sub_model1)
-
-# get R square
-rsq.glmm(sub_model1)
 ```
 
-# onset PRP analysis
-- as preregistered
-
+### Onset model
+[Pre-registered]: 
+Fitting the model on trials in which the auditory tone was presented at various SOA relative to the visual stimulus onset. 
+RT2 is modeled as a function of SOA and task relevance. In addition, random intercept and slope of both parameters are taken separately for each
+subject and duration.
+We predicted that an interaction between SOA and task relevance such that in both T1 relevance conditions, an negative slope of RT2 is observed as a function
+of SOA but that the slope is larger (i.e. more negative) for task relevant compared to task irrelevant T1 trials. 
 ```{r onset_PRP1}
-
 # sub analysis restricted to onset
-
 onset_event_table = all_event_table %>% filter(SOA_lock == "onset")
 
 # fit onset model 
-onset_model = glmer(RT_aud ~ f_SOA*c_task_relevant +
+onset_model_prereg = glmer(RT_aud ~ f_SOA*c_task_relevant +
                        (1*f_SOA*c_task_relevant | sub_id) + 
-                      (1*f_SOA*c_task_relevant | f_duration), 
+                       (1*f_SOA*c_task_relevant | f_duration), 
                      family = Gamma(link="identity"), data = onset_event_table)
+summary(onset_model_prereg)
 
-summary(onset_model)
+# Fit onset model without the effect of duration due to fitting issues:
+onset_model_no_dur = glmer(RT_aud ~ f_SOA*c_task_relevant +
+                       (1*f_SOA*c_task_relevant | sub_id), 
+                     family = Gamma(link="identity"), data = onset_event_table)
+# Compare the two models to see which is best:
+anova(onset_model_no_dur, onset_model_prereg)
 
 # get chisquare and p values 
-Anova(onset_model)
+anova_results <- Anova(onset_model_no_dur)
+write.csv(anova_results, file = file.path(save_dir, "Experiment1-onset_mdl_anova.csv"), row.names = TRUE)
+anova_results
 
+# Post-hoc test: compare RT2 between task relevance condition separately for each SOA to quantify the difference in central stage occupation
+# between task relevance conditions
+em1 <- emmeans(onset_model_no_dur, "c_task_relevant", by = "f_SOA")
+onset_soa_contrasts <- contrast(em1, "pairwise", adjust = "bonferroni")
+onset_soa_contrasts
 # get R square
-rsq.glmm(onset_model)
+rsq.glmm(onset_model_no_dur)
 
 ```
 
-# offset PRP analysis
-- as preregistered
+### Offset model
+[Pre-registered]: 
+Fitting the model on trials in which the auditory tone was presented at various SOA relative to the visual stimulus offset 
+RT2 is modeled as a function of SOA, task relevance and T1 duration. The effect of duration was added to account for potential lingering effect of T1 processing on RT2. In addition, random intercept and slope of both parameters are taken separately for each subject.
+We predicted that no effect of SOA should be observed when the tone was presented relative to the offset of the visual stimulus, as this event is not task relevance and therefore should not be processed by the central stage. We however predicted that if T1 processing last longer than the T1 stimuli duration, an effect of SOA should be observed not because of the offset itself but rather due to the increased temporal interval between T1 onset and T2 onset with increasing SOAs. We expected such an effect could occur for short T1 trials (lasting only 500ms), but not for larger T1 duration. In other words, we predict that if such lingering T1 processing effect occurs, it should decrease with increased T1 duration.
 
 ```{r offset_PRP1}
 
 # sub analysis restricted to offset
-
 offset_event_table = all_event_table %>% filter(SOA_lock == "offset")
 
 # fit offset model
 offset_model = glmer(RT_aud ~ f_SOA*f_duration*c_task_relevant +
                        (1*f_SOA*f_duration*c_task_relevant | sub_id), 
                      family = Gamma(link="identity"), data = offset_event_table)
-
 summary(offset_model)
 
 # get chisquare and p values 
-Anova(offset_model)
+anova_results <- Anova(offset_model)
+write.csv(anova_results, file = file.path(save_dir, "Experiment1-offset_mdl_anova.csv"), row.names = TRUE)
+anova_results
 
 # get R square
 rsq.glmm(offset_model)
 
-
 # post-hoc bonferroni corrected pairwise comparison
-
 em1 <- emmeans(offset_model, "f_SOA", by = "f_duration")
-contrast(em1, "pairwise", adjust = "bonferroni")
+offset_soa_contrasts <- contrast(em1, "pairwise", adjust = "bonferroni")
+# Save to file:
+write.csv(offset_soa_contrasts, file = file.path(save_dir, "Experiment1-offset_soa_contrasts.csv"), row.names = TRUE)
 
 ```
 
-# control model
-- as preregistered
+### Control: Post-hoc offset PRP analysis separately for each duration
+[Not pre-registered]: 
+We observed a significant interaction between SOA and T1 duration on RT2. We had predicted that such an effect could be induced by a lingering of T1 processing, in which case the effect of SOA should decrease with increased duration. To further investigate the effect of T1 duration on RT2, we modeled RT2 separately for short, intermediate and long T1 trials (for offset trials). 
+Note: This constitutes a deviation from our pre-registered post-hoc testing, as we declared that the effect of SOA in the different duration will be investigating using post-hoc pairwise comparison. The current approach constitutes a better alternative, as it investigates the slope across SOA conditions rather than comparing pairs of SOA conditions. The results are consistent between both methods (see Post-hoc pairwise comparison between SOA conditions for offset locked trials)
 
-```{r ctr_model1}
+```{r offset_PRP1 post-hoc GLMs}
+
+# =======================================================================
+# Short
+offset_short_event_table = offset_event_table %>% filter(duration == 0.5)
+# Modelling:
+offset_short_model = glmer(RT_aud ~ f_SOA*c_task_relevant +
+                       (1*f_SOA*c_task_relevant | sub_id), 
+                     family = Gamma(link="identity"), data = offset_short_event_table)
+summary(offset_short_model)
+# Anova
+anova_results <- Anova(offset_short_model)
+write.csv(anova_results, file = file.path(save_dir, "Experiment1-offset_short_mdl_anova.csv"), row.names = TRUE)
+anova_results
+
+# =======================================================================
+# Intermediate
+offset_int_event_table = offset_event_table %>% filter(duration == 1.0)
+# Modelling:
+offset_int_model = glmer(RT_aud ~ f_SOA*c_task_relevant +
+                       (1*f_SOA*c_task_relevant | sub_id), 
+                     family = Gamma(link="identity"), data = offset_int_event_table)
+summary(offset_int_model)
+# Anova
+anova_results <- Anova(offset_int_model)
+write.csv(anova_results, file = file.path(save_dir, "Experiment1-offset_int_mdl_anova.csv"), row.names = TRUE)
+anova_results
+
+# =======================================================================
+# Long
+offset_long_event_table = offset_event_table %>% filter(duration == 1.5)
+# Modelling:
+offset_long_model = glmer(RT_aud ~ f_SOA*c_task_relevant +
+                       (1*f_SOA*c_task_relevant | sub_id), 
+                     family = Gamma(link="identity"), data = offset_long_event_table)
+summary(offset_long_model)
+# Anova
+anova_results <- Anova(offset_long_model)
+write.csv(anova_results, file = file.path(save_dir, "Experiment1-offset_long_mdl_anova.csv"), row.names = TRUE)
+anova_results
+```
 
 
+### Control: Post-hoc offset PRP analysis separately for each duration
+[Pre-registered]:
+To investigate the effect of SOA in offset locked trials in the different T1 duration conditions, we computed pairwise comparisons between all pairs of SOA conditions.
+```{r offset_PRP1 post-hoc pairwise}
+# Comparing RT2 between all pairs of SOAs separately for each T1 duration conditions:
+em1 <- emmeans(offset_model, "f_SOA", by = "f_duration")
+offset_soa_contrasts <- contrast(em1, "pairwise", adjust = "bonferroni")
+onset_soa_contrasts
+```
+
+### Control: Comparing onset locked 466ms SOA vs long trials 0ms SOA
+[Not pre-registered]: 
+We observed a PRP effect at stimulus offset especially for long trials. This may indicate that the disappearance of the visual stimulus in the long trials was indeed processed by the central stage and accordingly induced a PRP effect when T2 was presented in close succession to that event. Alternatively, the decrease in RT2 with increased SOA might reflect a facilitation of T2 processing at increased SOA, due to the increased probability of the event occuring at large SOAs (hazard rate). If that is the case RT2 should be at baseline at SOA=0 and fastest at SOA=0.466s. We do not have a clean baseline in our study. However, in the onset trials (where a clear PRP effect is observed), RT2 at SOA = 0.466 should be the closest to it. It is likely that the interference period was not completely over by 0.466ms, in which case, RT2 would be higher compared to baseline. If we observe that RT2 in SOA=0s in offset locked long trials is larger than at SOA=0.466ms onset locked trials, then this implies that RT2 in the offset locked long trials is larger than a data point that is itself larger than baseline. In that case, the decrease of RT2 with increased SOA in offset locked long trials does not reflect a facilitation at larger SOAs but rather a delaying at short SOAs, consistent with a PRP effect. 
+```{r ctr_model}
+# Extract the two conditions of interest:
+comp_tbl = all_event_table %>% filter((duration == 1.5 & SOA == 0 & SOA_lock == 'offset') | (SOA == 0.466 & SOA_lock == 'onset'))
 # with duration, category and pitch as random effects 
+comparison_mdl = glmer(RT_aud ~ SOA_lock +
+                     (1*SOA_lock | sub_id), 
+                   family=Gamma(link="identity"), data=comp_tbl)
+summary(comparison_mdl)
+# get chisquare and p values 
+Anova(comparison_mdl)
+em1 <- emmeans(comparison_mdl, "SOA_lock")
+onset_vs_long_soa_contrast <- contrast(em1, "pairwise", adjust = "bonferroni")
+# Save to file:
+write.csv(onset_vs_long_soa_contrast, file = file.path(save_dir, "Experiment1-offset_vs_onset_soa_contrasts.csv"), row.names = TRUE)
+```
 
+
+### Control: control model
+[Pre-registered]: 
+Adding the random effect of T2 pitch, T1 duration and T1 category as random effect to our model.
+```{r ctr_model1}
+# with duration, category and pitch as random effects 
 ctr_model = glmer(RT_aud ~ f_SOA*c_is_onset*c_task_relevant +
                      (1*f_SOA*c_is_onset*c_task_relevant | sub_id) +
                      (1*f_SOA*c_is_onset*c_task_relevant | f_duration) +
                      (1*f_SOA*c_is_onset*c_task_relevant | c_pitch) +
                      (1*f_SOA*c_is_onset*c_task_relevant | category), 
                    family=Gamma(link="identity"), data=all_event_table)
-
-
 summary(ctr_model)
-
 # get chisquare and p values 
 Anova(ctr_model)
-
 # get R square
 rsq.glmm(ctr_model)
-
 # compare control_model with main model
 anova(model1, ctr_model)
-
 ```
 
-# accuracy analysis - acc_model
-GLMM with auditory accuracy as a dependent variable and SAO, onset/offset and task-relevance as fixed effects
-- not preregistered
-
-```{r acc_model}
-
-# make task relevance and SOA lock numeric
-acc_event_table = raw_event_table %>% mutate(is_task_relevant = ifelse(task_relevance == 'non-target',1,0)) 
-acc_event_table = acc_event_table %>% mutate(is_onset = ifelse(SOA_lock == 'onset',1,0))
-
-# make SOA and duration factors 
-acc_event_table = acc_event_table %>% mutate(f_SOA = factor(SOA, ordered = TRUE, levels = c("0", "0.116", "0.232", "0.466")))
-acc_event_table = acc_event_table %>% mutate(f_duration = factor(duration, ordered = TRUE, levels = c("0.5", "1", "1.5")))
-
-# center variables 
-acc_event_table = acc_event_table %>% mutate(c_task_relevant = is_task_relevant - mean(is_task_relevant))
-acc_event_table = acc_event_table %>% mutate(c_is_onset = is_onset - mean(is_onset))
-acc_event_table = acc_event_table %>% mutate(c_SOA = SOA - mean(SOA))
-acc_event_table = acc_event_table %>% mutate(c_duration = duration - mean(duration))
-# remove targets 
-acc_event_table = acc_event_table %>% filter(task_relevance != 'target')
-
-acc_model = glmer(trial_accuracy_aud ~ f_SOA*c_is_onset*c_task_relevant +
-                     (1*f_SOA*c_is_onset*c_task_relevant | sub_id)+
-                     (1*f_SOA*c_is_onset*c_task_relevant | f_duration),
-              family = binomial, data=acc_event_table)
-
-summary(acc_model)
-Anova(acc_model)
-
-
-```
-
-# effect size of PRP
-
+### effect size of PRP
 PRP effect magnitude: Difference in ms between short SOA and longest SOA for certain condition
 PRP effect size: Cohen's D effect size for the same contrast
-
 ```{r effect_size1}
 
 # initialize varibales
 effect_size_table = matrix(ncol = 6, nrow = 5)
 rownames(effect_size_table) = c("Mean_SOA0", "Mean_SOA466", "PRP_size", "joined_SD", "Cohensd")
 colnames(effect_size_table) = c("target", "non_target_onset", "irrelevant_onset", "offset_short", "offset_intermediate", "offset_long")
-
 # mean of SOA = 0
 effect_size_table[1, ] = c(mean(target_event_table %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'target') %>% pull(RT_aud), na.rm = TRUE),
                            mean(target_event_table %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(RT_aud), na.rm = TRUE), 
@@ -448,7 +499,6 @@ effect_size_table[1, ] = c(mean(target_event_table %>% filter(SOA == 0 & SOA_loc
                            mean(all_event_table %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 0.5) %>% pull(RT_aud), na.rm = TRUE), 
                            mean(all_event_table %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1) %>% pull(RT_aud), na.rm = TRUE), 
                            mean(all_event_table %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1.5) %>% pull(RT_aud), na.rm = TRUE))
-
 # mean of SOA = 466
 effect_size_table[2, ] = c(mean(target_event_table %>% filter(SOA == 0.466 & SOA_lock == 'offset' & task_relevance == 'target' & duration == 1.5) %>% pull(RT_aud), na.rm = TRUE),
                            mean(target_event_table %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(RT_aud), na.rm = TRUE),
@@ -456,10 +506,8 @@ effect_size_table[2, ] = c(mean(target_event_table %>% filter(SOA == 0.466 & SOA
                            mean(all_event_table %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 0.5) %>% pull(RT_aud), na.rm = TRUE),
                            mean(all_event_table %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1) %>% pull(RT_aud), na.rm = TRUE),
                            mean(all_event_table %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1.5) %>% pull(RT_aud), na.rm = TRUE))
-
 # PRP size
 effect_size_table[3, ] = effect_size_table[1, ] - effect_size_table[2, ] 
-
 # joined SD
 effect_size_table[4, ] = c(sd(c(target_event_table %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'target') %>% pull(RT_aud),target_event_table %>% filter(SOA == 0.466 & SOA_lock == 'offset' & task_relevance == 'target' & duration == 1.5) %>% pull(RT_aud))),
                            sd(c(target_event_table %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(RT_aud), target_event_table %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(RT_aud))),
@@ -471,17 +519,18 @@ effect_size_table[4, ] = c(sd(c(target_event_table %>% filter(SOA == 0 & SOA_loc
 # cohens d 
 effect_size_table[5, ] = (effect_size_table[1, ] - effect_size_table[2, ])/effect_size_table[4, ]
 
+# Save the effect size table to file:
+write.csv(effect_size_table, file = file.path(save_dir, "Experiment1-effect_sizes.csv"), row.names = TRUE)
+
 ```
 
-## ========================================================================== ##
 
 # Experiment 2
 As experiment 1 but with introspective ratings of decision time for both tasks (called iRT_aud and iRT_vis)
 
-# loading files for experiment 2
-
+## Experiment 2 preprocessing:
+### loading files for experiment 2
 ```{r loading2}
-
 # details of subjects  
 subNums2 = c(105, 106, 108, 109, 110, 113, 114, 115, 116, 118) # 101 excluded, 122 is the same as participant 116 from experiment one
 n2 = length(subNums2)
@@ -550,10 +599,19 @@ for (subNum in subNums2){
 all_event_table2 = all_event_table2 %>% mutate(sub_num = ifelse(sub_num == 122, 116, sub_num))
 all_event_table2 = all_event_table2 %>% mutate(sub_id = ifelse(sub_id == 'SX122','SX116', sub_id))
 
+# Create the directory to store the results:
+save_dir <- file.path(bids_root, "derivatives", "beh", "introspection")
+
+# Create the directory if it doesn't exist
+if (!file.exists(save_dir)) {
+  dir.create(save_dir, recursive = TRUE)
+}
 ```
 
-# apply trial exclusion for experiment 2
-
+### apply trial exclusion
+[Pre-registered]:
+"For the analyses, subjects with low mean performances in the visual (<80% hits or >20% false alarms) or auditory task (<80% accuracy) will be excluded. Moreover, all participants will be between 18 and 35 years old, have reportedly normal or corrected-to-normal visual, and no hearing impairments.
+In addition, only task-relevant non-target, and task-irrelevant trials will be included. Moreover, trials with no or incorrect inaccurate, implausible short auditory RT (<100 ms), or false alarms on the visual task (non-target trials with a visual response) will be excluded from the analysis"
 ```{r trial_exclusion2}
 
 # store table without exclusion
@@ -569,13 +627,6 @@ all_event_table2$iRT_aud[all_event_table2$iRT_aud == 0] = 1
 # # remove RT < 100 ms
 all_event_table2 = all_event_table2[all_event_table2$RT_aud > 0.1, ]
 
-# add response window column
-all_event_table2 = all_event_table2 %>% mutate(resp_window = (2-onset_SOA)+stim_jit )
-
-# remove RTaud > mean response window for offset, long duration and long SOA (deviation from preregistration)
-max_RT = mean(all_event_table2$resp_window[all_event_table2$SOA == 0.466 & all_event_table2$SOA_lock == 'offset' & all_event_table2$duration == 1.5], na.rm = TRUE)
-all_event_table2 = all_event_table2[all_event_table2$RT_aud < max_RT, ]
-
 # remove incorrect auditory responses
 all_event_table2 = all_event_table2[all_event_table2$trial_accuracy_aud == 1, ]
 
@@ -583,15 +634,25 @@ all_event_table2 = all_event_table2[all_event_table2$trial_accuracy_aud == 1, ]
 all_event_table2 = all_event_table2[!is.na(all_event_table2$RT_aud), ]
 
 # store table with targets
- target_event_table2 = all_event_table2
+target_event_table2 = all_event_table2
 
 # remove target trials from all_event_table
 all_event_table2 = all_event_table2[all_event_table2$task_relevance != 'target', ]
 
 ```
 
-# transfrom data for experiment 2
-
+### transfrom data
+[Pre-registered]:
+"
+Variables for the glmm:
+RT – raw (gamma identity link function)
+SOA – ordinal 
+onset/offset – binary, numeric, centered
+task-relevance – binary, numeric, centered
+duration – ordinal
+pitch – binary, numeric, centered
+category – nominal
+"
 ``` {r transform_data2}
 
 # add log transformed column
@@ -615,8 +676,7 @@ all_event_table2 = all_event_table2 %>% mutate(c_pitch = (pitch-1050)/100) # mak
 
 ```
 
-# test exclusion criteria for experiment 2
-
+### test exclusion criteria
 ```{R test exclusion2}
 
 # after trials removal
@@ -653,8 +713,8 @@ print('perceptage of offset target trials removed')
 
 ```
 
-# performance experiment 2
-
+### performance experiment 2
+Compute the performance for T1 and T2 in the second experiment.
 ``` {r perfromance2}
 perf2 = data.frame(matrix(ncol = 0, nrow = 1))
 perf2$sub_num = 'NaN'
@@ -671,7 +731,7 @@ perf2$RT_aud_raw = NaN
 perf2$RT_vis_raw = NaN
 perf2 = perf2[-c(1), ]
 
-for (sub_num in subNums) {
+for (sub_num in subNums2) {
   perf2 = perf2 %>% add_row(sub_num = as.character(sub_num),
                           hits = sum(raw_event_table2$trial_response_vis =='hit' & raw_event_table2$sub_num == sub_num),
                           misses = sum(raw_event_table2$trial_response_vis =='miss' & raw_event_table2$sub_num == sub_num),
@@ -718,137 +778,312 @@ perf2 = perf2 %>% add_row(sub_num = 'sd',
                         RT_aud_raw = sd(perf2$RT_aud_raw[1:n2]),
                         RT_vis_raw = sd(perf2$RT_vis_raw[1:n2]))
 
+# Save performances to file:
+write.csv(perf2, file = file.path(save_dir, "Experiment2-performances.csv"), row.names = TRUE)
+
 # percentage of underestimation in RTaud
 underest_RTaud = mean(all_event_table2$iRT_aud)/mean(all_event_table2$RT_aud*1000)
+
 
 ```
 
 
-# main analysis - experiment 2
-general linear mixed effect model 1 with iRTvis or iRT_aud as dependent variables - as preregistred
+## Experiment 2 analysis:
 
-fixed effects: SOA (ordinal), SOA-Lock (as c_is_onset,  numeric, centered), Task-relevance (as c_task_relevant, numeric, centered)
+### RT2 analysis:
+
+#### Full, Onset and offset models:
+[Pre-registered]: 
+"general linear mixed effects analysis of SOA, onset/offset, and task-relevance (fixed effects, including interaction terms) on RTaud (dependent variable). As random effects, we will have intercepts for subjects and duration, including random slopes for the effects of SOA, onset/offset, and task relevance. "
+Generalized linear mixed effect model (GLMM)
+fixed effects: SOA (ordinal), SOA-Lock (as c_is_onset,  numeric, centered), Task-relevance (as is relevant, numeric, centered)
 random effects: Subject ID, Duration (ordinal)
+GLMMs as in section "glmm1_epx1", "onset_PRP1", and "offset_PRP1" but with data from second experiment
+
+```{r model_from_exp1}
+
+# ======================================================================
+# Full model:
+model_exp2 = glmer(RT_aud ~ f_SOA*c_is_onset*c_task_relevant +
+                     (1*f_SOA*c_is_onset*c_task_relevant | sub_id)+
+                     (1*f_SOA*c_is_onset*c_task_relevant | f_duration),
+               family=Gamma(link="identity"), data=all_event_table2)
+summary(model_exp2)
+# Anova
+anova_results <- Anova(model_exp2)
+write.csv(anova_results, file = file.path(save_dir, "Experiment2-RT2_full_mdl_anova.csv"), row.names = TRUE)
+anova_results
+# get R square
+rsq.glmm(model_exp2)
+
+# ======================================================================
+# Onset model:
+onset_event_table2 = all_event_table2 %>% filter(SOA_lock == "onset")
+# Model
+onset_model2 = glmer(RT_aud ~ f_SOA*c_task_relevant +
+                       (1*f_SOA*c_task_relevant | sub_id) + 
+                      (1*f_SOA*c_task_relevant | f_duration), 
+                     family = Gamma(link="identity"), data = onset_event_table2)
+summary(onset_model2)
+# Anova:
+anova_results <- Anova(onset_model2)
+write.csv(anova_results, file = file.path(save_dir, "Experiment2-RT2_onset_mdl_anova.csv"), row.names = TRUE)
+anova_results
+# get R square
+rsq.glmm(onset_model2)
+# Compute pairwise comparison between SOA conditions for the onset locked trials:
+em2 <- emmeans(onset_model2, "f_SOA")
+onset_soa_contrasts <- contrast(em2, "pairwise", adjust = "bonferroni")
+# Save to file:
+write.csv(onset_soa_contrasts, file = file.path(save_dir, "Experiment2-RT2_offset_soa_contrasts.csv"), row.names = TRUE)
+
+# ======================================================================
+# Offset model:
+offset_event_table2 = all_event_table2 %>% filter(SOA_lock == "offset")
+# Model:
+offset_model2 = glmer(RT_aud ~ f_SOA*f_duration*c_task_relevant +
+                       (1*f_SOA*f_duration*c_task_relevant | sub_id), 
+                     family = Gamma(link="identity"), data = offset_event_table2)
+summary(offset_model2)
+# Anova:
+anova_results <- Anova(offset_model2)
+write.csv(anova_results, file = file.path(save_dir, "Experiment2-RT2_offset_mdl_anova.csv"), row.names = TRUE)
+anova_results
+# get R square
+rsq.glmm(offset_model2)
+# post hoc pairwise comparisons using bonferroni corrected t-testing 
+em2 <- emmeans(offset_model2, "f_SOA", by = "f_duration")
+contrast(em2, "pairwise", adjust = "bonferroni")
+
+# ======================================================================
+# Offset short model:
+offset_short_event_table2 = offset_event_table2 %>% filter(duration == 0.5)
+# Model:
+offset_short_model2 = glmer(RT_aud ~ f_SOA*c_task_relevant +
+                       (1*f_SOA*c_task_relevant | sub_id), 
+                     family = Gamma(link="identity"), data = offset_short_event_table2)
+summary(offset_short_model2)
+# Anova:
+anova_results <- Anova(offset_short_model2)
+write.csv(anova_results, file = file.path(save_dir, "Experiment2-RT2_offset_short_anova.csv"), row.names = TRUE)
+anova_results
+
+# ======================================================================
+# Offset int model:
+offset_int_event_table2 = offset_event_table2 %>% filter(duration == 1.0)
+# Model:
+offset_int_model2 = glmer(RT_aud ~ f_SOA*c_task_relevant +
+                       (1*f_SOA*c_task_relevant | sub_id), 
+                     family = Gamma(link="identity"), data = offset_int_event_table2)
+summary(offset_int_model2)
+# Anova:
+anova_results <- Anova(offset_int_model2)
+write.csv(anova_results, file = file.path(save_dir, "Experiment2-RT2_offset_int_anova.csv"), row.names = TRUE)
+anova_results
+
+# ======================================================================
+# Offset long model:
+offset_long_event_table2 = offset_event_table2 %>% filter(duration == 1.5)
+# Model:
+offset_long_model2 = glmer(RT_aud ~ f_SOA*c_task_relevant +
+                       (1*f_SOA*c_task_relevant | sub_id), 
+                     family = Gamma(link="identity"), data = offset_long_event_table2)
+summary(offset_long_model2)
+# Anova:
+anova_results <- Anova(offset_long_model2)
+write.csv(anova_results, file = file.path(save_dir, "Experiment2-RT2_offset_long_anova.csv"), row.names = TRUE)
+anova_results
+```
+
+#### Control: Comparing onset locked 466ms SOA vs long trials 0ms SOA
+- Not pre-registered: we observed a PRP effect at stimulus offset especially for long trials. This might reflect a warning effect of the offset rather
+than a PRP. To test this possibility, comparing RT aud between the latest SOA of onset locked trials against the first SOA of long trials. 
+```{r ctr_model}
+# Extract the two conditions of interest:
+comp_tbl2 = all_event_table2 %>% filter((duration == 1.5 & SOA == 0 & SOA_lock == 'offset') | (SOA == 0.466 & SOA_lock == 'onset'))
+# with duration, category and pitch as random effects 
+comparison_mdl2 = glmer(RT_aud ~ SOA_lock +
+                     (1*SOA_lock | sub_id), 
+                   family=Gamma(link="identity"), data=comp_tbl2)
+# Pairwise comparisons:
+em2 <- emmeans(comparison_mdl2, "SOA_lock")
+onset_vs_long_soa_contrast2 <- contrast(em2, "pairwise", adjust = "bonferroni")
+# Save to file:
+write.csv(onset_vs_long_soa_contrast2, file = file.path(save_dir, "Experiment2-offset_vs_onset_soa_contrasts.csv"), row.names = TRUE)
+
+```
+
+### iT2 analysis
+[Pre-registered]
+"To analyze the effects of our experimental variables on ITaud and ITvis, a similar generalized linear model as for experiment 1 will be fitted:
+ITaudio/visual ~ SOA x onset/offset x Task relevance    + (SOA x onset/offset x Task relevance | Subject) + (SOA x onset/offset x Task relevance  | Duration)"
 
 ```{r iRT_models}
-
-#### Log instead of identity function #####
-
 # auditory 
 aud_iRT_model = glmer(iRT_aud ~ f_SOA*c_is_onset*c_task_relevant +
                      (1*f_SOA*c_is_onset*c_task_relevant | sub_id)+
                      (1*f_SOA*c_is_onset*c_task_relevant | f_duration),
                    family=Gamma(link="log"), data=all_event_table2)
-
 summary(aud_iRT_model)
-
 # get chisquare and p values 
-Anova(aud_iRT_model)
+anova_results <- Anova(aud_iRT_model)
+write.csv(anova_results, file = file.path(save_dir, "Experiment2-full_mdl_iRTaud_anova_results.csv"), row.names = TRUE)
+anova_results
 
 # residual plots for visual inspection
 plot(fitted(aud_iRT_model),residuals(aud_iRT_model))
 qqnorm(residuals(aud_iRT_model))
-
 # get R square
 rsq.glmm(aud_iRT_model)
 
-#### Log instead of identity function #####
+# ====================================================================
+# Onset:
+onset_event_table2 = all_event_table2 %>% filter(SOA_lock == "onset")
+aud_iRT_model_onset = glmer(iRT_aud ~ f_SOA*c_task_relevant +
+                     (1*f_SOA*c_task_relevant | sub_id),
+                   family=Gamma(link="log"), data=onset_event_table2)
+summary(aud_iRT_model_onset)
+# get chisquare and p values 
+anova_results <- Anova(aud_iRT_model_onset)
+write.csv(anova_results, file = file.path(save_dir, "Experiment2-iT2_onset_mdl_anova.csv"), row.names = TRUE)
+anova_results
+# Compute pairwise comparison between SOA conditions for the onset locked trials:
+em2 <- emmeans(aud_iRT_model_onset, "f_SOA")
+onset_soa_contrats <- contrast(em2, "pairwise", adjust = "bonferroni")
+# Save to file:
+write.csv(onset_soa_contrats, file = file.path(save_dir, "Experiment2-iT2_onset_soa_contrasts.csv"), row.names = TRUE)
 
-# visual
+# ====================================================================
+# Offset:
+offset_event_table2 = all_event_table2 %>% filter(SOA_lock == "offset")
+aud_iRT_model_offset = glmer(iRT_aud ~ f_SOA*c_task_relevant*f_duration +
+                     (1*f_SOA*f_duration*c_task_relevant | sub_id),
+                   family=Gamma(link="log"), data=offset_event_table2)
+summary(aud_iRT_model_offset)
+# get chisquare and p values 
+anova_results <- Anova(aud_iRT_model_offset)
+write.csv(anova_results, file = file.path(save_dir, "Experiment2-iT2_offset_mdl_anova.csv"), row.names = TRUE)
+anova_results
 
+```
+
+### iT1 analysis
+[Pre-registered]
+"To analyze the effects of our experimental variables on ITaud and ITvis, a similar generalized linear model as for experiment 1 will be fitted:
+ITaudio/visual ~ SOA x onset/offset x Task relevance    + (SOA x onset/offset x Task relevance | Subject) + (SOA x onset/offset x Task relevance  | Duration)"
+
+```{r iRT_models}
 vis_iRT_model = glmer(iRT_vis ~ f_SOA*c_is_onset*c_task_relevant +
                      (1*f_SOA*c_is_onset*c_task_relevant | sub_id)+
                      (1*f_SOA*c_is_onset*c_task_relevant | f_duration),
                    family=Gamma(link="log"), data=all_event_table2)
-
 summary(vis_iRT_model)
-
 # get chisquare and p values 
-Anova(vis_iRT_model)
+anova_results <- Anova(vis_iRT_model)
+write.csv(anova_results, file = file.path(save_dir, "Experiment2-iT1_full_mdl_anova.csv"), row.names = TRUE)
+anova_results
 
 # residual plots for visual inspection
 plot(fitted(vis_iRT_model),residuals(vis_iRT_model))
 qqnorm(residuals(vis_iRT_model))
-
 # get R square
-rsq.glmm(vis_iRT_model )
-```
+rsq.glmm(vis_iRT_model)
 
-# main analyses from experiment 1 
-GLMMs as in section "glmm1_epx1", "onset_PRP1", and "offset_PRP1" but with data from second experiment
-
-fixed effects: SOA (ordinal), SOA-Lock (as c_is_onset,  numeric, centered), Task-relevance (as is relevant, numeric, centered)
-random effects: Subject ID, Duration (ordinal)
-
-```{r model_from_exp1}
-
-model_exp2 = glmer(RT_aud ~ f_SOA*c_is_onset*c_task_relevant +
-                     (1*f_SOA*c_is_onset*c_task_relevant | sub_id)+
-                     (1*f_SOA*c_is_onset*c_task_relevant | f_duration),
-               family=Gamma(link="identity"), data=all_event_table2)
-
-summary(model_exp2)
-
-# get chisquare and p values 
-Anova(model_exp2)
-
-# get R square
-rsq.glmm(model_exp2)
-
-
-# onset PRP analysis
+# ====================================================================
+# Onset:
 onset_event_table2 = all_event_table2 %>% filter(SOA_lock == "onset")
-
-# new model (needs to be adjusted probably)
-
-onset_model2 = glmer(RT_aud ~ f_SOA*c_task_relevant +
-                       (1*f_SOA*c_task_relevant | sub_id) + 
-                      (1*f_SOA*c_task_relevant | f_duration), 
-                     family = Gamma(link="identity"), data = onset_event_table2)
-
-summary(onset_model2)
-
+vis_iRT_model_onset = glmer(iRT_vis ~ f_SOA*c_task_relevant +
+                     (1*f_SOA*c_task_relevant | sub_id),
+                   family=Gamma(link="log"), data=onset_event_table2)
+summary(vis_iRT_model_onset)
 # get chisquare and p values 
-Anova(onset_model2)
-
-# get R square
-rsq.glmm(onset_model2)
-
-
-# offset PRP analysis
-offset_event_table2 = all_event_table2 %>% filter(SOA_lock == "offset")
-
-# new model (needs to be adjusted probably)
-
-offset_model2 = glmer(RT_aud ~ f_SOA*f_duration*c_task_relevant +
-                       (1*f_SOA*f_duration*c_task_relevant | sub_id), 
-                     family = Gamma(link="identity"), data = offset_event_table2)
-
-summary(offset_model2)
-
-# get chisquare and p values 
-Anova(offset_model2)
-
-# get R square
-rsq.glmm(offset_model2)
-
-
+anova_results <- Anova(vis_iRT_model_onset)
+write.csv(anova_results, file = file.path(save_dir, "Experiment2-iT1_onset_mdl_anova.csv"), row.names = TRUE)
+anova_results
 # post hoc pairwise comparisons using bonferroni corrected t-testing 
-em2 <- emmeans(offset_model, "f_SOA", by = "f_duration")
-contrast(em2, "pairwise", adjust = "bonferroni")
+em2 <- emmeans(vis_iRT_model_onset, "f_SOA")
+onset_soa_contrats <- contrast(em2, "pairwise", adjust = "bonferroni")
+# Save to file:
+write.csv(onset_soa_contrats, file = file.path(save_dir, "Experiment2-iT1_onset_soa_contrasts.csv"), row.names = TRUE)
+
+# ====================================================================
+# Offset:
+offset_event_table2 = all_event_table2 %>% filter(SOA_lock == "offset")
+vis_iRT_model_offset = glmer(iRT_vis ~ f_SOA*c_task_relevant*f_duration +
+                     (1*f_SOA*f_duration*c_task_relevant | sub_id),
+                   family=Gamma(link="log"), data=offset_event_table2)
+summary(vis_iRT_model_offset)
+# get chisquare and p values 
+anova_results <- Anova(vis_iRT_model_offset)
+write.csv(anova_results, file = file.path(save_dir, "Experiment2-iT1_offset_mdl_anova.csv"), row.names = TRUE)
+anova_results
 
 ```
 
-# Relationship between T1 (iRTvis) and T2 (RTaud)
+### Correlation between RT1-iT1 and RT2-iT2
+[Pre-regsitered]:
+"Secondly, we predict that the general comparisons of iTaud to RTaud will show a significant correlation of iTaud with objective RTaud (Indicating a general introspecitve sensitivity for RT). Nevertheless, iTaud is expected to be generally lower than objective RTaud"
 
-How much variance of T2 is explained by T1. How is this affected by SOA
-- as preregistered
+correlation plots RT1 ~ iT1 and RT2 ~ iT2
+- as preregistred
+```{R plotting_fig8ab_exp2}
+# Further remove the trials in which participants failed to detect a target (which were not removed by previous bad trials rejection as the
+# targets were excluded)
+target_event_table2 = target_event_table2 %>% filter(trial_response_vis == "hit" | trial_response_vis == "cr")
+# correlation for auditory RT (fig 8a)
+corr_fig1 = ggscatter(target_event_table2 , x = "z_RT_aud", y = "z_iRT_aud",
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson", cor.coef.size = 6)+
+  labs(title = "Estimation performance auditory task", tag = "B")+
+  xlab("Objective z-scored reaction time")+
+  ylab('Subjective z-scored decision time')+
+  theme_bw() +
+  theme(axis.line = element_line(colour = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(linetype = "solid"),
+        panel.background = element_blank(),
+        axis.text = element_text(color = "black", size = 15),
+        legend.text = element_text(size = 20),
+        legend.title = element_text(size = 20, face="bold"),
+        axis.title = element_text(size = 20, face="bold"),
+        plot.title = element_text(size = 25, face="bold"),
+        plot.tag = element_text(size = 25, face="bold"))
 
-Correlation analysis and GLMM
-- not preregistered
+# plot figure
+print(corr_fig1)
+
+# correlation for auditory RT (fig 8b)
+target_only_event_table2 = target_event_table2 %>% filter(task_relevance == "target")
+corr_fig2 = ggscatter(target_only_event_table2 , x = "z_RT_vis", y = "z_iRT_vis",
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE,  cor.method = "pearson", cor.coef.size = 6)+
+  labs(title = "Estimation performance visual task", tag = "A")+
+  xlab("Objective z-scored reaction time")+
+  ylab('Subjective z-scored decision time')+
+  theme_bw() +
+  theme(axis.line = element_line(colour = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(linetype = "solid"),
+        panel.background = element_blank(),
+        axis.text = element_text(color = "black", size = 15),
+        legend.text = element_text(size = 20),
+        legend.title = element_text(size = 20, face="bold"),
+        axis.title = element_text(size = 20, face="bold"),
+        plot.title = element_text(size = 25, face="bold"),
+        plot.tag = element_text(size = 25, face="bold"))
+
+# plot figure
+print(corr_fig2)
+
+```
+
+### Relationship between T1 (iRTvis) and T2 (RTaud)
+[Pre-regsitered]:
+"According to the central stage interference model, the ddelay in T2 processing at short SOA is explained by a transient occupation of the GNW by T1. Consequently, a large part of the variance of RT to T2 must be due to the variable T1 completion. Based on that, we predict a correlation between iTvis and RTaud that is strongest at the shortest SOA andd decreases with increasing SOAs."
 
 ```{r iRTvis~RTaud}
-
 # correlation analysis (showing correlation for different condition)
 correlation_plot = ggplot(all_event_table2, aes(x = z_iRT_vis, y = RT_aud*1000, color = f_SOA)) +
   geom_point() +
@@ -867,37 +1102,87 @@ correlation_plot = ggplot(all_event_table2, aes(x = z_iRT_vis, y = RT_aud*1000, 
   stat_cor(aes(color = f_SOA),label.y = c(2850,2700,2550), method = "pearson", show.legend = FALSE)
 correlation_plot
 
+# ==============================================================================
 # GLMM with iRTVis as predictor for RTaud
 all_event_table2 = all_event_table2 %>% mutate(iRT_vis_0.001 = iRT_vis*0.001)
-
 model_T1 = glmer(RT_aud ~ f_SOA*c_is_onset*c_task_relevant*iRT_vis_0.001 +
                    (1*f_SOA*c_is_onset*c_task_relevant*iRT_vis_0.001| sub_id)+
                    (1*f_SOA*c_is_onset*c_task_relevant*iRT_vis_0.001 | f_duration),
                  family=Gamma(link="identity"), data=all_event_table2)
-
 summary(model_T1)
-Anova(model_T1)
-plot(fitted(model_T1),residuals(model_T1))
-qqnorm(residuals(model_T1))
-rsq.glmm(model_T1)
+anova_results <- Anova(model_T1)
+write.csv(anova_results, file = file.path(save_dir, "Experiment2-iT1-RT2_anova.csv"), row.names = TRUE)
+anova_results
 
+# ========================================================
+# Onset trials:
+onset_event_table2 = all_event_table2 %>% filter(SOA_lock == "onset")
+model_T1_onset = glmer(RT_aud ~ f_SOA*c_task_relevant*iRT_vis_0.001 +
+                   (1*f_SOA*c_task_relevant*iRT_vis_0.001| sub_id),
+                 family=Gamma(link="identity"), data=onset_event_table2)
+summary(model_T1_onset)
+anova_results <- Anova(model_T1_onset)
+write.csv(anova_results, file = file.path(save_dir, "Experiment2-iT1-RT2_onset_anova.csv"), row.names = TRUE)
+anova_results
+
+# ========================================================
+# Offset trials:
+offset_event_table2 = all_event_table2 %>% filter(SOA_lock == "offset")
+model_T1_offset = glmer(RT_aud ~ f_SOA*f_duration*iRT_vis_0.001 +
+                   (1*f_SOA*f_duration*iRT_vis_0.001| sub_id),
+                 family=Gamma(link="identity"), data=offset_event_table2)
+summary(model_T1_offset)
+anova_results <- Anova(model_T1_offset)
+write.csv(anova_results, file = file.path(save_dir, "Experiment2-iT1-RT2_offset_anova.csv"), row.names = TRUE)
+anova_results
+
+# ==============================
+# Short trials
+offset_short_event_table2 = offset_event_table2 %>% filter(duration == 0.5)
+model_T1_offset_short = glmer(RT_aud ~ f_SOA*iRT_vis_0.001 +
+                   (1*f_SOA*iRT_vis_0.001| sub_id),
+                 family=Gamma(link="identity"), data=offset_short_event_table2)
+summary(model_T1_offset_short)
+anova_results <- Anova(model_T1_offset_short)
+write.csv(anova_results, file = file.path(save_dir, "Experiment2-iT1-RT2_offset_short_anova.csv"), row.names = TRUE)
+anova_results
+
+# ==============================
+# Intermediate trials
+offset_int_event_table2 = offset_event_table2 %>% filter(duration == 1.0)
+model_T1_offset_int = glmer(RT_aud ~ f_SOA*iRT_vis_0.001 +
+                   (1*f_SOA*iRT_vis_0.001| sub_id),
+                 family=Gamma(link="identity"), data=offset_int_event_table2)
+summary(model_T1_offset_int)
+anova_results <- Anova(model_T1_offset_int)
+write.csv(anova_results, file = file.path(save_dir, "Experiment2-iT1-RT2_offset_int_anova.csv"), row.names = TRUE)
+anova_results
+
+# ==============================
+# Long trials
+offset_long_event_table2 = offset_event_table2 %>% filter(duration == 1.5)
+model_T1_offset_long = glmer(RT_aud ~ f_SOA*iRT_vis_0.001 +
+                   (1*f_SOA*iRT_vis_0.001| sub_id),
+                 family=Gamma(link="identity"), data=offset_long_event_table2)
+summary(model_T1_offset_long)
+anova_results <- Anova(model_T1_offset_long)
+write.csv(anova_results, file = file.path(save_dir, "Experiment2-iT1-RT2_offset_long_anova.csv"), row.names = TRUE)
+anova_results
 ```
 
-# Control analysis: downsampling trials to Marti'S numbers
+
+###  Control analysis: downsampling trials to Marti'S numbers
+[Not pre-regsitered]:
 In the study by Marti et al., 2012 (DOI: 10.1016/j.cognition.2010.01.003), they found not association between iRT and SOA, suggesting that participants are unaware of the PRP effect. In our experiment, we found that SOA impacts iRT, suggesting awareness (to some extent) of the PRP effect. Why are our results different? In Marti et al., the number of trials was much lower than in our experiment, due to the additional factors of task relevance and stimuli duration. In their study, they had only 40 observations per SOA and per subject. In our study, we had 40 trials per SOA x task relevance x duration. To investigate whether the discrepancy in findings is due to the discrepancy in trial numbers, we investigate the effect of SOA in task relevant trials, downsampling to 40 trials (ignoring duration, which has no effect on iRT). 
 
 ```{r iRT downsampled}
-
 # Select task relevant onset locked trials only:
 onset_event_table2 = all_event_table2 %>% filter(SOA_lock == "onset")
 tr_onset_event_table2 = onset_event_table2 %>% filter(task_relevance == "non-target")
-
 # Set the number of iterations:
 iterations <- 1000
-
 # Pre-allocate to store the pvalues
 p_values <- numeric()
-
 for (i in 1:iterations) {
   # Subsample the data
   subsampled_df <- tr_onset_event_table2 %>%
@@ -925,17 +1210,16 @@ hist(p_values, main="P-values", xlab="P-val", ylab="Frequncy", border="black")
 
 ```
 
-# Control: relationship between introspective and objective RT
+### Control: relationship between introspective and objective RT
+[Not pre-registered]:
 In our data, we observe that despite the SOA effect on the iT being significant, the iT curve are much flatter than the RT curves, indicating that participants strongly underestimate their RT. Nonetheless, the iT is correlated with RT on a trial by trial basis. To quantify this two aspects of our data statistically, we compute Beta weights for the within and between SOA condition correlation of RT and iT. For that purpose, we compute two regressors: the mean RT per SOA condition and the deviation from mean RT on a trial by trial basis. We expect the mean RT per SOA to not explain a lot of variance, as the slope between mean RT and iT do not show a close association. On the other hand, participants iT still show a close association with RT overall, which should be reflected in a stronger correlation with the trial by trial deviation from the mean.
 
 ```{r RTaud~iRTaud}
 # Subselect the column of interest:
-df <- all_event_table2[, c("sub_id", "onset_SOA", "RT_aud", "iRT_aud")]
-
+df <- all_event_table2[, c("sub_id", "SOA_lock", "onset_SOA", "RT_aud", "iRT_aud")]
+df = df %>% filter(SOA_lock == "onset")
 # Convert iRT to sec:
 df <- df %>% mutate(iRT_aud_0.001 = iRT_aud*0.001)
-# Log transform the RT:
-df$RT_aud <- log(df$RT_aud)
 
 # Compute mean RT audio separately for each SOA:
 df <- df %>%
@@ -944,9 +1228,6 @@ df <- df %>%
 # Compute deviation between mean RT and single  trials RT:
 df <- df %>%
   mutate(dev_RT_aud = RT_aud - mean_RT_aud)
-# Mean center both predictors:
-df$mean_RT_aud <- df$mean_RT_aud - mean(df$mean_RT_aud)
-df$dev_RT_aud <- df$dev_RT_aud - mean(df$dev_RT_aud)
 
 # Model iT as a function of mean RT and deviation from mean RT:
 model_full = glmer(iRT_aud_0.001 ~ dev_RT_aud + mean_RT_aud +
@@ -957,19 +1238,138 @@ model_devRT = glmer(iRT_aud_0.001 ~ dev_RT_aud +
                   (1 + dev_RT_aud | sub_id), family=Gamma(link="log"), data=df)
 
 # Compute the proportion of variance explained by the mean and RT deviance respectively:
-rsq_full <- rsq.glmm(model_full)
-rsq_meanRT <- rsq.glmm(model_meanRT)
-rsq_devRT <- rsq.glmm(model_devRT)
+rsq_full <- r.squaredGLMM(model_full)
+rsq_meanRT <- r.squaredGLMM(model_meanRT)
+rsq_devRT <- r.squaredGLMM(model_devRT)
 print('Variance explained by meanRT:')
-print(rsq_full[['model']] - rsq_devRT[['model']])
+print(rsq_full['delta', 'R2c'] - rsq_devRT['delta', 'R2c'])
 print('Variance explained by devRT:')
-print(rsq_full[['model']] - rsq_meanRT[['model']])
+print(rsq_full['delta', 'R2c'] - rsq_meanRT['delta', 'R2c'])
 
-summary(model_full)
-Anova(model_full)
-plot(fitted(model_full),residuals(model_full))
-qqnorm(residuals(model_full))
+```
 
+### effect size of the PRP:
+```{r effect size}
+
+# ==============================================================================
+# RT2:
+RT_aud_effect_size_table = matrix(ncol = 6, nrow = 5)
+rownames(RT_aud_effect_size_table) = c("Mean_SOA0", "Mean_SOA466", "PRP_size", "joined_SD", "Cohensd")
+colnames(RT_aud_effect_size_table) = c("target", "non_target_onset", "irrelevant_onset", "offset_short", "offset_intermediate", "offset_long")
+
+# ==================================================
+# mean of SOA = 0
+RT_aud_effect_size_table[1, ] = c(mean(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'target') %>% pull(RT_aud), na.rm = TRUE),
+                           mean(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(RT_aud), na.rm = TRUE), 
+                           mean(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(RT_aud), na.rm = TRUE), 
+                           mean(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 0.5) %>% pull(RT_aud), na.rm = TRUE), 
+                           mean(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1) %>% pull(RT_aud), na.rm = TRUE), 
+                           mean(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1.5) %>% pull(RT_aud), na.rm = TRUE))
+
+# ==================================================
+# mean of SOA = 466
+RT_aud_effect_size_table[2, ] = c(mean(target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' & task_relevance == 'target' & duration == 1.5) %>% pull(RT_aud), na.rm = TRUE),
+                           mean(target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(RT_aud), na.rm = TRUE),
+                           mean(target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(RT_aud), na.rm = TRUE),
+                           mean(all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 0.5) %>% pull(RT_aud), na.rm = TRUE),
+                           mean(all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1) %>% pull(RT_aud), na.rm = TRUE),
+                           mean(all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1.5) %>% pull(RT_aud), na.rm = TRUE))
+
+# ==================================================
+# PRP size
+RT_aud_effect_size_table[3, ] = RT_aud_effect_size_table[1, ] - RT_aud_effect_size_table[2, ] 
+# joined SD
+RT_aud_effect_size_table[4, ] = c(sd(c(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'target') %>% pull(RT_aud),target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' & task_relevance == 'target' & duration == 1.5) %>% pull(RT_aud))),
+                           sd(c(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(RT_aud), target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(RT_aud))),
+                           sd(c(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(RT_aud), target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(RT_aud))),
+                           sd(c(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 0.5) %>% pull(RT_aud), all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 0.5) %>% pull(RT_aud))),
+                           sd(c(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1) %>% pull(RT_aud), all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1) %>% pull(RT_aud))),
+                           sd(c(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1.5) %>% pull(RT_aud), all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1.5) %>% pull(RT_aud))))
+# ==================================================
+# cohens d 
+RT_aud_effect_size_table[5, ] = (RT_aud_effect_size_table[1, ] - RT_aud_effect_size_table[2, ])/RT_aud_effect_size_table[4, ]
+write.csv(RT_aud_effect_size_table, file = file.path(save_dir, "Experiment2-RT2_effect_sizes.csv"), row.names = TRUE)
+
+# ==============================================================================
+# iT2:
+IT_aud_effect_size_table = matrix(ncol = 6, nrow = 5)
+rownames(IT_aud_effect_size_table) = c("Mean_SOA0", "Mean_SOA466", "PRP_size", "joined_SD", "Cohensd")
+colnames(IT_aud_effect_size_table) = c("target", "non_target_onset", "irrelevant_onset", "offset_short", "offset_intermediate", "offset_long")
+
+# ==================================================
+# mean of SOA = 0
+IT_aud_effect_size_table[1, ] = c(mean(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'target') %>% pull(iRT_aud), na.rm = TRUE),
+                           mean(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(iRT_aud), na.rm = TRUE), 
+                           mean(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(iRT_aud), na.rm = TRUE), 
+                           mean(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 0.5) %>% pull(iRT_aud), na.rm = TRUE), 
+                           mean(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1) %>% pull(iRT_aud), na.rm = TRUE), 
+                           mean(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1.5) %>% pull(iRT_aud), na.rm = TRUE))
+
+# ==================================================
+# mean of SOA = 466
+IT_aud_effect_size_table[2, ] = c(mean(target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' & task_relevance == 'target' & duration == 1.5) %>% pull(iRT_aud), na.rm = TRUE),
+                           mean(target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(iRT_aud), na.rm = TRUE),
+                           mean(target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(iRT_aud), na.rm = TRUE),
+                           mean(all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 0.5) %>% pull(iRT_aud), na.rm = TRUE),
+                           mean(all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1) %>% pull(iRT_aud), na.rm = TRUE),
+                           mean(all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1.5) %>% pull(iRT_aud), na.rm = TRUE))
+
+# ==================================================
+# PRP size
+IT_aud_effect_size_table[3, ] = IT_aud_effect_size_table[1, ] - IT_aud_effect_size_table[2, ] 
+
+# joined SD
+IT_aud_effect_size_table[4, ] = c(sd(c(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'target') %>% pull(iRT_aud),target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' & task_relevance == 'target' & duration == 1.5) %>% pull(iRT_aud))),
+                           sd(c(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(iRT_aud), target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(iRT_aud))),
+                           sd(c(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(iRT_aud), target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(iRT_aud))),
+                           sd(c(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 0.5) %>% pull(iRT_aud), all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 0.5) %>% pull(iRT_aud))),
+                           sd(c(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1) %>% pull(iRT_aud), all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1) %>% pull(iRT_aud))),
+                           sd(c(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1.5) %>% pull(iRT_aud), all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1.5) %>% pull(iRT_aud))))
+
+# cohens d 
+IT_aud_effect_size_table[5, ] = (IT_aud_effect_size_table[1, ] - IT_aud_effect_size_table[2, ])/IT_aud_effect_size_table[4, ]
+write.csv(IT_aud_effect_size_table, file = file.path(save_dir, "Experiment2-iT2_effect_sizes.csv"), row.names = TRUE)
+
+
+# ==============================================================================
+# iT1: 
+IT_vis_effect_size_table = matrix(ncol = 6, nrow = 5)
+rownames(IT_vis_effect_size_table) = c("Mean_SOA0", "Mean_SOA466", "PRP_size", "joined_SD", "Cohensd")
+colnames(IT_vis_effect_size_table) = c("target", "non_target_onset", "irrelevant_onset", "offset_short", "offset_intermediate", "offset_long")
+
+# ==================================================
+# mean of SOA = 0
+IT_vis_effect_size_table[1, ] = c(mean(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'target') %>% pull(iRT_vis), na.rm = TRUE),
+                           mean(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(iRT_vis), na.rm = TRUE), 
+                           mean(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(iRT_vis), na.rm = TRUE), 
+                           mean(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 0.5) %>% pull(iRT_vis), na.rm = TRUE), 
+                           mean(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1) %>% pull(iRT_vis), na.rm = TRUE), 
+                           mean(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1.5) %>% pull(iRT_vis), na.rm = TRUE))
+
+# ==================================================
+# mean of SOA = 466
+IT_vis_effect_size_table[2, ] = c(mean(target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' & task_relevance == 'target' & duration == 1.5) %>% pull(iRT_vis), na.rm = TRUE),
+                           mean(target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(iRT_vis), na.rm = TRUE),
+                           mean(target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(iRT_vis), na.rm = TRUE),
+                           mean(all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 0.5) %>% pull(iRT_vis), na.rm = TRUE),
+                           mean(all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1) %>% pull(iRT_vis), na.rm = TRUE),
+                           mean(all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1.5) %>% pull(iRT_vis), na.rm = TRUE))
+
+# ==================================================
+# PRP size
+IT_vis_effect_size_table[3, ] = IT_vis_effect_size_table[1, ] - IT_vis_effect_size_table[2, ] 
+
+# joined SD
+IT_vis_effect_size_table[4, ] = c(sd(c(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'target') %>% pull(iRT_vis),target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' & task_relevance == 'target' & duration == 1.5) %>% pull(iRT_vis))),
+                           sd(c(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(iRT_vis), target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(iRT_vis))),
+                           sd(c(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(iRT_vis), target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(iRT_vis))),
+                           sd(c(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 0.5) %>% pull(iRT_vis), all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 0.5) %>% pull(iRT_vis))),
+                           sd(c(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1) %>% pull(iRT_vis), all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1) %>% pull(iRT_vis))),
+                           sd(c(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1.5) %>% pull(iRT_vis), all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1.5) %>% pull(iRT_vis))))
+
+# cohens d 
+IT_vis_effect_size_table[5, ] = (IT_vis_effect_size_table[1, ] - IT_vis_effect_size_table[2, ])/IT_vis_effect_size_table[4, ]
+write.csv(IT_vis_effect_size_table, file = file.path(save_dir, "Experiment2-iT1_effect_sizes.csv"), row.names = TRUE)
 ```
 
 # power analysis
