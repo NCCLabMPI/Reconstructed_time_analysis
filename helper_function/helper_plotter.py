@@ -9,7 +9,6 @@ import environment_variables as ev
 from mne.stats import bootstrap_confidence_interval
 from scipy.ndimage import uniform_filter1d
 
-
 font = {'size': 12}
 matplotlib.rc('font', **font)
 # Get matplotlib colors:
@@ -129,7 +128,7 @@ def plot_within_subject_boxplot(data_df, within_column, between_column, dependen
                                 ax=None, cousineau_correction=True, title="", xlabel="", ylabel="", xlim=None,
                                 width=0.1, face_colors=None, edge_colors=None, xlabel_fontsize=9,
                                 plot_avg_line=False, style="boxplot", plot_single_sub=True,
-                                avg_line_color=None, zorder=1, alpha=1):
+                                avg_line_color=None, zorder=1, alpha=1, label=None, jitter=0):
     """
     This function generates within subject design boxplot with line plots connecting each subjects dots across
     conditions. Further offers the option to apply Cousineau Morey correction. Importantly, data must be passed before
@@ -195,9 +194,11 @@ def plot_within_subject_boxplot(data_df, within_column, between_column, dependen
                            medianprops=dict(color="black", linewidth=1.5), zorder=zorder)
     elif style == "errorbar":
         for pos_i, pos in enumerate(positions):
-            ax.errorbar(pos, np.mean(avg_data_2d[:, pos_i], axis=0),
+            ax.errorbar(pos + jitter, np.mean(avg_data_2d[:, pos_i], axis=0),
                         yerr=np.std(avg_data_2d[:, pos_i], axis=0) / np.sqrt(avg_data_2d.shape[0]),
-                        color=face_colors[pos_i], fmt="o", zorder=zorder, alpha=alpha)
+                        color=face_colors[pos_i], fmt="None", zorder=zorder, alpha=0.8)
+            ax.scatter(pos + jitter, np.mean(avg_data_2d[:, pos_i], axis=0),
+                       color=face_colors[pos_i], s=40, alpha=0.8)
     else:
         raise Exception("The only supported styles are boxplot or error bars")
     if plot_single_sub:
@@ -206,8 +207,9 @@ def plot_within_subject_boxplot(data_df, within_column, between_column, dependen
                            color=avg_line_color, alpha=0.5, zorder=zorder)
     if plot_avg_line:
         avg_line_color = np.mean(np.array(face_colors), axis=0)
-        ax.plot(positions, np.mean(avg_data_2d, axis=0), '-', linewidth=2, color=avg_line_color, alpha=alpha,
-                zorder=zorder)
+        ax.plot(positions + jitter, np.mean(avg_data_2d, axis=0), '-', linewidth=2, color=avg_line_color, alpha=0.8,
+                zorder=zorder, label=label)
+    ax.set_xticks(positions, labels=positions)
     ax.tick_params(axis='x', labelrotation=45, labelsize=xlabel_fontsize)
     ax.set_title(title)
     ax.set_xlabel(xlabel)
@@ -228,7 +230,7 @@ def plot_within_subject_boxplot(data_df, within_column, between_column, dependen
 
 def soa_boxplot(data_df, dependent_variable, fig_size=None, lock_column="SOA_lock", subject_column="sub_id",
                 between_column="onset_SOA", ax=None, fig=None, colors_onset_locked=None, colors_offset_locked=None,
-                avg_line_color=None, zorder=0, alpha=1):
+                avg_line_color=None, zorder=0, alpha=1, label="", jitter=0):
     """
     This function plots the PRP study data in a standardized format, so that it can be used across experiments and data
     types. It is not super well documented, but it is not meant to be reuused as highly specific to this design.
@@ -258,7 +260,7 @@ def soa_boxplot(data_df, dependent_variable, fig_size=None, lock_column="SOA_loc
                                           xlim=[-0.1, 0.6], width=0.1,
                                           face_colors=colors_onset_locked, plot_avg_line=True,
                                           style="errorbar", plot_single_sub=False, avg_line_color=avg_line_color,
-                                          zorder=zorder, alpha=alpha)
+                                          zorder=zorder, alpha=alpha, label=label + " onset", jitter=jitter)
     # Loop through each duration to plot the offset locked SOA separately:
     for i, dur in enumerate(sorted(list(data_df["duration"].unique()))):
         _, _, _ = plot_within_subject_boxplot(data_df[(data_df[lock_column] == 'offset')
@@ -273,7 +275,7 @@ def soa_boxplot(data_df, dependent_variable, fig_size=None, lock_column="SOA_loc
                                               face_colors=colors_offset_locked, plot_avg_line=True,
                                               style="errorbar", plot_single_sub=False,
                                               avg_line_color=avg_line_color, zorder=zorder,
-                                              alpha=alpha)
+                                              alpha=alpha, label=label + " offset", jitter=jitter)
         ax[i + 1].yaxis.set_visible(False)
     # Remove the spines:
     for i in [0, 1, 2]:
@@ -284,8 +286,8 @@ def soa_boxplot(data_df, dependent_variable, fig_size=None, lock_column="SOA_loc
                       linestyle="none", color='k', mec='k', mew=1, clip_on=False)
         ax[i].plot([1, 1], [0, 0], transform=ax[i].transAxes, **kwargs)
         ax[i + 1].plot([0, 0], [0, 0], transform=ax[i + 1].transAxes, **kwargs)
-        ax[i].plot([1, 1], [1, 1], transform=ax[i].transAxes, **kwargs)
-        ax[i + 1].plot([0, 0], [1, 1], transform=ax[i + 1].transAxes, **kwargs)
+        # ax[i].plot([1, 1], [1, 1], transform=ax[i].transAxes, **kwargs)
+        # ax[i + 1].plot([0, 0], [1, 1], transform=ax[i + 1].transAxes, **kwargs)
     plt.subplots_adjust(wspace=0.05)
 
     return fig, ax
@@ -341,7 +343,7 @@ def plot_ts_ci(data, times, color, plot_ci=True, ax=None, label="", clusters=Non
     return ax
 
 
-def plot_pupil_latency(evoked_dict, times, latencies_df, colors, pupil_size_ylim=None, boxplot_ylim=None,
+def plot_pupil_latency(evoked_dict, times, latencies_df, colors, pupil_size_ylim=None,
                        plot_legend=True, figsize=None, smooth_ms=0):
     """
 
@@ -353,12 +355,8 @@ def plot_pupil_latency(evoked_dict, times, latencies_df, colors, pupil_size_ylim
     :return:
     """
     if figsize is None:
-        figsize = [10, 11.7 / 4]
-    fig = plt.figure(figsize=figsize, constrained_layout=True)
-    spec = fig.add_gridspec(ncols=4, nrows=1)
-    ax1 = fig.add_subplot(spec[0, 0:3])
-    ax2 = fig.add_subplot(spec[0, 3])
-
+        figsize = [8.3, 11.7 / 4]
+    fig, ax = plt.subplots(figsize=figsize)
     for soa in evoked_dict.keys():
         # Plot the evoked pupil response:
         if smooth_ms == 0:
@@ -366,33 +364,27 @@ def plot_pupil_latency(evoked_dict, times, latencies_df, colors, pupil_size_ylim
         else:
             smooth_samp = int((smooth_ms * 0.001) / (times[1] - times[0]))
             data = uniform_filter1d(np.array(evoked_dict[soa]), size=smooth_samp, axis=-1)
-        plot_ts_ci(data, times, colors[soa], plot_ci=False, ax=ax1, label=soa)
+        plot_ts_ci(data, times, colors[str(soa)], plot_ci=False, ax=ax, label=soa)
         # Extract the mean latencies:
         lat = np.mean(latencies_df[latencies_df["SOA"] == soa]["latency"].to_numpy())
         # Plot the latency:
-        ax1.vlines(x=latencies_df[latencies_df["SOA"] == soa]["SOA_locked"].to_numpy()[0], ymin=pupil_size_ylim[0],
-                   ymax=pupil_size_ylim[1], linestyle="-",
-                   color=colors[soa], linewidth=2, zorder=10)
-        ax1.vlines(x=lat, ymin=0,
-                   ymax=np.mean(np.array(evoked_dict[soa]), axis=0)[np.argmin(np.abs(times - lat))],
-                   linestyle="--",
-                   color=colors[soa], linewidth=2, zorder=10)
-    ax1.set_ylim(pupil_size_ylim)
+        ax.vlines(x=latencies_df[latencies_df["SOA"] == soa]["onset_SOA"].to_numpy()[0], ymin=pupil_size_ylim[0],
+                  ymax=pupil_size_ylim[1], linestyle="-",
+                  color=colors[str(soa)], linewidth=2, zorder=10)
+        ax.vlines(x=lat, ymin=0,
+                  ymax=np.mean(np.array(evoked_dict[soa]), axis=0)[np.argmin(np.abs(times - lat))],
+                  linestyle="--",
+                  color=colors[str(soa)], linewidth=2, zorder=10)
+    ax.set_ylim(pupil_size_ylim)
     if plot_legend:
-        ax1.legend()
-    ax1.set_xlabel("Time (sec.)")
-    ax1.set_ylabel("Pupil size (norm.)")
-    # Plot the latency as a function of SOA:
-    plot_within_subject_boxplot(latencies_df, "sub_id", "SOA", "latency_aud",
-                                positions="SOA", ax=ax2, cousineau_correction=False, title="", xlabel="SOA",
-                                ylabel=r'$\tau_{\mathrm{audio}}$', xlim=[-0.1, 0.6], width=0.1,
-                                face_colors=[colors[soa] for soa in np.sort(list(evoked_dict.keys()))])
-    ax2.set_ylim(boxplot_ylim)
-    plt.suptitle("Pupil peak latency")
+        ax.legend()
+    ax.set_xlabel("Time (sec.)")
+    ax.set_ylabel("Pupil size (norm.)")
     return fig
 
 
-def plot_decoding_accuray(times, data, ci, smooth_ms=50, color=None, ax=None, label="", ylim=None):
+def plot_decoding_results(times, data, ci=0.95, smooth_ms=50, color=None, ax=None, label="",
+                          ylim=None, onset=None, offset=None):
     """
     This function plots decoding results
     :param times:
@@ -408,19 +400,27 @@ def plot_decoding_accuray(times, data, ci, smooth_ms=50, color=None, ax=None, la
     :return:
     """
     # Compute the smoothing window:
+    if ylim is None:
+        ylim = [0.4, 1.0]
     smooth_samp = int((smooth_ms * 0.001) / (times[1] - times[0]))
-
     # Smooth the data and CI:
     data = uniform_filter1d(data, size=smooth_samp, axis=-1)
-    upci = uniform_filter1d(ci[1, :], size=smooth_samp, axis=-1)
-    lowci = uniform_filter1d(ci[0, :], size=smooth_samp, axis=-1)
-
+    # Compute the 95% confidence intervals:
+    ci = bootstrap_confidence_interval(data, ci=ci, n_bootstraps=2000)
     # Plot the score:
-    ax.plot(times, data, color=color, label=label)
+    ax.plot(times, np.mean(data, axis=0), color=color, label=label)
     # Plot the CI:
-    ax.fill_between(times, lowci, upci,
+    ax.fill_between(times, ci[0], ci[1],
                     color=color,
                     alpha=.3)
     ax.set_ylim(ylim)
+    ax.set_xlim([times[0], times[-1]])
+    if onset is not None:
+        # Plot the statistical significance:
+        sig_time = np.arange(onset, offset, times[1] - times[0])
+        # Get the indices of the significant time points:
+        sig_ind = np.array([np.argmin(np.abs(val - times)) for val in sig_time])
+        ax.fill_between(sig_time, ylim[0], ylim[1],
+                        color=[1, 0, 0], alpha=.4)
 
     return ax

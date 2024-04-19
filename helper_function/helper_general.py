@@ -13,10 +13,12 @@ import mne
 from mne_bids import convert_montage_to_mri
 from matplotlib import colormaps
 from math import ceil
+from mne.decoding import cross_val_multiscore
 from sklearn.model_selection import StratifiedKFold
 from mne.stats.cluster_level import _pval_from_histogram
 from joblib import Parallel, delayed
 from tqdm import tqdm
+from scipy.stats import binom
 
 
 def compute_pseudotrials(data, labels, n_trials=5):
@@ -76,8 +78,107 @@ def decoding_label_shuffle(estimator, test_data, test_labels):
                            test_labels[np.random.choice(test_data.shape[0], test_data.shape[0], replace=False)])
 
 
+def binomial_duration_test(estimator, data, labels, times, kfolds=5, n_jobs=1, alpha=0.05, min_dur_ms=50,
+                           prop_trials=0.8):
+    # Downsample the data:
+    data_new = []
+    lbl_new = []
+    for lbl in np.unique(labels):
+        lbl_inds = np.where(labels == lbl)[0]
+        data_ = data[lbl_inds, ...]
+        lbls_ = labels[lbl_inds]
+        n_trials_new = int(prop_trials * lbls_.shape[0])
+        # Bootstrap:
+        data_boots = data_[np.random.choice(n_trials_new, n_trials_new, replace=False), ...]
+        data_new.append(data_boots)
+        lbl_new.append(np.array([lbl] * n_trials_new))
+    data_new = np.concatenate(data_new, axis=0)
+    lbl_new = np.concatenate(lbl_new, axis=0)
+
+    # Determine significance threshold:
+    st = binom.ppf(1 - 0.05, data_new.shape[0], 1 / 2) * 1 / data_new.shape[0]
+    # Perform decoding:
+    scr = cross_val_multiscore(estimator, data_new, lbl_new, cv=kfolds, n_jobs=n_jobs)
+    # Average across folds:
+    scr = np.mean(scr, axis=0)
+    # Determine significance:
+    pval = np.array([0.01 if val > st else 1 for val in scr])
+    onset, offset = extract_first_bout(times, pval, alpha, min_dur_ms)
+    dur = offset - onset if onset is not None else 0
+    return scr, pval, dur, onset, offset
+
+
+def label_shuffle_diff(data1, data2, labels1, labels2, estimator, kfolds=5, n_jobs=1):
+    """
+
+    :param data1:
+    :param data2:
+    :param labels1:
+    :param labels2:
+    :param estimator:
+    :param kfolds:
+    :param n_jobs:
+    :return:
+    """
+    # Shuffle all the labels:
+    labels1_shu = labels1[np.random.choice(labels1.shape[0], labels1.shape[0], replace=False)]
+    labels2_shu = labels2[np.random.choice(labels2.shape[0], labels2.shape[0], replace=False)]
+    scr1_shu = cross_val_multiscore(estimator, data1, labels1_shu, cv=kfolds, n_jobs=n_jobs)
+    scr2_shu = cross_val_multiscore(estimator, data2, labels2_shu, cv=kfolds, n_jobs=n_jobs)
+    return np.mean(scr1_shu, axis=0) - np.mean(scr2_shu, axis=0)
+
+
+def decoding_difference_duration(data1, labels1, data2, labels2, times, estimator, n_perm=1000, cv_repeats=5,
+                                 n_jobs=1, kfolds=5, alpha=0.05, min_dur_ms=50, random_seed=None, tail=1):
+    """
+
+    :param data1:
+    :param labels1:
+    :param data2:
+    :param labels2:
+    :param times:
+    :param estimator:
+    :param n_perm:
+    :param cv_repeats:
+    :param n_jobs:
+    :param kfolds:
+    :param alpha:
+    :param min_dur_ms:
+    :param random_seed:
+    :param tail:
+    :return:
+    """
+    if random_seed is not None:
+        np.random.seed(random_seed)
+    # Perform the decoding  for each condition separately:
+    scr1 = []
+    scr2 = []
+    for i in range(cv_repeats):
+        scr1.append(cross_val_multiscore(estimator, data1, labels1, cv=kfolds, n_jobs=n_jobs))
+        scr2.append(cross_val_multiscore(estimator, data2, labels2, cv=kfolds, n_jobs=n_jobs))
+    scr1 = np.concatenate(scr1, axis=0)
+    scr2 = np.concatenate(scr2, axis=0)
+    # Compute the difference:
+    decoding_diff = np.mean(scr1, axis=0) - np.mean(scr2, axis=0)
+
+    # Run the labels shuffle:
+    null_dist_diff = Parallel(n_jobs=n_jobs)(delayed(label_shuffle_diff)(data1, data2, labels1, labels2, estimator,
+                                                                         kfolds=kfolds,
+                                                                         n_jobs=1,
+                                                                         ) for i in
+                                             tqdm(range(n_perm)))
+    pvals_diff = _pval_from_histogram(decoding_diff, null_dist_diff, tail)
+    # Extract the bout of significance:
+    onset, offset = extract_first_bout(times, pvals_diff, alpha, min_dur_ms)
+    if onset is not None:
+        duration = offset - onset
+    else:
+        duration = 0
+    return scr1, scr2, decoding_diff, null_dist_diff, pvals_diff, onset, offset, duration
+
+
 def estimate_decoding_duration(data, labels, times, estimator, n_bootrstrap=100, n_perm=1000, n_jobs=1,
-                               kfolds=5, alpha=0.05, min_dur_ms=50, random_seed=None):
+                               kfolds=5, alpha=0.05, min_dur_ms=50, random_seed=None, test="binomial"):
     """
     This function estimates for how long the information decodable from. The algorithm functions by performing the
     decoding, then computing an empirical null by shuffling labels of the test fold (for computation speed). The
@@ -94,6 +195,7 @@ def estimate_decoding_duration(data, labels, times, estimator, n_bootrstrap=100,
     :param alpha:
     :param min_dur_ms:
     :param random_seed:
+    :param test:
     :return:
     """
     if random_seed is not None:
@@ -102,40 +204,55 @@ def estimate_decoding_duration(data, labels, times, estimator, n_bootrstrap=100,
     # Create cross validation iterator:
     skf = StratifiedKFold(n_splits=kfolds)
     # Loop through each bootstrap iterations:
-    scores = []
-    pvals = []
-    onsets = []
-    offsets = []
-    durations = []
-    for i in tqdm(range(n_bootrstrap)):
-        # Loop through cross validation folds:
-        scr = []
-        scr_perm = []
-        data_boot = data[:, np.random.choice(data.shape[1], data.shape[1], replace=True), :]
-        for train_index, test_index in skf.split(data, labels):
-            # Training:
-            estimator.fit(data_boot[train_index, :, :], labels[train_index])
-            # Test:
-            scr.append(estimator.score(data_boot[test_index, :, :], labels[test_index]))
-            scr_perm.append(Parallel(n_jobs=n_jobs)(delayed(decoding_label_shuffle)(estimator,
-                                                                                    data_boot[test_index, :, :],
-                                                                                    labels[test_index]
-                                                                                    ) for i in
-                                                    range(ceil(n_perm / kfolds))))
-        # Convert the results to arrays:
-        scr = np.array(scr)
-        scores.append(np.mean(scr, axis=0))
-        scr_perm = np.array(scr_perm)
-        # Compute the p values:
-        pvals.append(_pval_from_histogram(np.mean(scr, axis=0), scr_perm, 1))
-        # Extract the bout of significance:
-        onset, offset = extract_first_bout(times, pvals[-1], alpha, min_dur_ms)
-        onsets.append(onset)
-        offsets.append(offset)
-        if onset is not None:
-            durations.append(offset - onset)
-        else:
-            durations.append(0)
+    if test == "permutation":
+        for i in tqdm(range(n_bootrstrap)):
+            scores = []
+            pvals = []
+            onsets = []
+            offsets = []
+            durations = []
+            # Loop through cross validation folds:
+            scr = []
+            scr_perm = []
+            data_boot = data[:, np.random.choice(data.shape[1], data.shape[1], replace=True), :]
+            for train_index, test_index in skf.split(data, labels):
+                # Training:
+                estimator.fit(data_boot[train_index, :, :], labels[train_index])
+                # Test:
+                scr.append(estimator.score(data_boot[test_index, :, :], labels[test_index]))
+                scr_perm.append(Parallel(n_jobs=n_jobs)(delayed(decoding_label_shuffle)(estimator,
+                                                                                        data_boot[test_index, :, :],
+                                                                                        labels[test_index]
+                                                                                        ) for i in
+                                                        range(ceil(n_perm / kfolds))))
+            # Convert the results to arrays:
+            scr = np.array(scr)
+            scores.append(np.mean(scr, axis=0))
+            scr_perm = np.array(scr_perm)
+            # Compute the p values:
+            pvals.append(_pval_from_histogram(np.mean(scr, axis=0), scr_perm, 1))
+            # Extract the bout of significance:
+            onset, offset = extract_first_bout(times, pvals[-1], alpha, min_dur_ms)
+            onsets.append(onset)
+            offsets.append(offset)
+            if onset is not None:
+                durations.append(offset - onset)
+            else:
+                durations.append(0)
+    elif test == "binomial":
+        # Run the decoding with binomial significance test in parallel:
+        scores, pvals, durations, onsets, offsets = (
+            zip(*Parallel(n_jobs=n_jobs)(delayed(binomial_duration_test)(estimator,
+                                                                         data,
+                                                                         labels, times,
+                                                                         kfolds=kfolds,
+                                                                         n_jobs=1,
+                                                                         alpha=alpha,
+                                                                         min_dur_ms=min_dur_ms
+                                                                         ) for i in
+                                         tqdm(range(n_bootrstrap)))))
+    else:
+        raise Exception("Only permutation or binomial test possible!")
     # Compute the confidence interval of the decoding scores:
     ci = compute_ci(scores, axis=0, interval=0.95)
     return (np.array(scores), np.array(pvals), ci, np.array(onsets), np.array(offsets),
@@ -177,7 +294,7 @@ def create_super_subject(epochs_dict, targets_col, n_trials=80):
     # Exclude any subjects with less than the set number of trials in each condition:
     valid_subjects = [sub for sub in target_counts.keys() if all([cts >= n_trials for cts in target_counts[sub]])]
     # Delete discarded subjects:
-    for sub in epochs_dict.keys():
+    for sub in epochs_dict.copy().keys():
         if sub not in valid_subjects:
             print("Discarding sub-{}, not enough trials!".format(sub))
             del epochs_dict[sub]
@@ -743,7 +860,7 @@ def max_percentage_index(data, thresh_percent):
         data = data + np.abs(np.min(data))
         threshold_value = np.max(data) * (thresh_percent / 100)
     else:
-        threshold_value = np.max(data) * (thresh_percent / 100)
+        threshold_value = np.min(data) + (np.ptp(data) * (thresh_percent / 100))
 
     # Find the first index where the value is greater than or equal to the threshold
     ind = np.argmax(data >= threshold_value)
