@@ -4,10 +4,9 @@ import numpy as np
 from pathlib import Path
 import matplotlib.pyplot as plt
 import seaborn as sns
-from scipy.stats import zscore, pearsonr
-from helper_function.helper_plotter import plot_within_subject_boxplot, soa_boxplot
+from helper_function.helper_plotter import soa_boxplot
 import environment_variables as ev
-from helper_function.helper_general import load_beh_data, compute_dprime, reject_outliers
+from helper_function.helper_general import load_beh_data
 
 SMALL_SIZE = 14
 MEDIUM_SIZE = 16
@@ -21,7 +20,6 @@ plt.rc('xtick', labelsize=SMALL_SIZE)  # fontsize of the tick labels
 plt.rc('ytick', labelsize=SMALL_SIZE)  # fontsize of the tick labels
 plt.rc('legend', fontsize=SMALL_SIZE)  # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
-sns.set_style("white")
 
 # ======================================================================================================================
 # Experiment 1:
@@ -49,25 +47,25 @@ d = 1.5
 fig_ta, ax_ta = soa_boxplot(data_df[data_df["task_relevance"] == 'target'],
                             "RT_vis",
                             colors_onset_locked=[[0.5, 0.5, 0.5]] * 4, colors_offset_locked=[[0.5, 0.5, 0.5]] * 4,
-                            fig_size=[8.3 / 3, 11.7 / 2], avg_line_color=[0.5, 0.5, 0.5], zorder=0,
-                            alpha=0.5)
+                            fig_size=[8.3 / 2, 11.7 / 2], avg_line_color=[0.5, 0.5, 0.5], zorder=0,
+                            alpha=0.5, label="RT visual", jitter=-0.04)
 # RT audio
 soa_boxplot(data_df[data_df["task_relevance"] == 'target'],
             "RT_aud", ax=ax_ta,
             colors_onset_locked=colors_onset, colors_offset_locked=colors_offset,
-            fig_size=[8.3 / 3, 11.7 / 3], zorder=10000)
+            fig_size=[8.3 / 2, 11.7 / 2], zorder=10000, label="RT audio", jitter=0.04)
 for ax in ax_ta:
     ax.axhline(0.64, linestyle="--", color=[0.7, 0.7, 0.7], alpha=0.8)
 # Task relevant:
 fig_tr, ax_tr = soa_boxplot(data_df[data_df["task_relevance"] == 'non-target'],
                             "RT_aud",
                             colors_onset_locked=colors_onset, colors_offset_locked=colors_offset,
-                            fig_size=[8.3 / 3, 11.7 / 2])
+                            fig_size=[8.3 / 2, 11.7 / 2], label="RT audio")
 # Task irrelevant:
 fig_ti, ax_ti = soa_boxplot(data_df[data_df["task_relevance"] == 'irrelevant'],
                             "RT_aud",
                             colors_onset_locked=colors_onset, colors_offset_locked=colors_offset,
-                            fig_size=[8.3 / 3, 11.7 / 2])
+                            fig_size=[8.3 / 2, 11.7 / 2], label="RT audio")
 # Set the y limit to be the same for both plots:
 lims = [[ax_tr[0].get_ylim()[0], ax_ti[0].get_ylim()[0]], [ax_tr[0].get_ylim()[1], ax_ti[0].get_ylim()[1]]]
 max_lims = [min(min(lims)), max(max(lims))]
@@ -133,9 +131,7 @@ for dur_i, dur in enumerate(durations):
                                       color=ev.colors["soa_offset_locked"][str(soa)])
 # Add axis decorations:
 fig.supxlabel("RT (s)")
-fig.supylabel("CD")
-ax[0, -1].legend(fontsize=10)
-ax[-1, -1].legend(fontsize=10)
+fig.supylabel("CDF")
 ax[0, 0].set_xlim([np.min(xlims), np.max(xlims)])
 fig.savefig(Path(save_root, "Experiment1-figure2b.svg"), transparent=True, dpi=dpi)
 fig.savefig(Path(save_root, "Experiment1-figure2b.png"), transparent=True, dpi=dpi)
@@ -172,6 +168,8 @@ onset_lock_rt = [ev.colors["soa_onset_locked"][str(soa)] for soa in list(np.sort
 offset_lock_rt = [ev.colors["soa_offset_locked"][str(soa)] for soa in list(np.sort(data_df["SOA"].unique()))]
 onset_lock_it = [ev.colors["soa_onset_locked_iRT"][str(soa)] for soa in list(np.sort(data_df["SOA"].unique()))]
 offset_lock_it = [ev.colors["soa_offset_locked_iRT"][str(soa)] for soa in list(np.sort(data_df["SOA"].unique()))]
+onset_lock_visit = [ev.colors["soa_onset_locked_visiRT"][str(soa)] for soa in list(np.sort(data_df["SOA"].unique()))]
+offset_lock_visit = [ev.colors["soa_offset_locked_visiRT"][str(soa)] for soa in list(np.sort(data_df["SOA"].unique()))]
 
 # Target:
 d = 1.5
@@ -179,17 +177,23 @@ d = 1.5
 fig_ta, ax_ta = soa_boxplot(data_df[data_df["task_relevance"] == 'target'],
                             "RT_vis",
                             colors_onset_locked=[[0.5, 0.5, 0.5]] * 4, colors_offset_locked=[[0.5, 0.5, 0.5]] * 4,
-                            fig_size=[8.3 / 3, 11.7 / 2], avg_line_color=[0.5, 0.5, 0.5], zorder=0,
-                            alpha=0.5)
+                            fig_size=[8.3 / 2, 11.7 / 2], avg_line_color=[0.5, 0.5, 0.5], zorder=0,
+                            alpha=0.5, label="RT visual", jitter=-0.04)
 # RT audio
 soa_boxplot(data_df[data_df["task_relevance"] == 'target'],
             "RT_aud", ax=ax_ta,
             colors_onset_locked=onset_lock_rt, colors_offset_locked=offset_lock_rt,
-            fig_size=[8.3 / 3, 11.7 / 3], zorder=10000)
+            fig_size=[8.3 / 2, 11.7 / 2], zorder=10000, label="RT audio", jitter=0.04)
+# iRT audio
 soa_boxplot(data_df[data_df["task_relevance"] == 'target'],
             "iRT_aud", ax=ax_ta,
             colors_onset_locked=onset_lock_it, colors_offset_locked=offset_lock_it,
-            fig_size=[8.3 / 3, 11.7 / 3], zorder=10000)
+            fig_size=[8.3 / 2, 11.7 / 2], zorder=10000, label="iT audio", jitter=-0.04)
+# iRT vis
+soa_boxplot(data_df[data_df["task_relevance"] == 'target'],
+            "iRT_vis", ax=ax_ta,
+            colors_onset_locked=onset_lock_visit, colors_offset_locked=offset_lock_visit,
+            fig_size=[8.3 / 2, 11.7 / 2], zorder=10000, label="iT visual", jitter=0.04)
 
 for ax in ax_ta:
     ax.axhline(0.64, linestyle="--", color=[0.7, 0.7, 0.7], alpha=0.8)
@@ -197,20 +201,28 @@ for ax in ax_ta:
 fig_tr, ax_tr = soa_boxplot(data_df[data_df["task_relevance"] == 'non-target'],
                             "RT_aud",
                             colors_onset_locked=colors_onset, colors_offset_locked=colors_offset,
-                            fig_size=[8.3 / 3, 11.7 / 2])
+                            fig_size=[8.3 / 2, 11.7 / 2], label="RT audio")
 soa_boxplot(data_df[data_df["task_relevance"] == 'non-target'],
             "iRT_aud", ax=ax_tr,
             colors_onset_locked=onset_lock_it, colors_offset_locked=offset_lock_it,
-            fig_size=[8.3 / 3, 11.7 / 2])
+            fig_size=[8.3 / 2, 11.7 / 2], label="iT audio")
+soa_boxplot(data_df[data_df["task_relevance"] == 'non-target'],
+            "iRT_vis", ax=ax_tr,
+            colors_onset_locked=onset_lock_visit, colors_offset_locked=offset_lock_visit,
+            fig_size=[8.3 / 2, 11.7 / 2], label="iT visual")
 # Task irrelevant:
 fig_ti, ax_ti = soa_boxplot(data_df[data_df["task_relevance"] == 'irrelevant'],
                             "RT_aud",
                             colors_onset_locked=colors_onset, colors_offset_locked=colors_offset,
-                            fig_size=[8.3 / 3, 11.7 / 2])
+                            fig_size=[8.3 / 2, 11.7 / 2], label="RT audio")
 soa_boxplot(data_df[data_df["task_relevance"] == 'irrelevant'],
             "iRT_aud", ax=ax_ti,
             colors_onset_locked=onset_lock_it, colors_offset_locked=offset_lock_it,
-            fig_size=[8.3 / 3, 11.7 / 2])
+            fig_size=[8.3 / 2, 11.7 / 2], label="iT audio")
+soa_boxplot(data_df[data_df["task_relevance"] == 'irrelevant'],
+            "iRT_vis", ax=ax_ti,
+            colors_onset_locked=onset_lock_visit, colors_offset_locked=offset_lock_visit,
+            fig_size=[8.3 / 2, 11.7 / 2], label="iT visual")
 
 # Set the y limit to be the same for both plots:
 lims = [[ax_tr[0].get_ylim()[0], ax_ti[0].get_ylim()[0]], [ax_tr[0].get_ylim()[1], ax_ti[0].get_ylim()[1]]]
@@ -318,11 +330,7 @@ for dur_i, dur in enumerate(durations):
                                       color=ev.colors["soa_offset_locked_iRT"][str(soa)])
 # Add axis decorations:
 fig.supxlabel("RT (s)")
-fig.supylabel("CD")
-ax[0, -1].legend(fontsize=10)
-ax[0, -2].legend(fontsize=10)
-ax[-1, -1].legend(fontsize=10)
-ax[-1, -2].legend(fontsize=10)
+fig.supylabel("CDF")
 ax[0, 0].set_xlim([0, np.max(xlims)])
 fig.savefig(Path(save_root, "Experiment2-figure2b.svg"), transparent=True, dpi=dpi)
 fig.savefig(Path(save_root, "Experiment2-figure2b.png"), transparent=True, dpi=dpi)
