@@ -1,6 +1,7 @@
 import mne
 import os
 import json
+import numpy as np
 from pathlib import Path
 import matplotlib.pyplot as plt
 from helper_function.helper_general import (baseline_scaling, cluster_1samp_across_sub, equate_epochs_events,
@@ -9,7 +10,18 @@ from helper_function.helper_plotter import plot_ts_ci
 import environment_variables as ev
 
 # Set the font size:
-plt.rcParams.update({'font.size': 14})
+SMALL_SIZE = 14
+MEDIUM_SIZE = 16
+BIGGER_SIZE = 18
+dpi = 300
+plt.rcParams['svg.fonttype'] = 'none'
+plt.rc('font', size=SMALL_SIZE)  # controls default text sizes
+plt.rc('axes', titlesize=SMALL_SIZE)  # fontsize of the axes title
+plt.rc('axes', labelsize=MEDIUM_SIZE)  # fontsize of the x and y labels
+plt.rc('xtick', labelsize=SMALL_SIZE)  # fontsize of the tick labels
+plt.rc('ytick', labelsize=SMALL_SIZE)  # fontsize of the tick labels
+plt.rc('legend', fontsize=SMALL_SIZE)  # legend fontsize
+plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
 
 def pupil_amplitude(parameters_file, subjects, session="1", task="prp", analysis_name="pupil_amplitude",
@@ -19,6 +31,7 @@ def pupil_amplitude(parameters_file, subjects, session="1", task="prp", analysis
         param = json.load(json_file)
     # Load all subjects data:
     subjects_epochs = {}
+    subjects_targets = {}
     # Create the directory to save the results in:
     save_dir = Path(ev.bids_root, "derivatives", analysis_name, task)
     if not os.path.isdir(save_dir):
@@ -59,17 +72,13 @@ def pupil_amplitude(parameters_file, subjects, session="1", task="prp", analysis
                               remove_fixdist=param["remove_fixdist"],
                               fixdist_thresh_deg=param["fixdist_thresh_deg"],
                               fixdist_prop_trhesh=param["fixdist_prop_trhesh"])
-        # Decimate
-        epochs.decimate(int(epochs.info["sfreq"] / param["decim_freq"]))
-
-        # Extract the relevant conditions:
-        epochs = epochs[param["task_relevance"]]
 
         # Extract the relevant channels:
         epochs.pick(param["picks"])
         # Baseline correction:
         baseline_scaling(epochs, correction_method=param["baseline"], baseline=param["baseline_window"])
-        subjects_epochs[sub] = epochs
+        subjects_epochs[sub] = epochs.copy()[param["task_relevance"]]
+        subjects_targets[sub] = epochs.copy()["target"]
 
     # Plot the drop logs:
     drop_log_df = format_drop_logs({sub: subjects_epochs[sub].drop_log for sub in subjects_epochs.keys()})
@@ -94,6 +103,7 @@ def pupil_amplitude(parameters_file, subjects, session="1", task="prp", analysis
 
     # ==================================================================================================================
     # Task relevance comparisons:
+    ylim = [0.95, 1.22]
     # =====================================================================================
     # Onset locked task relevance analysis:
     # ===========================================================
@@ -115,9 +125,15 @@ def pupil_amplitude(parameters_file, subjects, session="1", task="prp", analysis
     plot_ts_ci(evks[conditions[1]], epochs.times, ev.colors["task_relevance"][param["task_relevance"][1]],
                ax=ax, label=param["task_relevance"][1], clusters=clusters,
                clusters_pval=cluster_p_values, clusters_alpha=0.1, sig_thresh=0.05, plot_nonsig_clusters=True)
+    # Compute the targets evoked:
+    targets_evoked = np.array([np.mean(subjects_targets[sub]["/".join([lock])].average().get_data(), axis=0)
+                               for sub in subjects_targets.keys()])
+    plot_ts_ci(targets_evoked, epochs.times, [0.4, 0.4, 0.4],
+               ax=ax, label="target")
     # Decorate the axes:
     ax.set_xlabel("Time (sec.)")
     ax.set_ylabel("Pupil dilation (norm.)")
+    ax.set_ylim(ylim)
     ax.spines[['right', 'top']].set_visible(False)
     plt.legend()
     plt.title("{} locked pupil size across durations (N={})".format(lock, len(subjects_epochs)))
@@ -151,8 +167,14 @@ def pupil_amplitude(parameters_file, subjects, session="1", task="prp", analysis
                    clusters_pval=cluster_p_values, clusters_alpha=0.1,
                    label=param["task_relevance"][1], sig_thresh=0.05 / len(param["duration"]),
                    plot_single_subjects=False, plot_nonsig_clusters=True)
+        # Compute the targets evoked:
+        targets_evoked = np.array([np.mean(subjects_targets[sub]["/".join([dur, lock])].average().get_data(), axis=0)
+                                   for sub in subjects_targets.keys()])
+        plot_ts_ci(targets_evoked, epochs.times, [0.4, 0.4, 0.4],
+                   ax=ax[dur_i], label="target")
 
     # Decorate the axes:
+    ax[0].set_ylim(ylim)
     ax[0].spines[['right', 'top']].set_visible(False)
     ax[0].set_title("Short")
     ax[1].set_ylabel("Pupil dilation (norm.)")
@@ -190,7 +212,13 @@ def pupil_amplitude(parameters_file, subjects, session="1", task="prp", analysis
                ax=ax, label=param["task_relevance"][1], clusters=clusters,
                clusters_pval=cluster_p_values, clusters_alpha=0.1, sig_thresh=0.05, plot_single_subjects=False,
                plot_nonsig_clusters=True)
+    # Compute the targets evoked:
+    targets_evoked = np.array([np.mean(subjects_targets[sub]["/".join([lock])].average().get_data(), axis=0)
+                               for sub in subjects_targets.keys()])
+    plot_ts_ci(targets_evoked, epochs.times, [0.4, 0.4, 0.4],
+               ax=ax, label="target")
     # Decorate the axes:
+    ax.set_ylim(ylim)
     ax.set_xlabel("Time (sec.)")
     ax.set_ylabel("Pupil dilation (norm.)")
     ax.spines[['right', 'top']].set_visible(False)
@@ -225,7 +253,13 @@ def pupil_amplitude(parameters_file, subjects, session="1", task="prp", analysis
                    clusters_pval=cluster_p_values, clusters_alpha=0.1,
                    label=param["task_relevance"][1], sig_thresh=0.05 / len(param["duration"]),
                    plot_single_subjects=False, plot_nonsig_clusters=True)
+        # Compute the targets evoked:
+        targets_evoked = np.array([np.mean(subjects_targets[sub]["/".join([dur, lock])].average().get_data(), axis=0)
+                                   for sub in subjects_targets.keys()])
+        plot_ts_ci(targets_evoked, epochs.times, [0.4, 0.4, 0.4],
+                   ax=ax[dur_i], label="target")
     # Decorate the axes:
+    ax[0].set_ylim(ylim)
     ax[0].spines[['right', 'top']].set_visible(False)
     ax[0].set_title("Short")
     ax[1].set_ylabel("Pupil dilation (norm.)")

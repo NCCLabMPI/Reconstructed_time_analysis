@@ -3,7 +3,7 @@
   "data_type": "eyetrack",
   "crop": [-0.2, 2.7],
   "decim_freq": 100,
-  "baseline": "mean",
+  "baseline": "ratio",
   "eyes": ["left", "right"],
   "exlude_beh": true,
   "baseline_zthresh": 2,
