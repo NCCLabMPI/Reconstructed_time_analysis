@@ -11,6 +11,7 @@ from scipy.ndimage import gaussian_filter1d
 import environment_variables as ev
 from mne.decoding import cross_val_multiscore
 import numpy as np
+import pandas as pd
 import pickle
 from helper_function.helper_general import create_super_subject, get_roi_channels, \
     decoding_difference_duration, moving_average, compute_pseudotrials
@@ -22,11 +23,17 @@ plt.rcParams.update({'font.size': 14})
 views = ['lateral', 'medial', 'rostral', 'caudal', 'ventral', 'dorsal']
 
 
-def decoding(parameters_file, subjects, data_root, session="1", task="dur", analysis_name="decoding",
-             task_conditions=None, subname="all-dur"):
+def decoding(parameters_file, subjects, data_root,
+             session="1", task="Dur",
+             signal='high_gamma',
+             analysis_name="decoding",
+             task_conditions=None,
+             subname="all-dur",
+             atlas='destrieux'):
     # First, load the parameters:
     if task_conditions is None:
         task_conditions = ["Relevant non-target", "Irrelevant", "Target"]
+
     with open(parameters_file) as json_file:
         param = json.load(json_file)
     save_dir = Path(ev.bids_root, "derivatives", analysis_name, task, subname)
@@ -59,34 +66,21 @@ def decoding(parameters_file, subjects, data_root, session="1", task="dur", anal
 
         # Load each subjects' data:
         for sub in subjects:
-            # Create file name:
+            # Load the epochs:
             epochs_file = Path(data_root, "derivatives", "preprocessing", "sub-" + sub, "ses-" + session,
-                               "ieeg", "epoching",
+                               "ieeg", "epoching", signal,
                                "sub-{}_ses-{}_task-{}_desc-epoching_ieeg-epo.fif".format(sub,
                                                                                          session,
                                                                                          task))
-            # Load the file:
             epochs = mne.read_epochs(epochs_file)
 
-            # Issue with the encoding of the channels coordinates frame in previous MNE version
-            from mne.io.constants import FIFF
-            for d in epochs.info["dig"]:
-                d['coord_frame'] = FIFF.FIFFV_COORD_MRI
-            # Crop if needed:
-            epochs.crop(param["crop"][0], param["crop"][1])
-            times = epochs.times
-            # Extract the conditions of interest:
-            epochs = epochs[param["conditions"]]
-
-            # Extract only the channels in the correct ROI:
-            roi_channels = get_roi_channels(epochs.get_montage(), "sub-" + sub,
-                                            roi, ev.fs_directory,
-                                            aseg="aparc.a2009s+aseg", dist=2)
-            if len(roi_channels) == 0:
+            # Extract the channels from this labels:
+            picks = get_roi_channels(bids_root, sub, session, atlas, roi)
+            if len(picks) == 0:
                 print("sub-{} has no electrodes in {}".format(sub, roi_name))
                 continue
-            # Append to the rest:
-            subjects_epochs[sub] = epochs.pick(roi_channels)
+            subjects_epochs[sub] = epochs.pick(picks)
+
         if len(subjects_epochs) == 0:
             continue
         # Create the classifier:
@@ -204,28 +198,7 @@ if __name__ == "__main__":
     parameters = (
         r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis"
         r"\06-iEEG_decoding_parameters_all-dur.json")
-    decoding(parameters, ev.subjects_lists_ecog["dur"], ev.bids_root,
-             session="V1", task="Dur", analysis_name="decoding", subname="all-dur",
+    bids_root = r"C:\Users\alexander.lepauvre\Documents\GitHub\iEEG-data-release\bids-curate"
+    decoding(parameters, ev.subjects_lists_ecog["dur"], bids_root,
+             session="1", task="Dur", analysis_name="decoding", subname="all-dur",
              task_conditions=["Relevant non-target", "Irrelevant", "Relevant target"])
-
-    # Short trials:
-    # parameters = (
-    #     r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis"
-    #     r"\06-iEEG_decoding_parameters_short.json")
-    # decoding(parameters, ev.subjects_lists_ecog["dur"], ev.bids_root,
-    #          session="V1", task="Dur", analysis_name="decoding", subname="short",
-    #          task_conditions=["Relevant non-target", "Irrelevant", "Relevant target"])
-    # Intermediate trials
-    # parameters = (
-    #     r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis"
-    #     r"\06-iEEG_decoding_parameters_int.json")
-    # decoding(parameters, ev.subjects_lists_ecog["dur"], ev.bids_root,
-    #          session="V1", task="Dur", analysis_name="decoding", subname="int",
-    #          task_conditions=["Relevant non-target", "Irrelevant", "Relevant target"])
-    # Long trials
-    # parameters = (
-    #     r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis"
-    #     r"\06-iEEG_decoding_parameters_long.json")
-    # decoding(parameters, ev.subjects_lists_ecog["dur"], ev.bids_root,
-    #          session="V1", task="Dur", analysis_name="decoding", subname="long",
-    #          task_conditions=["Relevant non-target", "Irrelevant", "Relevant target"])

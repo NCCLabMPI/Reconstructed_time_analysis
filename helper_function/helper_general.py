@@ -327,27 +327,37 @@ def create_super_subject(epochs_dict, targets_col, n_trials=80):
     return super_sub_data, super_sub_targets
 
 
-def get_roi_channels(montage, subject, rois, fs_dir, aseg="aparc+aseg", dist=2):
+def get_roi_channels(bids_root, subject, session, atlas, rois, exclude_labels=None):
     """
-    This function takes in a list of channels and returns only those which are in a particular set of ROIs.
-    :param montage: (list of string) list of channels
-    :param subject: (list of string) list of channels
-    :param rois: (list of string) list of channels
-    :param fs_dir:
-    :param aseg:
-    :param dist:
+    This function takes in a list of rois and finds all the channels from a particular subject in that ROI based on the
+    BIDS files
+    :param bids_root: (Path) BIDS root
+    :param subject: (string) name of the subject
+    :param session: (string) name of the session
+    :param atlas: (string) name of the atlas to use (destrieux, desikan...)
+    :param rois: (string or list of strings) name of the rois to select channels from
+    :return: (list) channels in the specified ROIs
     """
+    if isinstance(rois, str):
+        rois = [rois]
+    if exclude_labels is None:
+        exclude_labels = ['unknown', 'left-cerebral-white-matter', 'right-cerebral-white-matter']
 
-    # Extract the labels of each channel:
-    labels, colors = mne.get_montage_volume_labels(montage, subject, fs_dir, aseg=aseg, dist=dist)
+    # Load the labels file:
+    label_file = Path(bids_root, f'sub-{subject}', f'ses-{session}', 'ieeg',
+                      f"sub-{subject}_ses-{session}_atlas-{atlas}_labels.tsv")
+    labels_df = pd.read_csv(label_file, sep='\t')
 
-    # Keep each channel found within the list:
-    roi_channels = []
-    for ch in labels.keys():
-        for lbl in labels[ch]:
-            if lbl in rois:
-                roi_channels.append(ch)
-    return list(set(roi_channels))
+    # Convert to a dict and remove unknown and white matter labels:
+    labels_dict = {
+        ch: [label for label in region.split('/') if label.lower() not in exclude_labels]
+        for ch, region in zip(labels_df['channel'], labels_df['region'])
+    }
+
+    # Select channels where the first label is in rois:
+    picks = [ch for ch, labels in labels_dict.items() if labels and labels[0] in rois]
+
+    return picks
 
 
 def extract_first_bout(times, data, threshold, min_duration):
