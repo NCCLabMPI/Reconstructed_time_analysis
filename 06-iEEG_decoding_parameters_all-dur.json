@@ -1,8 +1,10 @@
 {
-  "visit": "1",
   "task": "Dur",
   "session": "1",
-  "data_type": "eyetrack",
+  "data_type": "ieeg",
+  "preprocessing_folder": "epoching",
+  "signal": "high_gamma",
+  "atlas": "destrieux",
   "crop": [-0.1, 1.5],
   "conditions": ["stimulus onset/face", "stimulus onset/object"],
   "targets_column": "category",

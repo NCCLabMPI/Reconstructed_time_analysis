@@ -22,22 +22,17 @@ plt.rcParams.update({'font.size': 14})
 views = ['lateral', 'medial', 'rostral', 'caudal', 'ventral', 'dorsal']
 
 
-def decoding(parameters_file, subjects, data_root, session="1", task="Dur",
-             signal='high_gamma', analysis_name="decoding", task_conditions=None,
-             subname="all-dur", atlas='destrieux'):
+def decoding(parameters_file, subjects, data_root, analysis_name="decoding", task_conditions=None,
+             subname="all-dur"):
     """
     Perform decoding analysis on iEEG data.
 
     :param parameters_file: (str) Path to the parameters file in JSON format.
     :param subjects: (list) List of subjects.
     :param data_root: (str) Root directory for data.
-    :param session: (str) Name of the session.
-    :param task: (str) Name of the task.
-    :param signal: (str) Type of signal to analyze.
     :param analysis_name: (str) Name of the analysis.
     :param task_conditions: (list) List of task conditions.
     :param subname: (str) Name of the subset.
-    :param atlas: (str) Name of the atlas to use.
     :return: None
     """
     if task_conditions is None:
@@ -46,7 +41,7 @@ def decoding(parameters_file, subjects, data_root, session="1", task="Dur",
     with open(parameters_file) as json_file:
         param = json.load(json_file)
 
-    save_dir = Path(ev.bids_root, "derivatives", analysis_name, task, subname)
+    save_dir = Path(ev.bids_root, "derivatives", analysis_name, param["task"], subname)
     os.makedirs(save_dir, exist_ok=True)
 
     subjects_epochs = {}
@@ -70,16 +65,16 @@ def decoding(parameters_file, subjects, data_root, session="1", task="Dur",
         roi_results[roi_name] = {}
 
         for sub in subjects:
-            epochs_file = Path(data_root, "derivatives", "preprocessing", f"sub-{sub}", f"ses-{session}",
-                               "ieeg", "epoching", signal,
-                               f"sub-{sub}_ses-{session}_task-{task}_desc-epoching_ieeg-epo.fif")
+            epochs_file = Path(data_root, "derivatives", "preprocessing", f"sub-{sub}", f"ses-{param["session"]}",
+                               param["data_type"], param["preprocessing_folder"], param["signal"],
+                               f"sub-{sub}_ses-{param["session"]}_task-{param["task"]}_desc-epoching_ieeg-epo.fif")
             epochs = mne.read_epochs(epochs_file)
             times = epochs.times
 
             # Extract the conditions of interest:
             epochs = epochs[param["conditions"]]
 
-            picks = get_roi_channels(data_root, sub, session, atlas, roi)
+            picks = get_roi_channels(data_root, sub, param["session"], param["atlas"], roi)
             if not picks:
                 print(f"sub-{sub} has no electrodes in {roi_name}")
                 continue
@@ -126,7 +121,7 @@ def decoding(parameters_file, subjects, data_root, session="1", task="Dur",
         if param["pseudotrials"] is not None:
             data_ti, labels_ti = compute_pseudotrials(data_ti, labels_ti, param["pseudotrials"])
 
-        assert n_channels_ti == n_channels_tr, "The number of channels does not match between task relevance conditions!"
+        assert n_channels_ti == n_channels_tr, "The number of channels does not match between task relevance conditions"
 
         # ============================
         # Targets:
@@ -142,7 +137,7 @@ def decoding(parameters_file, subjects, data_root, session="1", task="Dur",
         if param["pseudotrials"] is not None:
             data_tar, labels_tar = compute_pseudotrials(data_tar, labels_tar, param["pseudotrials"])
 
-        assert n_channels_ti == n_channels_tar, "The number of channels does not match between task relevance conditions!"
+        assert n_channels_ti == n_channels_tar, "The number of channels does not match between task relevance conditions"
         n_channels = n_channels_tar
 
         # ==============================================================================================================
@@ -195,5 +190,5 @@ if __name__ == "__main__":
     )
     bids_root = r"C:\Users\alexander.lepauvre\Documents\GitHub\iEEG-data-release\bids-curate"
     decoding(parameters, ev.subjects_lists_ecog["dur"], bids_root,
-             session="1", task="Dur", analysis_name="decoding", subname="all-dur",
+             analysis_name="decoding", subname="all-dur",
              task_conditions=["Relevant non-target", "Irrelevant", "Relevant target"])
