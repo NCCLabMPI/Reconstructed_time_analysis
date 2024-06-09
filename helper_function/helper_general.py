@@ -351,7 +351,7 @@ def get_roi_channels(bids_root, subject, session, atlas, rois, exclude_labels=No
     # Convert to a dict and remove unknown and white matter labels:
     labels_dict = {
         ch: [label for label in region.split('/') if label.lower() not in exclude_labels]
-        for ch, region in zip(labels_df['channel'], labels_df['region'])
+        for ch, region in zip(labels_df['channel'], labels_df['region']) if region is not np.nan
     }
 
     # Select channels where the first label is in rois:
