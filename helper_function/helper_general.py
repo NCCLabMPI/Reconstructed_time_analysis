@@ -73,190 +73,76 @@ def compute_ci(data, axis=0, interval=0.95):
     return np.percentile(data, ci, axis=axis)
 
 
-def decoding_label_shuffle(estimator, test_data, test_labels):
-    return estimator.score(test_data,
-                           test_labels[np.random.choice(test_data.shape[0], test_data.shape[0], replace=False)])
+def decoding_shuffle(estim_fit, data, labels):
+    """
+    This function shuffles the labels and computes the score using the provided estimator.
+
+    :param estim_fit: (estimator object) A fitted scikit learn estimator object implementing 'score'.
+    :param data: (array-like of shape (n_samples, n_features, n time points)) The data to be scored.
+    :param labels: (array-like of shape (n_samples,)) The true labels corresponding to the data.
+
+    :return: score (float) The score of the estimator when the labels are shuffled.
+    """
+    # Shuffle the labels:
+    labels_shu = labels[np.random.choice(labels.shape[0], labels.shape[0], replace=False)]
+    # Score:
+    return estim_fit.score(X=data, y=labels_shu)
 
 
-def binomial_duration_test(estimator, data, labels, times, kfolds=5, n_jobs=1, alpha=0.05, min_dur_ms=50,
-                           prop_trials=0.8):
-    # Downsample the data:
-    data_new = []
-    lbl_new = []
-    for lbl in np.unique(labels):
-        lbl_inds = np.where(labels == lbl)[0]
-        data_ = data[lbl_inds, ...]
-        lbls_ = labels[lbl_inds]
-        n_trials_new = int(prop_trials * lbls_.shape[0])
-        # Bootstrap:
-        data_boots = data_[np.random.choice(n_trials_new, n_trials_new, replace=False), ...]
-        data_new.append(data_boots)
-        lbl_new.append(np.array([lbl] * n_trials_new))
-    data_new = np.concatenate(data_new, axis=0)
-    lbl_new = np.concatenate(lbl_new, axis=0)
+def decoding(estimator, data, labels, n_pseudotrials=5, kfolds=5, n_jobs=1, n_perm=1000, verbose=False):
+    """
+    This function performs decoding using cross-validation and computes the null distribution using label shuffling.
 
-    # Determine significance threshold:
-    st = binom.ppf(1 - 0.05, data_new.shape[0], 1 / 2) * 1 / data_new.shape[0]
-    # Perform decoding:
-    scr = cross_val_multiscore(estimator, data_new, lbl_new, cv=kfolds, n_jobs=n_jobs)
-    # Average across folds:
-    scr = np.mean(scr, axis=0)
-    # Determine significance:
-    pval = np.array([0.01 if val > st else 1 for val in scr])
-    onset, offset = extract_first_bout(times, pval, alpha, min_dur_ms)
-    dur = offset - onset if onset is not None else 0
-    return scr, pval, dur, onset, offset
+    :param estimator: (estimator object) An estimator object implementing 'fit' and 'score'.
+    :param data: (array-like of shape (n_samples, n_features, n_timepoints)) The data to be used for decoding.
+    :param labels: (array-like of shape (n_samples,)) The true labels corresponding to the data.
+    :param n_pseudotrials: (int) Number of pseudotrials to be created. Default is 5.
+    :param kfolds: (int) Number of folds for cross-validation. Default is 5.
+    :param n_jobs: (int) Number of parallel jobs to run. Default is 1.
+    :param n_perm: (int) Number of permutations for generating the null distribution. Default is 1000.
+    :param verbose: (bool) If True, prints additional information. Default is False.
 
-
-def label_shuffle_diff(data1, data2, labels1, labels2, estimator, kfolds=5, n_jobs=1):
+    :return: scores (np.array) The scores of the estimator for each fold.
+             scores_shuffle (np.array) The scores of the estimator for each permutation with shuffled labels.
     """
 
-    :param data1:
-    :param data2:
-    :param labels1:
-    :param labels2:
-    :param estimator:
-    :param kfolds:
-    :param n_jobs:
-    :return:
-    """
-    # Shuffle all the labels:
-    labels1_shu = labels1[np.random.choice(labels1.shape[0], labels1.shape[0], replace=False)]
-    labels2_shu = labels2[np.random.choice(labels2.shape[0], labels2.shape[0], replace=False)]
-    scr1_shu = cross_val_multiscore(estimator, data1, labels1_shu, cv=kfolds, n_jobs=n_jobs)
-    scr2_shu = cross_val_multiscore(estimator, data2, labels2_shu, cv=kfolds, n_jobs=n_jobs)
-    return np.mean(scr1_shu, axis=0) - np.mean(scr2_shu, axis=0)
+    if n_pseudotrials is not None:
+        if verbose:
+            print("Computing pseudotrials")
+        data, labels = compute_pseudotrials(data, labels, n_pseudotrials)
+    if verbose:
+        print("Performing decoding on data: ")
+        print(f"    N channels = {data.shape[1]}")
+        print(f"    N time points = {data.shape[2]}")
+        print(f"    N Trials = {data.shape[0]}")
+    # Handle inputs:
+    if not (n_perm/kfolds).is_integer():
+        print('WARNING: The number of permutation you have requested to generate the null distribution is not '
+              'divisible by the number of folds!')
 
-
-def decoding_difference_duration(data1, labels1, data2, labels2, times, estimator, n_perm=1000, cv_repeats=5,
-                                 n_jobs=1, kfolds=5, alpha=0.05, min_dur_ms=50, random_seed=None, tail=1):
-    """
-
-    :param data1:
-    :param labels1:
-    :param data2:
-    :param labels2:
-    :param times:
-    :param estimator:
-    :param n_perm:
-    :param cv_repeats:
-    :param n_jobs:
-    :param kfolds:
-    :param alpha:
-    :param min_dur_ms:
-    :param random_seed:
-    :param tail:
-    :return:
-    """
-    if random_seed is not None:
-        np.random.seed(random_seed)
-    # Perform the decoding  for each condition separately:
-    scr1 = []
-    scr2 = []
-    for i in range(cv_repeats):
-        scr1.append(cross_val_multiscore(estimator, data1, labels1, cv=kfolds, n_jobs=n_jobs))
-        scr2.append(cross_val_multiscore(estimator, data2, labels2, cv=kfolds, n_jobs=n_jobs))
-    scr1 = np.concatenate(scr1, axis=0)
-    scr2 = np.concatenate(scr2, axis=0)
-    # Compute the difference:
-    decoding_diff = np.mean(scr1, axis=0) - np.mean(scr2, axis=0)
-
-    # Run the labels shuffle:
-    null_dist_diff = Parallel(n_jobs=n_jobs)(delayed(label_shuffle_diff)(data1, data2, labels1, labels2, estimator,
-                                                                         kfolds=kfolds,
-                                                                         n_jobs=1,
-                                                                         ) for i in
-                                             tqdm(range(n_perm)))
-    pvals_diff = _pval_from_histogram(decoding_diff, null_dist_diff, tail)
-    # Extract the bout of significance:
-    onset, offset = extract_first_bout(times, pvals_diff, alpha, min_dur_ms)
-    if onset is not None:
-        duration = offset - onset
-    else:
-        duration = 0
-    return scr1, scr2, decoding_diff, null_dist_diff, pvals_diff, onset, offset, duration
-
-
-def estimate_decoding_duration(data, labels, times, estimator, n_bootrstrap=100, n_perm=1000, n_jobs=1,
-                               kfolds=5, alpha=0.05, min_dur_ms=50, random_seed=None, test="binomial"):
-    """
-    This function estimates for how long the information decodable from. The algorithm functions by performing the
-    decoding, then computing an empirical null by shuffling labels of the test fold (for computation speed). The
-    first bout of decoding that is superior to chance for a duration x s taken as the decoding duration. This is
-    repeated by bootstrapping the features to get estimate of the variance of the decoding duration.
-    :param data:
-    :param labels:
-    :param times:
-    :param estimator:
-    :param n_bootrstrap:
-    :param n_perm:
-    :param n_jobs:
-    :param kfolds:
-    :param alpha:
-    :param min_dur_ms:
-    :param random_seed:
-    :param test:
-    :return:
-    """
-    if random_seed is not None:
-        np.random.seed(random_seed)
-
-    # Create cross validation iterator:
+    # Creating cross val iterator:
     skf = StratifiedKFold(n_splits=kfolds)
-    # Loop through each bootstrap iterations:
-    if test == "permutation":
-        for i in tqdm(range(n_bootrstrap)):
-            scores = []
-            pvals = []
-            onsets = []
-            offsets = []
-            durations = []
-            # Loop through cross validation folds:
-            scr = []
-            scr_perm = []
-            data_boot = data[:, np.random.choice(data.shape[1], data.shape[1], replace=True), :]
-            for train_index, test_index in skf.split(data, labels):
-                # Training:
-                estimator.fit(data_boot[train_index, :, :], labels[train_index])
-                # Test:
-                scr.append(estimator.score(data_boot[test_index, :, :], labels[test_index]))
-                scr_perm.append(Parallel(n_jobs=n_jobs)(delayed(decoding_label_shuffle)(estimator,
-                                                                                        data_boot[test_index, :, :],
-                                                                                        labels[test_index]
-                                                                                        ) for i in
-                                                        range(ceil(n_perm / kfolds))))
-            # Convert the results to arrays:
-            scr = np.array(scr)
-            scores.append(np.mean(scr, axis=0))
-            scr_perm = np.array(scr_perm)
-            # Compute the p values:
-            pvals.append(_pval_from_histogram(np.mean(scr, axis=0), scr_perm, 1))
-            # Extract the bout of significance:
-            onset, offset = extract_first_bout(times, pvals[-1], alpha, min_dur_ms)
-            onsets.append(onset)
-            offsets.append(offset)
-            if onset is not None:
-                durations.append(offset - onset)
-            else:
-                durations.append(0)
-    elif test == "binomial":
-        # Run the decoding with binomial significance test in parallel:
-        scores, pvals, durations, onsets, offsets = (
-            zip(*Parallel(n_jobs=n_jobs)(delayed(binomial_duration_test)(estimator,
-                                                                         data,
-                                                                         labels, times,
-                                                                         kfolds=kfolds,
-                                                                         n_jobs=1,
-                                                                         alpha=alpha,
-                                                                         min_dur_ms=min_dur_ms
-                                                                         ) for i in
-                                         tqdm(range(n_bootrstrap)))))
-    else:
-        raise Exception("Only permutation or binomial test possible!")
-    # Compute the confidence interval of the decoding scores:
-    ci = compute_ci(scores, axis=0, interval=0.95)
-    return (np.array(scores), np.array(pvals), ci, np.array(onsets), np.array(offsets),
-            np.array(durations))
+    skf.get_n_splits(data, labels)
+
+    # Preallocate the results:
+    scores = []
+    scores_shuffle = []
+
+    # Loop through each fold:
+    for i, (train_index, test_index) in enumerate(skf.split(data, labels)):
+        # Fit model:
+        estimator.fit(X=data[train_index],
+                      y=labels[train_index])
+        # Test model:
+        scores.append(estimator.score(X=data[test_index], y=labels[test_index]))
+        # Shuffle the labels:
+        scores_shuffle.extend(Parallel(n_jobs=n_jobs)(delayed(decoding_shuffle)(estimator,
+                                                                                data[test_index],
+                                                                                labels[test_index],
+                                                                                ) for i in
+                                                      tqdm(range(int(n_perm/kfolds)))))
+
+    return np.array(scores), np.array(scores_shuffle)
 
 
 def get_cmap_rgb_values(values, cmap=None, center=None):

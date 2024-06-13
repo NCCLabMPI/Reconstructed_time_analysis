@@ -1,29 +1,25 @@
 import os
 import json
 import pickle
-import numpy as np
-import pandas as pd
 import mne
+import time
 from pathlib import Path
+import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.pipeline import make_pipeline
 from sklearn import svm
 from sklearn.preprocessing import StandardScaler
-from mne.decoding import SlidingEstimator, cross_val_multiscore
-from scipy.ndimage import gaussian_filter1d
+from mne.decoding import SlidingEstimator
 import environment_variables as ev
 from helper_function.helper_general import create_super_subject, get_roi_channels, \
-    decoding_difference_duration, moving_average, compute_pseudotrials
-
-# Set the font size:
-plt.rcParams.update({'font.size': 14})
+    decoding, moving_average
 
 # Set list of views:
 views = ['lateral', 'medial', 'rostral', 'caudal', 'ventral', 'dorsal']
 
 
-def decoding(parameters_file, subjects, data_root, analysis_name="decoding", task_conditions=None,
-             subname="all-dur"):
+def decoding_pipeline(parameters_file, subjects, data_root, analysis_name="decoding", task_conditions=None,
+                      subname="all-dur"):
     """
     Perform decoding analysis on iEEG data.
 
@@ -36,7 +32,7 @@ def decoding(parameters_file, subjects, data_root, analysis_name="decoding", tas
     :return: None
     """
     if task_conditions is None:
-        task_conditions = ["Relevant non-target", "Irrelevant", "Target"]
+        task_conditions = {"tr": "Relevant non-target", "ti": "Irrelevant", "targets": "Target"}
 
     with open(parameters_file) as json_file:
         param = json.load(json_file)
@@ -44,7 +40,6 @@ def decoding(parameters_file, subjects, data_root, analysis_name="decoding", tas
     save_dir = Path(ev.bids_root, "derivatives", analysis_name, param["task"], subname)
     os.makedirs(save_dir, exist_ok=True)
 
-    subjects_epochs = {}
     roi_results = {}
     times = []
 
@@ -62,6 +57,7 @@ def decoding(parameters_file, subjects, data_root, analysis_name="decoding", tas
         print("=========================================")
         print("ROI")
         print(roi_name)
+        subjects_epochs = {}
         roi_results[roi_name] = {}
 
         for sub in subjects:
@@ -69,110 +65,73 @@ def decoding(parameters_file, subjects, data_root, analysis_name="decoding", tas
                                param["data_type"], param["preprocessing_folder"], param["signal"],
                                f"sub-{sub}_ses-{param["session"]}_task-{param["task"]}_desc-epoching_ieeg-epo.fif")
             epochs = mne.read_epochs(epochs_file)
-            times = epochs.times
 
             # Extract the conditions of interest:
             epochs = epochs[param["conditions"]]
 
+            # Get the channels within this ROI:
             picks = get_roi_channels(data_root, sub, param["session"], param["atlas"], roi)
+            # Skip if no channels in that ROI for this subject
             if not picks:
                 print(f"sub-{sub} has no electrodes in {roi_name}")
                 continue
+            # Append to the rest:
             subjects_epochs[sub] = epochs.pick(picks)
 
+        # Skip if no channels were found in this ROI:
         if not subjects_epochs:
             continue
 
+        # 1. Create the model:
+        # ============================
         clf = make_pipeline(StandardScaler(), svm.SVC(kernel='linear', class_weight='balanced'))
         time_res = SlidingEstimator(clf, n_jobs=1, scoring='accuracy', verbose="ERROR")
 
-        # ==============================================================================================================
-        # 1. Create the super subject:
-        # ============================
-        # Task relevant:
-        tr_epochs = {sub: subjects_epochs[sub][task_conditions[0]] for sub in subjects_epochs}
-        data_tr, labels_tr = create_super_subject(tr_epochs, param["targets_column"], n_trials=param["min_ntrials"])
+        # Loop through each task conditions:
+        for tsk in task_conditions.keys():
+            # 2. Create the super subject:
+            # ============================
+            tsk_epochs = {sub: subjects_epochs[sub][task_conditions[tsk]] for sub in subjects_epochs}
+            times = [tsk_epochs[sub].times for sub in tsk_epochs.keys()][0]
+            data, labels = create_super_subject(tsk_epochs, param["labels_col"], n_trials=param["min_ntrials"])
+            n_channels = data.shape[1]
 
-        window_size = int((param["mvavg_window_ms"] * 0.001) / (times[1] - times[0]))
+            # 3. Moving average:
+            # ============================
+            window_size = int((param["mvavg_window_ms"] * 0.001) / (times[1] - times[0]))
+            print(f"Window size: {window_size}")
+            data = moving_average(data, window_size, axis=-1, overlapping=False)
+            times = moving_average(times, window_size, axis=-1, overlapping=False)
 
-        if param["smooth_ms"] is not None:
-            smooth_samp = int((param["smooth_ms"] * 0.001) / (times[1] - times[0]))
-            data_tr = gaussian_filter1d(data_tr, smooth_samp, axis=-1)
-        else:
-            smooth_samp = 0
+            # 4. Apply decoding (pseudotrials happen inside)
+            # ============================
+            scores = []
+            scores_shuffle = []
+            for i in range(param["n_iter"]):
+                # Repeat the decoding sev
+                start_time = time.time()  # Record the start time
+                scr, scr_shuffle = decoding(time_res, data, labels,
+                                            n_pseudotrials=param["pseudotrials"],
+                                            kfolds=param["kfold"],
+                                            n_jobs=param["n_jobs"],
+                                            n_perm=param["n_perm"],
+                                            verbose=True)
+                scores.append(scr)
+                scores_shuffle.append(scr_shuffle)
+                end_time = time.time()  # Record the end time
+                iteration_time = end_time - start_time  # Calculate the elapsed time
+                print(f"Iteration {i + 1} took {iteration_time:.2f} seconds")  # Print the time taken
+            # Average across iterations:
+            scores = np.mean(np.stack(scores, axis=2), axis=-1)
+            scores_shuffle = np.mean(np.stack(scores_shuffle, axis=2), axis=-1)
 
-        data_tr = moving_average(data_tr, window_size, axis=-1, overlapping=False)
-        times = moving_average(times, window_size, axis=-1, overlapping=False)
-        n_channels_tr = data_tr.shape[1]
-
-        if param["pseudotrials"] is not None:
-            data_tr, labels_tr = compute_pseudotrials(data_tr, labels_tr, param["pseudotrials"])
-
-        # ============================
-        # Task irrelevant:
-        ti_epochs = {sub: subjects_epochs[sub][task_conditions[1]] for sub in subjects_epochs}
-        data_ti, labels_ti = create_super_subject(ti_epochs, param["targets_column"], n_trials=param["min_ntrials"])
-
-        if param["smooth_ms"] is not None:
-            data_ti = gaussian_filter1d(data_ti, smooth_samp, axis=-1)
-        data_ti = moving_average(data_ti, window_size, axis=-1, overlapping=False)
-        n_channels_ti = data_ti.shape[1]
-
-        if param["pseudotrials"] is not None:
-            data_ti, labels_ti = compute_pseudotrials(data_ti, labels_ti, param["pseudotrials"])
-
-        assert n_channels_ti == n_channels_tr, "The number of channels does not match between task relevance conditions"
-
-        # ============================
-        # Targets:
-        target_epochs = {sub: subjects_epochs[sub][task_conditions[2]] for sub in subjects_epochs}
-        data_tar, labels_tar = create_super_subject(target_epochs, param["targets_column"],
-                                                    n_trials=param["min_ntargets"])
-
-        if param["smooth_ms"] is not None:
-            data_tar = gaussian_filter1d(data_tar, smooth_samp, axis=-1)
-        data_tar = moving_average(data_tar, window_size, axis=-1, overlapping=False)
-        n_channels_tar = data_tar.shape[1]
-
-        if param["pseudotrials"] is not None:
-            data_tar, labels_tar = compute_pseudotrials(data_tar, labels_tar, param["pseudotrials"])
-
-        assert n_channels_ti == n_channels_tar, "The number of channels does not match between task relevance conditions"
-        n_channels = n_channels_tar
-
-        # ==============================================================================================================
-        # 2. Decoding and estimating durations between task relevant and irrelevant:
-        # ============================
-        print("=" * 20)
-        print("Compute decoding difference duration: ")
-        scores_tr, scores_ti, decoding_diff, null_dist, pvals_diff, onset, offset, duration = (
-            decoding_difference_duration(data_tr, labels_tr, data_ti, labels_ti, times, time_res,
-                                         n_perm=param["n_perm"], n_jobs=param["n_jobs"],
-                                         kfolds=param["kfold"], alpha=param["alpha"],
-                                         min_dur_ms=param["dur_threshold"], random_seed=42, tail=1))
-
-        # Compute the decoding score for target trials:
-        print("=" * 20)
-        print("Compute decoding in target trials: ")
-        scores_targets = np.concatenate([
-            cross_val_multiscore(time_res, data_tar, labels_tar, cv=param["kfold"], n_jobs=param["n_jobs"])
-            for _ in range(5)
-        ], axis=0)
-
-        # ==============================================================================================================
-        # 3. Package the results and save to pickle:
-        roi_results[roi_name] = {
-            "scores_tr": scores_tr,
-            "scores_ti": scores_ti,
-            "scores_targets": scores_targets,
-            "decoding_diff": decoding_diff,
-            "null_dist": null_dist,
-            "pvals_diff": pvals_diff,
-            "onset": onset,
-            "offset": offset,
-            "duration": duration,
-            "n_channels": n_channels
-        }
+            # Package the results:
+            roi_results[roi_name].update({
+                f"scores_{tsk}": scores,
+                f"scores_shuffle_{tsk}": scores_shuffle,
+                "n_channels": n_channels,
+                "times": times
+            })
 
         # Save results to file:
         with open(Path(save_dir, f'results-{roi_name}.pkl'), 'wb') as f:
@@ -189,6 +148,6 @@ if __name__ == "__main__":
         r"\06-iEEG_decoding_parameters_all-dur.json"
     )
     bids_root = r"C:\Users\alexander.lepauvre\Documents\GitHub\iEEG-data-release\bids-curate"
-    decoding(parameters, ev.subjects_lists_ecog["dur"], bids_root,
-             analysis_name="decoding", subname="all-dur",
-             task_conditions=["Relevant non-target", "Irrelevant", "Relevant target"])
+    decoding_pipeline(parameters, ev.subjects_lists_ecog["dur"], bids_root,
+                      analysis_name="decoding", subname="all-dur",
+                      task_conditions={"tr": "Relevant non-target", "ti": "Irrelevant"})
