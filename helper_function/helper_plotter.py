@@ -8,6 +8,7 @@ from helper_function.helper_general import cousineau_morey_correction
 import environment_variables as ev
 from mne.stats import bootstrap_confidence_interval
 from scipy.ndimage import uniform_filter1d
+from helper_function.helper_general import get_cmap_rgb_values
 
 font = {'size': 12}
 matplotlib.rc('font', **font)
@@ -418,9 +419,52 @@ def plot_decoding_results(times, data, ci=0.95, smooth_ms=50, color=None, ax=Non
     if onset is not None:
         # Plot the statistical significance:
         sig_time = np.arange(onset, offset, times[1] - times[0])
-        # Get the indices of the significant time points:
-        sig_ind = np.array([np.argmin(np.abs(val - times)) for val in sig_time])
         ax.fill_between(sig_time, ylim[0], ylim[1],
                         color=[1, 0, 0], alpha=.4)
 
     return ax
+
+
+def plot_rois(subjects_dir, subject, parc, roi_dict, cmap="jet"):
+    """
+    This function plots regions of interest (ROIs) on a brain surface using MNE-Python.
+
+    The function reads anatomical labels from a specified parcellation, normalizes the provided ROI values,
+    and maps them to a colormap to visually represent the intensity of each ROI on the brain surface.
+
+    :param subjects_dir: Directory containing the FreeSurfer subject directories.
+    :param subject: Name of the subject to plot the ROIs for.
+    :param parc: Name of the parcellation to use (e.g., 'aparc', 'aparc.a2009s').
+    :param roi_dict: Dictionary where keys are ROI names and values are the corresponding intensity values.
+    :param cmap: Name of the colormap to use for mapping the ROI values (default is 'jet').
+
+    :return: A Brain object with the plotted ROIs.
+
+    Example usage:
+    brain = plot_rois('/path/to/subjects_dir', 'subject_name', 'aparc', {'ROI1': 1.5, 'ROI2': 3.2})
+    brain.show_view('lateral')
+    """
+
+    import mne
+    import matplotlib.colors as mcolors
+
+    # Normalize the values
+    norm = mcolors.Normalize(vmin=min(roi_dict.values()), vmax=max(roi_dict.values()))
+    # Create the color bar:
+    cmap = plt.get_cmap(cmap)
+
+    # Read the annotations
+    annot = mne.read_labels_from_annot(subject, parc=parc, subjects_dir=subjects_dir)
+    # Create brain:
+    Brain = mne.viz.get_brain_class()
+    brain = Brain('fsaverage', hemi='lh', surf='inflated', subjects_dir=ev.fs_directory, size=(800, 600))
+
+    # Loop through each label:
+    for roi in roi_dict.keys():
+        # Find the corresponding label:
+        lbl = [l for l in annot if l.name == roi + "-lh"]
+        roi_color = cmap(norm(roi_dict[roi]))
+        brain.add_label(lbl[0], color=mcolors.to_rgb(roi_color), borders=False)
+        brain.add_label(lbl[0], color=[0, 0, 0], borders=True)
+
+    return brain
