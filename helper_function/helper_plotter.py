@@ -457,7 +457,8 @@ def plot_rois(subjects_dir, subject, parc, roi_dict, cmap="jet"):
     annot = mne.read_labels_from_annot(subject, parc=parc, subjects_dir=subjects_dir)
     # Create brain:
     Brain = mne.viz.get_brain_class()
-    brain = Brain('fsaverage', hemi='lh', surf='inflated', subjects_dir=ev.fs_directory, size=(800, 600))
+    brain = Brain('fsaverage', hemi='lh', surf='inflated', background='white', subjects_dir=ev.fs_directory,
+                  size=(800, 600))
 
     # Loop through each label:
     for roi in roi_dict.keys():
