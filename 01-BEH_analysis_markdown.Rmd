@@ -446,7 +446,7 @@ onset_soa_contrasts
 ### Control: Comparing onset locked 466ms SOA vs long trials 0ms SOA
 [Not pre-registered]: 
 We observed a PRP effect at stimulus offset especially for long trials. This may indicate that the disappearance of the visual stimulus in the long trials was indeed processed by the central stage and accordingly induced a PRP effect when T2 was presented in close succession to that event. Alternatively, the decrease in RT2 with increased SOA might reflect a facilitation of T2 processing at increased SOA, due to the increased probability of the event occuring at large SOAs (hazard rate). If that is the case RT2 should be at baseline at SOA=0 and fastest at SOA=0.466s. We do not have a clean baseline in our study. However, in the onset trials (where a clear PRP effect is observed), RT2 at SOA = 0.466 should be the closest to it. It is likely that the interference period was not completely over by 0.466ms, in which case, RT2 would be higher compared to baseline. If we observe that RT2 in SOA=0s in offset locked long trials is larger than at SOA=0.466ms onset locked trials, then this implies that RT2 in the offset locked long trials is larger than a data point that is itself larger than baseline. In that case, the decrease of RT2 with increased SOA in offset locked long trials does not reflect a facilitation at larger SOAs but rather a delaying at short SOAs, consistent with a PRP effect. 
-```{r ctr_model}
+```{r ctr_model2}
 # Extract the two conditions of interest:
 comp_tbl = all_event_table %>% filter((duration == 1.5 & SOA == 0 & SOA_lock == 'offset') | (SOA == 0.466 & SOA_lock == 'onset'))
 # with duration, category and pitch as random effects 
@@ -918,7 +918,7 @@ write.csv(onset_vs_long_soa_contrast2, file = file.path(save_dir, "Experiment2-o
 "To analyze the effects of our experimental variables on ITaud and ITvis, a similar generalized linear model as for experiment 1 will be fitted:
 ITaudio/visual ~ SOA x onset/offset x Task relevance    + (SOA x onset/offset x Task relevance | Subject) + (SOA x onset/offset x Task relevance  | Duration)"
 
-```{r iRT_models}
+```{r iT2_models}
 # auditory 
 aud_iRT_model = glmer(iRT_aud ~ f_SOA*c_is_onset*c_task_relevant +
                      (1*f_SOA*c_is_onset*c_task_relevant | sub_id)+
@@ -972,7 +972,7 @@ anova_results
 "To analyze the effects of our experimental variables on ITaud and ITvis, a similar generalized linear model as for experiment 1 will be fitted:
 ITaudio/visual ~ SOA x onset/offset x Task relevance    + (SOA x onset/offset x Task relevance | Subject) + (SOA x onset/offset x Task relevance  | Duration)"
 
-```{r iRT_models}
+```{r iT1_models}
 vis_iRT_model = glmer(iRT_vis ~ f_SOA*c_is_onset*c_task_relevant +
                      (1*f_SOA*c_is_onset*c_task_relevant | sub_id)+
                      (1*f_SOA*c_is_onset*c_task_relevant | f_duration),
@@ -1076,6 +1076,35 @@ corr_fig2 = ggscatter(target_only_event_table2 , x = "z_RT_vis", y = "z_iRT_vis"
 
 # plot figure
 print(corr_fig2)
+
+```
+
+### Under-estimation of RT2 with iT2:
+[Pre-regsitered]:
+"(2b) Nevertheless, ITaud is expected to be substantially lower than objective RTaud. "
+```{r RTaud-iTaud}
+
+# Centered RT2:
+all_event_table2$iRT_aud_center = (all_event_table2$iRT_aud - mean(all_event_table2$iRT_aud)) / 1000
+
+# Modelling RT_aud as a function of iT_aud to test for the under-estimation of RT
+iRT_RT2_mdl = glmer(RT_aud  ~ iRT_aud_center +
+                     (1 | sub_id),
+                   family=Gamma(link="log"), data=all_event_table2)
+summary(iRT_RT2_mdl)
+# Convert the intercept back into sec by exponentiating:
+intercept_original_scale <- exp(fixef(iRT_RT2_mdl)["(Intercept)"])
+cat("Intercept on the original scale:", intercept_original_scale, "\n")
+
+plot <- ggplot(all_event_table2, aes(x = iRT_aud_center, y =RT_aud )) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "blue") +
+  ggtitle(paste("Scatter plot of col1 vs col2")) +
+  xlab("iRT") +
+  ylab("RT2") +
+  annotate("text", x = Inf, y = Inf, label = "Correlation",
+           hjust = 1.1, vjust = 1.5, size = 5, color = "red")
+print(plot)
 
 ```
 
