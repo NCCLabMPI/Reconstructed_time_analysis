@@ -9,10 +9,8 @@ import matplotlib as mpl
 import environment_variables as ev
 from mne.stats import bootstrap_confidence_interval
 from mne.stats.cluster_level import _pval_from_histogram
-from scipy.ndimage import uniform_filter1d, gaussian_filter1d
-import matplotlib.gridspec as gridspec
 import pickle
-from helper_function.helper_general import get_cmap_rgb_values, extract_first_bout
+from helper_function.helper_general import extract_first_bout
 from helper_function.helper_plotter import plot_decoding_results, plot_rois
 import pandas as pd
 
@@ -31,7 +29,8 @@ plt.rc('legend', fontsize=SMALL_SIZE)  # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
 # Set list of views:
-views = ['lateral', 'medial', 'rostral', 'caudal', 'ventral', 'dorsal']
+views = {'side': {"azimuth": 180, "elevation": 90}, 'front': {"azimuth": 130, "elevation": 90},
+         "ventral": {"azimuth": 90, "elevation": 180}}
 
 # Directory of the results:
 save_dir = Path(ev.bids_root, "derivatives", "decoding", "Dur", "all-dur")
@@ -46,6 +45,8 @@ for file in [path for path in listdir(save_dir) if path.endswith('pkl')]:
     with open(Path(save_dir, file), "rb") as fp:
         res = pickle.load(fp)
     roi_name = file.split("results-")[1].split(".pkl")[0]
+    if res["n_channels"] < 10:
+        continue
     # Compute the difference between both tasks conditions:
     decoding_diff = np.mean(res["scores_tr"], axis=0) - np.mean(res["scores_ti"], axis=0)
 
@@ -56,14 +57,14 @@ for file in [path for path in listdir(save_dir) if path.endswith('pkl')]:
     pvals = _pval_from_histogram(decoding_diff, diff_null, 1)
 
     # Extract the bout of significance:
-    onset, offset = extract_first_bout(res['times'], pvals, 0.05, 0.05)
+    onset, offset = extract_first_bout(res['times'], pvals, 0.05, 0.04)
 
     if onset is not None:
         duration = offset - onset
     else:
         duration = 0
 
-    # Plot the time series:
+    #  Plot the time series:
     fig, ax = plt.subplots(figsize=[4, 3])
     plot_decoding_results(res['times'], res["scores_tr"], ci=0.95, smooth_ms=50,
                           color=ev.colors["task_relevance"]["non-target"], ax=ax,
@@ -105,24 +106,33 @@ sig_rois = {roi_name: roi_results[roi_name] for roi_name in roi_results.keys()
 
 # Plot the onset of each roi on brain:
 rois_onset = {roi_name: sig_rois[roi_name]["onset"] for roi_name in sig_rois.keys()}
-brain = plot_rois(ev.fs_directory, "fsaverage", "aparc.a2009s", rois_onset, cmap="jet")
+brain = plot_rois(ev.fs_directory, "fsaverage", "aparc.a2009s", rois_onset, cmap="Reds")
 for view in views:
-    brain.show_view(view)
+    brain.show_view(**views[view])
     brain.save_image(Path(save_dir, "{}_{}.png".format("onset", view)))
 brain.close()
 
 # Plot the offset of each roi on brain:
 rois_offset = {roi_name: sig_rois[roi_name]["offset"] for roi_name in sig_rois.keys()}
-brain = plot_rois(ev.fs_directory, "fsaverage", "aparc.a2009s", rois_offset, cmap="jet")
+brain = plot_rois(ev.fs_directory, "fsaverage", "aparc.a2009s", rois_offset, cmap="Reds")
 for view in views:
-    brain.show_view(view)
+    brain.show_view(**views[view])
     brain.save_image(Path(save_dir, "{}_{}.png".format("offset", view)))
 brain.close()
 
 # Plot the duration of each roi on brain:
 rois_duration = {roi_name: sig_rois[roi_name]["duration"] for roi_name in sig_rois.keys()}
-brain = plot_rois(ev.fs_directory, "fsaverage", "aparc.a2009s", rois_duration, cmap="jet")
-for view in views:
-    brain.show_view(view)
+brain = plot_rois(ev.fs_directory, "fsaverage", "aparc.a2009s", rois_duration, cmap="Reds")
+for view in views.keys():
+    brain.show_view(**views[view])
     brain.save_image(Path(save_dir, "{}_{}.png".format("duration", view)))
 brain.close()
+# Plot a colorbar:
+norm = mpl.colors.Normalize(vmin=min(rois_duration.values()),
+                            vmax=min(rois_duration.values()))
+fig, ax = plt.subplots(figsize=(6, 1))
+fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap='Reds'),
+             cax=ax, orientation='horizontal', label='Duration (s)')
+fig.savefig(Path(save_dir, "colorbar.svg"),
+            transparent=False, dpi=300)
+plt.close()
