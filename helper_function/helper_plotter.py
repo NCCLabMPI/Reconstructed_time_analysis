@@ -403,9 +403,10 @@ def plot_decoding_results(times, data, ci=0.95, smooth_ms=50, color=None, ax=Non
     # Compute the smoothing window:
     if ylim is None:
         ylim = [0.4, 1.0]
-    smooth_samp = int((smooth_ms * 0.001) / (times[1] - times[0]))
-    # Smooth the data and CI:
-    data = uniform_filter1d(data, size=smooth_samp, axis=-1)
+    if smooth_ms is not None:
+        smooth_samp = int((smooth_ms * 0.001) / (times[1] - times[0]))
+        # Smooth the data and CI:
+        data = uniform_filter1d(data, size=smooth_samp, axis=-1)
     # Compute the 95% confidence intervals:
     ci = bootstrap_confidence_interval(data, ci=ci, n_bootstraps=2000)
     # Plot the score:

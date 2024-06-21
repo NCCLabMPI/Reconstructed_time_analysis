@@ -5,7 +5,7 @@ import mne
 import time
 from pathlib import Path
 import numpy as np
-import matplotlib.pyplot as plt
+import argparse
 from sklearn.pipeline import make_pipeline
 from sklearn import svm
 from sklearn.preprocessing import StandardScaler
@@ -18,8 +18,7 @@ from helper_function.helper_general import create_super_subject, get_roi_channel
 views = ['lateral', 'medial', 'rostral', 'caudal', 'ventral', 'dorsal']
 
 
-def decoding_pipeline(parameters_file, subjects, data_root, analysis_name="decoding", task_conditions=None,
-                      subname="all-dur"):
+def decoding_pipeline(parameters_file, subjects, data_root, analysis_name="decoding", task_conditions=None):
     """
     Perform decoding analysis on iEEG data.
 
@@ -28,16 +27,22 @@ def decoding_pipeline(parameters_file, subjects, data_root, analysis_name="decod
     :param data_root: (str) Root directory for data.
     :param analysis_name: (str) Name of the analysis.
     :param task_conditions: (list) List of task conditions.
-    :param subname: (str) Name of the subset.
     :return: None
     """
+    # Parse command line inputs:
+    parser = argparse.ArgumentParser(
+        description="Implements analysis of EDFs for experiment1")
+    parser.add_argument('--config', type=str, default=None,
+                        help="Config file for analysis parameters (file name + path)")
+    args = parser.parse_args()
+
     if task_conditions is None:
         task_conditions = {"tr": "Relevant non-target", "ti": "Irrelevant", "targets": "Target"}
 
-    with open(parameters_file) as json_file:
+    with open(args.config) as json_file:
         param = json.load(json_file)
 
-    save_dir = Path(ev.bids_root, "derivatives", analysis_name, param["task"], subname)
+    save_dir = Path(ev.bids_root, "derivatives", analysis_name, param["task"], args.config.split(".json")[0])
     os.makedirs(save_dir, exist_ok=True)
 
     roi_results = {}
@@ -68,6 +73,9 @@ def decoding_pipeline(parameters_file, subjects, data_root, analysis_name="decod
 
             # Extract the conditions of interest:
             epochs = epochs[param["conditions"]]
+
+            # Crop the data:
+            epochs.crop(tmin=param["crop"][0], tmax=param["crop"][1])
 
             # Get the channels within this ROI:
             picks = get_roi_channels(data_root, sub, param["session"], param["atlas"], roi)
@@ -149,5 +157,5 @@ if __name__ == "__main__":
     )
     bids_root = r"C:\Users\alexander.lepauvre\Documents\GitHub\iEEG-data-release\bids-curate"
     decoding_pipeline(parameters, ev.subjects_lists_ecog["dur"], bids_root,
-                      analysis_name="decoding", subname="all-dur",
+                      analysis_name="decoding",
                       task_conditions={"tr": "Relevant non-target", "ti": "Irrelevant"})
