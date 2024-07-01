@@ -98,7 +98,7 @@ def decoding_pipeline(parameters_file, subjects, data_root, analysis_name="decod
         # 1. Create the model:
         # ============================
         clf = make_pipeline(StandardScaler(), svm.SVC(kernel='linear', class_weight='balanced'))
-        time_res = SlidingEstimator(clf, n_jobs=1, scoring='roc_auc', verbose="ERROR")
+        time_res = SlidingEstimator(clf, n_jobs=1, scoring=param["metric"], verbose="ERROR")
 
         # Loop through each task conditions:
         for tsk in task_conditions.keys():
