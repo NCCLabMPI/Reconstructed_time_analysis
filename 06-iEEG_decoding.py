@@ -34,6 +34,8 @@ def decoding_pipeline(parameters_file, subjects, data_root, analysis_name="decod
         description="Implements analysis of EDFs for experiment1")
     parser.add_argument('--config', type=str, default=None,
                         help="Config file for analysis parameters (file name + path)")
+    parser.add_argument('--roi', type=str, default=None,
+                        help="Name of the ROI on which to run the analysis")
     args = parser.parse_args()
 
     if task_conditions is None:
@@ -48,22 +50,25 @@ def decoding_pipeline(parameters_file, subjects, data_root, analysis_name="decod
     roi_results = {}
     times = []
 
-    if param["rois"] == "all":
+    if len(args.roi) == 0:
         labels = mne.read_labels_from_annot("fsaverage", parc='aparc.a2009s', hemi='both', surf_name='pial',
                                             subjects_dir=ev.fs_directory, sort=True)
         roi_names = list(set(lbl.name.replace("-lh", "").replace("-rh", "")
                              for lbl in labels if "unknown" not in lbl.name))
-        rois_list = [["ctx_lh_" + roi, "ctx_rh_" + roi] for roi in roi_names]
+    elif isinstance(args.roi, str):
+        roi_names = [args.roi]
     else:
-        rois_list = param["rois"]
+        raise Exception("The ROI must be a single string!")
 
-    for ii, roi in enumerate(rois_list):
-        roi_name = roi[0].replace("ctx_lh_", "")
+    for ii, roi in enumerate(roi_names):
         print("=========================================")
         print("ROI")
-        print(roi_name)
+        print(roi)
         subjects_epochs = {}
-        roi_results[roi_name] = {}
+        roi_results[roi] = {}
+
+        # Convert to volumetric labels:
+        vol_roi = [["ctx_lh_" + roi, "ctx_rh_" + roi] for roi in roi_names]
 
         for sub in subjects:
             epochs_file = Path(data_root, "derivatives", "preprocessing", f"sub-{sub}", f"ses-{param["session"]}",
@@ -78,10 +83,10 @@ def decoding_pipeline(parameters_file, subjects, data_root, analysis_name="decod
             epochs.crop(tmin=param["crop"][0], tmax=param["crop"][1])
 
             # Get the channels within this ROI:
-            picks = get_roi_channels(data_root, sub, param["session"], param["atlas"], roi)
+            picks = get_roi_channels(data_root, sub, param["session"], param["atlas"], vol_roi)
             # Skip if no channels in that ROI for this subject
             if not picks:
-                print(f"sub-{sub} has no electrodes in {roi_name}")
+                print(f"sub-{sub} has no electrodes in {roi}")
                 continue
             # Append to the rest:
             subjects_epochs[sub] = epochs.pick(picks)
@@ -134,7 +139,7 @@ def decoding_pipeline(parameters_file, subjects, data_root, analysis_name="decod
             scores_shuffle = np.mean(np.stack(scores_shuffle, axis=2), axis=-1)
 
             # Package the results:
-            roi_results[roi_name].update({
+            roi_results[roi].update({
                 f"scores_{tsk}": scores,
                 f"scores_shuffle_{tsk}": scores_shuffle,
                 "n_channels": n_channels,
@@ -142,8 +147,8 @@ def decoding_pipeline(parameters_file, subjects, data_root, analysis_name="decod
             })
 
         # Save results to file:
-        with open(Path(save_dir, f'results-{roi_name}.pkl'), 'wb') as f:
-            pickle.dump(roi_results[roi_name], f)
+        with open(Path(save_dir, f'results-{roi}.pkl'), 'wb') as f:
+            pickle.dump(roi_results[roi], f)
 
     # Save results to file:
     with open(Path(save_dir, 'results-all_roi.pkl'), 'wb') as f:

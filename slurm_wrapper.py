@@ -1,6 +1,5 @@
 import os
 import subprocess
-from pathlib import Path
 
 
 def decoding_batch(configs):
@@ -11,7 +10,8 @@ def decoding_batch(configs):
     # Launching a job for each:
     for config in configs:
         # Run the rsa analysis script using the customized config file
-        run_command = f"sbatch SLURM_decoding.sh --config={config}"
+        run_command = f'sbatch SLURM_decoding.sh --config="{config}"'
+        print(run_command)
         subprocess.Popen(run_command, shell=True)
 
 
@@ -22,5 +22,9 @@ if __name__ == "__main__":
          "./decoding_pseudotrials.json",
          "./decoding_pseudotrials_5ms.json",
          "./decoding_no_pseudo.json",
-         "./decoding_no_pseudo_5ms.json"
+         "./decoding_no_pseudo_5ms.json",
+         "./decoding_pseudotrials_acc.json",
+         "./decoding_pseudotrials_5ms_acc.json",
+         "./decoding_no_pseudo_acc.json",
+         "./decoding_no_pseudo_5ms_acc.json"
     ])
