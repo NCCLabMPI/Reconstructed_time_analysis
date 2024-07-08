@@ -68,7 +68,8 @@ def decoding_pipeline(parameters_file, subjects, data_root, analysis_name="decod
         roi_results[roi] = {}
 
         # Convert to volumetric labels:
-        vol_roi = [["ctx_lh_" + roi, "ctx_rh_" + roi] for roi in roi_names]
+        vol_roi = ["ctx_lh_" + roi, "ctx_rh_" + roi]
+        print(vol_roi)
 
         for sub in subjects:
             epochs_file = Path(data_root, "derivatives", "preprocessing", f"sub-{sub}", f"ses-{param["session"]}",
@@ -160,7 +161,7 @@ if __name__ == "__main__":
         r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis"
         r"\06-iEEG_decoding_parameters_all-dur.json"
     )
-    bids_root = r"C:\Users\alexander.lepauvre\Documents\GitHub\iEEG-data-release\bids-curate"
+    bids_root = "/hpc/users/alexander.lepauvre/ReconstructedTime/bids-curate"
     decoding_pipeline(parameters, ev.subjects_lists_ecog["dur"], bids_root,
                       analysis_name="decoding",
                       task_conditions={"tr": "Relevant non-target", "ti": "Irrelevant"})
