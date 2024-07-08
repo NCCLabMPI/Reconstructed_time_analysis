@@ -1,7 +1,7 @@
 
-bids_root = r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\bids"
-raw_root = r"P:\2023-0357-ReconTime\03_data\raw_data"
-fs_directory = r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\bids\derivatives\fs"
+bids_root = "/hpc/users/alexander.lepauvre/ReconstructedTime/bids-curate"
+# raw_root = "P:\2023-0357-ReconTime\03_data\raw_data"
+fs_directory = "/hpc/users/alexander.lepauvre/ReconstructedTime/bids-curate/derivatives/fs"
 colors = {
     "task_relevance": {
         "non-target": [104/255, 142/255, 38/255],
@@ -103,9 +103,8 @@ subjects_lists_et = {
 
 subjects_lists_ecog = {
     "dur": [
-         "CE103", "CE106", "CE107", "CE108", "CE109", "CE110", "CE112", "CE113", "CE115", "CE119", "CE120", "CE121",
+         "CE103", "CE106", "CE107", "CE108", "CE109", "CE110", "CE112", "CE113", "CE115", "CE119", "CE120",
          "CF102", "CF104", "CF105", "CF106", "CF107", "CF109", "CF110", "CF112", "CF113", "CF116", "CF117",
-         "CF119", "CF120", "CF121", "CF122", "CF124", "CF125", "CF126", "CG101", "CG103", "CG104",
-         "CG105", "CG106"
+         "CF119", "CF120", "CF121", "CF122", "CG101", "CG103", "CG104",
      ]
 }
