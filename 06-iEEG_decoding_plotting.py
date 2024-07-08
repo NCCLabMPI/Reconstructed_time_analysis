@@ -10,7 +10,7 @@ import environment_variables as ev
 from mne.stats import bootstrap_confidence_interval
 from mne.stats.cluster_level import _pval_from_histogram
 import pickle
-from helper_function.helper_general import extract_first_bout
+from helper_function.helper_general import extract_first_bout, cluster_test
 from helper_function.helper_plotter import plot_decoding_results, plot_rois
 import pandas as pd
 
@@ -32,12 +32,13 @@ plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 views = {'side': {"azimuth": 180, "elevation": 90}, 'front': {"azimuth": 130, "elevation": 90},
          "ventral": {"azimuth": 90, "elevation": 180}}
 
-subfolders = ["decoding_no_pseudo", "decoding_no_pseudo_5ms", "decoding_no_pseudo_5ms_acc", "decoding_no_pseudo_acc",
-              "decoding_pseudotrials", "decoding_pseudotrials_5ms", "decoding_pseudotrials_5ms_acc",
+subfolders = ["decoding_no_pseudo", "decoding_no_pseudo_5ms", "decoding_no_pseudo_5ms_acc",
+              "decoding_no_pseudo_acc", "decoding_pseudotrials", "decoding_pseudotrials_5ms_acc",
               "decoding_pseudotrials_acc"]
+
 for fl in subfolders:
     # Directory of the results:
-    save_dir = Path(ev.bids_root, "derivatives", "decoding", "Dur", fl)
+    save_dir = Path(ev.bids_root, "derivatives", "decoding_no_uw", "Dur", fl)
 
     # Prepare a dict for the results of each ROI:
     roi_results = {}
@@ -58,6 +59,19 @@ for fl in subfolders:
         diff_null = res["scores_shuffle_tr"] - res["scores_shuffle_ti"]
 
         # Compute pvalues of the difference:
+        x_zscored, h0_zscore, clusters, cluster_pv, p_values, h0 = cluster_test(decoding_diff, diff_null,
+                                                                                z_threshold=1.5,
+                                                                                do_zscore=True)
+        if any(p_values < 0.05):
+            msk = np.array(p_values < 0.05, dtype=int)
+            onset = res["times"][np.where(np.diff(msk) == 1)[0]]
+            offset = res["times"][np.where(np.diff(msk) == -1)[0][0]]
+            duration = offset - onset
+        else:
+            onset = None
+            offset = None
+            duration = 0
+
         pvals = _pval_from_histogram(decoding_diff, diff_null, 1)
 
         # Extract the bout of significance:
@@ -70,10 +84,10 @@ for fl in subfolders:
 
         #  Plot the time series:
         fig, ax = plt.subplots(figsize=[4, 3])
-        plot_decoding_results(res['times'], res["scores_tr"], ci=0.95, smooth_ms=None,
+        plot_decoding_results(res['times'], res["scores_tr"], ci=0.95, smooth_ms=20,
                               color=ev.colors["task_relevance"]["non-target"], ax=ax,
                               label="Relevant", ylim=[0.35, 1.0], onset=onset, offset=offset)
-        plot_decoding_results(res['times'], res["scores_ti"], ci=0.95, smooth_ms=None,
+        plot_decoding_results(res['times'], res["scores_ti"], ci=0.95, smooth_ms=20,
                               color=ev.colors["task_relevance"]["irrelevant"], ax=ax,
                               label="Irrelevant", ylim=[0.35, 1.0], onset=None, offset=None)
         ax.axhline(0.05, res['times'][0], res['times'][-1])
