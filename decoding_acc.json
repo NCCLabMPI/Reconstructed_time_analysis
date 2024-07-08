@@ -8,6 +8,7 @@
   "crop": [-0.1, 2.0],
   "conditions": ["stimulus onset/face", "stimulus onset/object"],
   "labels_col": "category",
+  "metric": "roc_auc",
   "min_ntrials": 80,
   "pseudotrials": null,
   "n_iter": 3,
