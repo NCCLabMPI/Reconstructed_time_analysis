@@ -2,7 +2,7 @@
 #SBATCH --partition=xnat
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=32
-#SBATCH --mem-per-cpu=20000
+#SBATCH --mem-per-cpu=10000
 #SBATCH --mail-type=BEGIN,END
 #SBATCH --mail-user=alex.lepauvre@ae.mpg.de
 #SBATCH --time 48:00:00

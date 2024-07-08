@@ -26,12 +26,6 @@ if __name__ == "__main__":
     # Getting the current dir
     pwd = os.getcwd()
     decoding_batch([
-         "./decoding_pseudotrials.json",
-         "./decoding_pseudotrials_5ms.json",
-         "./decoding_no_pseudo.json",
-         "./decoding_no_pseudo_5ms.json",
-         "./decoding_pseudotrials_acc.json",
-         "./decoding_pseudotrials_5ms_acc.json",
-         "./decoding_no_pseudo_acc.json",
-         "./decoding_no_pseudo_5ms_acc.json"
+         "./decoding_acc.json",
+         "./decoding_acc.json"
     ])
