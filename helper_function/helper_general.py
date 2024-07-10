@@ -87,7 +87,7 @@ def decoding_shuffle(estim_fit, data, labels):
     return estim_fit.score(X=data, y=labels_shu)
 
 
-def decoding(estimator, data, labels, n_pseudotrials=5, kfolds=5, n_jobs=1, n_perm=1000, verbose=False):
+def decoding(estimator, data, labels, n_pseudotrials=5, kfolds=5, verbose=False, label_shuffle=False):
     """
     This function performs decoding using cross-validation and computes the null distribution using label shuffling.
 
@@ -97,8 +97,8 @@ def decoding(estimator, data, labels, n_pseudotrials=5, kfolds=5, n_jobs=1, n_pe
     :param n_pseudotrials: (int) Number of pseudotrials to be created. Default is 5.
     :param kfolds: (int) Number of folds for cross-validation. Default is 5.
     :param n_jobs: (int) Number of parallel jobs to run. Default is 1.
-    :param n_perm: (int) Number of permutations for generating the null distribution. Default is 1000.
     :param verbose: (bool) If True, prints additional information. Default is False.
+    :param label_shuffle: (bool) shuffle the labels to create a null distribution
 
     :return: scores (np.array) The scores of the estimator for each fold.
              scores_shuffle (np.array) The scores of the estimator for each permutation with shuffled labels.
@@ -113,10 +113,9 @@ def decoding(estimator, data, labels, n_pseudotrials=5, kfolds=5, n_jobs=1, n_pe
         print(f"    N channels = {data.shape[1]}")
         print(f"    N time points = {data.shape[2]}")
         print(f"    N Trials = {data.shape[0]}")
-    # Handle inputs:
-    if not (n_perm/kfolds).is_integer():
-        print('WARNING: The number of permutation you have requested to generate the null distribution is not '
-              'divisible by the number of folds!')
+    # Shuffle the labels:
+    if label_shuffle:
+        labels = labels[np.random.choice(labels.shape[0], labels.shape[0], replace=False)]
 
     # Creating cross val iterator:
     skf = StratifiedKFold(n_splits=kfolds)
@@ -124,7 +123,6 @@ def decoding(estimator, data, labels, n_pseudotrials=5, kfolds=5, n_jobs=1, n_pe
 
     # Preallocate the results:
     scores = []
-    scores_shuffle = []
 
     # Loop through each fold:
     for i, (train_index, test_index) in enumerate(skf.split(data, labels)):
@@ -133,14 +131,8 @@ def decoding(estimator, data, labels, n_pseudotrials=5, kfolds=5, n_jobs=1, n_pe
                       y=labels[train_index])
         # Test model:
         scores.append(estimator.score(X=data[test_index], y=labels[test_index]))
-        # Shuffle the labels:
-        scores_shuffle.extend(Parallel(n_jobs=n_jobs)(delayed(decoding_shuffle)(estimator,
-                                                                                data[test_index],
-                                                                                labels[test_index],
-                                                                                ) for i in
-                                                      tqdm(range(int(n_perm/kfolds)))))
 
-    return np.array(scores), np.array(scores_shuffle)
+    return np.array(scores)
 
 
 def get_cmap_rgb_values(values, cmap=None, center=None):

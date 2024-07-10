@@ -3,6 +3,8 @@ import json
 import pickle
 import mne
 import time
+from joblib import Parallel, delayed
+from tqdm import tqdm
 from pathlib import Path
 import numpy as np
 import argparse
@@ -120,21 +122,24 @@ def decoding_pipeline(parameters_file, subjects, data_root, analysis_name="decod
             # 4. Apply decoding (pseudotrials happen inside)
             # ============================
             scores = []
-            scores_shuffle = []
             for i in range(param["n_iter"]):
                 # Repeat the decoding sev
-                start_time = time.time()  # Record the start time
-                scr, scr_shuffle = decoding(time_res, data, labels,
-                                            n_pseudotrials=param["pseudotrials"],
-                                            kfolds=param["kfold"],
-                                            n_jobs=param["n_jobs"],
-                                            n_perm=param["n_perm"],
-                                            verbose=True)
+                scr = decoding(time_res, data, labels,
+                               n_pseudotrials=param["pseudotrials"],
+                               kfolds=param["kfold"],
+                               verbose=True,
+                               label_shuffle=False)
                 scores.append(scr)
-                scores_shuffle.append(scr_shuffle)
-                end_time = time.time()  # Record the end time
-                iteration_time = end_time - start_time  # Calculate the elapsed time
-                print(f"Iteration {i + 1} took {iteration_time:.2f} seconds")  # Print the time taken
+            # Compute the null distribution:
+            scores_shuffle.extend(Parallel(n_jobs=param["n_jobs"])(delayed(decoding)(time_res,
+                                                                        data,
+                                                                        labels,
+                                                                        n_pseudotrials=param["pseudotrials"],
+                                                                        kfolds=param["kfold"],
+                                                                        verbose=True,
+                                                                        label_shuffle=True
+                                                                        ) for i in
+                                                tqdm(range(int(param["n_perm"])))))
             # Average across iterations:
             scores = np.mean(np.stack(scores, axis=2), axis=-1)
             scores_shuffle = np.mean(np.stack(scores_shuffle, axis=2), axis=-1)
