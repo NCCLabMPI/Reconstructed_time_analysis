@@ -131,7 +131,7 @@ def decoding_pipeline(parameters_file, subjects, data_root, analysis_name="decod
                                label_shuffle=False)
                 scores.append(scr)
             # Compute the null distribution:
-            scores_shuffle.extend(Parallel(n_jobs=param["n_jobs"])(delayed(decoding)(time_res,
+            scores_shuffle = Parallel(n_jobs=param["n_jobs"])(delayed(decoding)(time_res,
                                                                         data,
                                                                         labels,
                                                                         n_pseudotrials=param["pseudotrials"],
@@ -139,7 +139,7 @@ def decoding_pipeline(parameters_file, subjects, data_root, analysis_name="decod
                                                                         verbose=True,
                                                                         label_shuffle=True
                                                                         ) for i in
-                                                tqdm(range(int(param["n_perm"])))))
+                                                tqdm(range(int(param["n_perm"]))))
             # Average across iterations:
             scores = np.mean(np.stack(scores, axis=2), axis=-1)
             scores_shuffle = np.mean(np.stack(scores_shuffle, axis=2), axis=-1)
