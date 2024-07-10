@@ -26,6 +26,6 @@ if __name__ == "__main__":
     # Getting the current dir
     pwd = os.getcwd()
     decoding_batch([
-         "./decoding_acc.json",
+         "./decoding_auc.json",
          "./decoding_acc.json"
     ])
