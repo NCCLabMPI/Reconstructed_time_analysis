@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --partition=xnat
+#SBATCH --partition=octopus
 #SBATCH --nodes=1
-#SBATCH --cpus-per-task=32
-#SBATCH --mem-per-cpu=10000
+#SBATCH --cpus-per-task=1
+#SBATCH --mem-per-cpu=20000
 #SBATCH --mail-type=BEGIN,END
 #SBATCH --mail-user=alex.lepauvre@ae.mpg.de
-#SBATCH --time 48:00:00
+#SBATCH --time 10:00:00
 #SBATCH --output=./slurm-%A_%a.out
 #SBATCH --job-name=MVPA
 
@@ -14,9 +14,9 @@ roi=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --config=*)
-      config="${1#*=}"
+      config="${1#*=}";;
     --roi=*)
-      roi="${1#*=}"
+      roi="${1#*=}";;
   esac
   shift
   echo ${config}
