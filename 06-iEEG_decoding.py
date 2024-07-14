@@ -167,6 +167,6 @@ if __name__ == "__main__":
         r"\06-iEEG_decoding_parameters_all-dur.json"
     )
     bids_root = "/hpc/users/alexander.lepauvre/ReconstructedTime/bids-curate"
-    decoding_pipeline(parameters, ['CF102', 'CF104', 'CF106'], bids_root,
+    decoding_pipeline(parameters, ev.subjects_lists_ecog["dur"], bids_root,
                       analysis_name="decoding",
                       task_conditions={"tr": "Relevant non-target", "ti": "Irrelevant"})
