@@ -132,17 +132,17 @@ def decoding_pipeline(parameters_file, subjects, data_root, analysis_name="decod
                 scores.append(scr)
             # Compute the null distribution:
             scores_shuffle = Parallel(n_jobs=param["n_jobs"])(delayed(decoding)(time_res,
-                                                                        data,
-                                                                        labels,
-                                                                        n_pseudotrials=param["pseudotrials"],
-                                                                        kfolds=param["kfold"],
-                                                                        verbose=True,
-                                                                        label_shuffle=True
-                                                                        ) for i in
-                                                tqdm(range(int(param["n_perm"]))))
+                                                                                data,
+                                                                                labels,
+                                                                                n_pseudotrials=param["pseudotrials"],
+                                                                                kfolds=param["kfold"],
+                                                                                verbose=False,
+                                                                                label_shuffle=True
+                                                                                ) for i in
+                                                              tqdm(range(int(param["n_perm"]))))
             # Average across iterations:
             scores = np.mean(np.stack(scores, axis=2), axis=-1)
-            scores_shuffle = np.mean(np.stack(scores_shuffle, axis=2), axis=-1)
+            scores_shuffle = np.mean(np.stack(scores_shuffle, axis=0), axis=1)
 
             # Package the results:
             roi_results[roi].update({
@@ -167,6 +167,6 @@ if __name__ == "__main__":
         r"\06-iEEG_decoding_parameters_all-dur.json"
     )
     bids_root = "/hpc/users/alexander.lepauvre/ReconstructedTime/bids-curate"
-    decoding_pipeline(parameters, ev.subjects_lists_ecog["dur"], bids_root,
+    decoding_pipeline(parameters, ['CF102', 'CF104', 'CF106'], bids_root,
                       analysis_name="decoding",
                       task_conditions={"tr": "Relevant non-target", "ti": "Irrelevant"})
