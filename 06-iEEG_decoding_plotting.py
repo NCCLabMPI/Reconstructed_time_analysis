@@ -5,9 +5,9 @@ import json
 import numpy as np
 from pathlib import Path
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 import matplotlib as mpl
 import environment_variables as ev
-from mne.stats import bootstrap_confidence_interval
 from mne.stats.cluster_level import _pval_from_histogram
 import pickle
 from helper_function.helper_general import extract_first_bout, cluster_test
@@ -32,13 +32,11 @@ plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 views = {'side': {"azimuth": 180, "elevation": 90}, 'front': {"azimuth": 130, "elevation": 90},
          "ventral": {"azimuth": 90, "elevation": 180}}
 
-subfolders = ["decoding_no_pseudo", "decoding_no_pseudo_5ms", "decoding_no_pseudo_5ms_acc",
-              "decoding_no_pseudo_acc", "decoding_pseudotrials", "decoding_pseudotrials_5ms_acc",
-              "decoding_pseudotrials_acc"]
+subfolders = ["decoding_auc", "decoding_acc"]
 
 for fl in subfolders:
     # Directory of the results:
-    save_dir = Path(ev.bids_root, "derivatives", "decoding_no_uw", "Dur", fl)
+    save_dir = Path(ev.bids_root, "derivatives", "decoding_10ms", "Dur", fl)
 
     # Prepare a dict for the results of each ROI:
     roi_results = {}
@@ -62,9 +60,9 @@ for fl in subfolders:
         x_zscored, h0_zscore, clusters, cluster_pv, p_values, h0 = cluster_test(decoding_diff, diff_null,
                                                                                 z_threshold=1.5,
                                                                                 do_zscore=True)
-        if any(p_values < 0.05):
-            msk = np.array(p_values < 0.05, dtype=int)
-            onset = res["times"][np.where(np.diff(msk) == 1)[0]]
+        if any(p_values < 0.01):
+            msk = np.array(p_values < 0.01, dtype=int)
+            onset = res["times"][np.where(np.diff(msk) == 1)[0][0]]
             offset = res["times"][np.where(np.diff(msk) == -1)[0][0]]
             duration = offset - onset
         else:
@@ -72,22 +70,19 @@ for fl in subfolders:
             offset = None
             duration = 0
 
-        pvals = _pval_from_histogram(decoding_diff, diff_null, 1)
-
-        # Extract the bout of significance:
-        onset, offset = extract_first_bout(res['times'], pvals, 0.05, 0.04)
-
-        if onset is not None:
-            duration = offset - onset
-        else:
-            duration = 0
+        # pvals = _pval_from_histogram(decoding_diff, diff_null, 1)
+        # onset, offset = extract_first_bout(res['times'], pvals, 0.05, 0.04)
+        # if onset is not None:
+        #     duration = offset - onset
+        # else:
+        #     duration = None
 
         #  Plot the time series:
         fig, ax = plt.subplots(figsize=[4, 3])
-        plot_decoding_results(res['times'], res["scores_tr"], ci=0.95, smooth_ms=20,
+        plot_decoding_results(res['times'], res["scores_tr"], ci=0.95, smooth_ms=50,
                               color=ev.colors["task_relevance"]["non-target"], ax=ax,
                               label="Relevant", ylim=[0.35, 1.0], onset=onset, offset=offset)
-        plot_decoding_results(res['times'], res["scores_ti"], ci=0.95, smooth_ms=20,
+        plot_decoding_results(res['times'], res["scores_ti"], ci=0.95, smooth_ms=50,
                               color=ev.colors["task_relevance"]["irrelevant"], ax=ax,
                               label="Irrelevant", ylim=[0.35, 1.0], onset=None, offset=None)
         ax.axhline(0.05, res['times'][0], res['times'][-1])
@@ -115,12 +110,140 @@ for fl in subfolders:
                     transparent=True, dpi=300)
         plt.close()
 
+        # Plot the null distribution for reference:
+        # Prepare a grid for the heatmap
+        num_bins = 200
+        hist, xedges, yedges = np.histogram2d(diff_null.flatten(),
+                                              np.repeat(np.arange(diff_null.shape[1]), diff_null.shape[0]),
+                                              bins=[num_bins, len(res['times'])],
+                                              range=[[-1, 1], [0, len(res['times'])]])  #
+        # Create the meshgrid for the surface plot
+        xpos, ypos = np.meshgrid(xedges[:-1] + (xedges[1] - xedges[0]) / 2,
+                                 yedges[:-1] + (yedges[1] - yedges[0]) / 2, indexing="ij")
+        # Create a 3D figure
+        fig = plt.figure(figsize=(12, 8))
+        ax = fig.add_subplot(111, projection='3d')
+
+        # Plot the surface
+        ax.plot_surface(xpos, ypos, hist, cmap='viridis')
+        ax.set_xlabel('Decoding Accuracy')
+        ax.set_ylabel('Time Points')
+        ax.set_zlabel('Density')
+        ax.set_title('Null Distribution Over Time')
+        fig.savefig(Path(fig_dir, f"{roi_name}_null_dist.png"),
+                    transparent=True, dpi=300)
+        plt.close()
+
+        # Plot the significance of the decoding for the task relevant and irrelevant separately:
+
+        # ======================================================================================
+        # Task relevant
+        x_zscored, h0_zscore, clusters, cluster_pv, p_values, h0 = cluster_test(np.mean(res["scores_tr"], axis=0),
+                                                                                res["scores_shuffle_tr"],
+                                                                                z_threshold=1.96,
+                                                                                do_zscore=True)
+        if any(p_values < 0.01):
+            msk = np.array(p_values < 0.01, dtype=int)
+            onset_tr = res["times"][np.where(np.diff(msk) == 1)[0][0]]
+            offset_tr = res["times"][np.where(np.diff(msk) == -1)[0][0]]
+            duration_tr = offset_tr - onset_tr
+            h0_tr = False
+            max_tr = np.max(np.mean(res["scores_tr"], axis=0))
+        else:
+            onset_tr = None
+            offset_tr = None
+            duration_tr = 0
+            h0_tr = True
+            max_tr = 0
+
+        #  Plot the time series:
+        fig, ax = plt.subplots(figsize=[4, 3])
+        plot_decoding_results(res['times'], res["scores_tr"], ci=0.95, smooth_ms=50,
+                              color=ev.colors["task_relevance"]["non-target"], ax=ax,
+                              label="Relevant", ylim=[0.35, 1.0], onset=onset_tr, offset=offset_tr)
+        ax.axhline(0.05, res['times'][0], res['times'][-1])
+        ax.set_xlim([res['times'][0], res['times'][-1]])
+        ax.text(0.15, 0.9, "N={}".format(res["n_channels"]),
+                horizontalalignment='center',
+                verticalalignment='center',
+                transform=ax.transAxes)
+        ax.set_xlabel("Time (sec.)")
+        ax.set_ylabel("AUC")
+        ax.spines[['right', 'top']].set_visible(False)
+        plt.legend(frameon=False)
+        plt.tight_layout()
+        fig_dir = Path(save_dir, "figures", "per_task")
+        if not os.path.isdir(fig_dir):
+            os.makedirs(fig_dir)
+        fig.savefig(Path(fig_dir, f"{roi_name}_decoding_tr.svg"),
+                    transparent=True, dpi=300)
+        fig.savefig(Path(fig_dir, f"{roi_name}_decoding_tr.png"),
+                    transparent=True, dpi=300)
+        plt.close()
+
+        # ======================================================================================
+        # Task irrelevant
+        # Compute pvalues:
+        x_zscored, h0_zscore, clusters, cluster_pv, p_values, h0 = cluster_test(np.mean(res["scores_ti"], axis=0),
+                                                                                res["scores_shuffle_ti"],
+                                                                                z_threshold=1.96,
+                                                                                do_zscore=True)
+        if any(p_values < 0.01):
+            msk = np.array(p_values < 0.01, dtype=int)
+            onset_ti = res["times"][np.where(np.diff(msk) == 1)[0][0]]
+            offset_ti = res["times"][np.where(np.diff(msk) == -1)[0][0]]
+            duration_ti = offset_ti - onset_ti
+            h0_ti = False
+            max_ti = np.max(np.mean(res["scores_tr"], axis=0))
+        else:
+            onset_ti = None
+            offset_ti = None
+            duration_ti = 0
+            h0_ti = True
+            max_ti = 0
+
+        #  Plot the time series:
+        fig, ax = plt.subplots(figsize=[4, 3])
+        plot_decoding_results(res['times'], res["scores_ti"], ci=0.95, smooth_ms=50,
+                              color=ev.colors["task_relevance"]["irrelevant"], ax=ax,
+                              label="Irrelevant", ylim=[0.35, 1.0], onset=onset_ti, offset=offset_ti)
+        ax.axhline(0.05, res['times'][0], res['times'][-1])
+        ax.set_xlim([res['times'][0], res['times'][-1]])
+        ax.text(0.15, 0.9, "N={}".format(res["n_channels"]),
+                horizontalalignment='center',
+                verticalalignment='center',
+                transform=ax.transAxes)
+        ax.set_xlabel("Time (sec.)")
+        ax.set_ylabel("AUC")
+        ax.spines[['right', 'top']].set_visible(False)
+        plt.legend(frameon=False)
+        plt.tight_layout()
+        fig_dir = Path(save_dir, "figures", "per_task")
+        if not os.path.isdir(fig_dir):
+            os.makedirs(fig_dir)
+        fig.savefig(Path(fig_dir, f"{roi_name}_decoding_ti.svg"),
+                    transparent=True, dpi=300)
+        fig.savefig(Path(fig_dir, f"{roi_name}_decoding_ti.png"),
+                    transparent=True, dpi=300)
+        plt.close()
+
         # Store the results here:
-        roi_results[roi_name] = {"onset": onset, "offset": offset, "duration": duration}
+        roi_results[roi_name] = {
+            "onset": onset,
+            "offset": offset,
+            "duration": duration,
+            "h0_tr": h0_ti,
+            "max_tr": max_ti,
+            "h0_ti": h0_ti,
+            "max_ti": max_ti,
+            "n_channels": res["n_channels"]
+        }
 
     # Extract the significant ROIs:
     sig_rois = {roi_name: roi_results[roi_name] for roi_name in roi_results.keys()
                 if roi_results[roi_name]["onset"] is not None}
+    if not sig_rois:
+        continue
 
     # Plot the onset of each roi on brain:
     rois_onset = {roi_name: sig_rois[roi_name]["onset"] for roi_name in sig_rois.keys()}
@@ -147,10 +270,78 @@ for fl in subfolders:
     brain.close()
     # Plot a colorbar:
     norm = mpl.colors.Normalize(vmin=min(rois_duration.values()),
-                                vmax=min(rois_duration.values()))
+                                vmax=max(rois_duration.values()))
     fig, ax = plt.subplots(figsize=(6, 1))
     fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap='Reds'),
                  cax=ax, orientation='horizontal', label='Duration (s)')
     fig.savefig(Path(save_dir, "colorbar.svg"),
                 transparent=False, dpi=300)
+    plt.close()
+
+    # ===========================================================================================
+    # Plot task relevant on brain:
+    # Extract the significant ROIs:
+    tr_rois = {roi_name: roi_results[roi_name] for roi_name in roi_results.keys()
+               if roi_results[roi_name]["h0_tr"] is False}
+    if not sig_rois:
+        continue
+
+    # Plot the onset of each roi on brain:
+    tr_maxs = {roi_name: tr_rois[roi_name]["max_tr"] for roi_name in tr_rois.keys()}
+    brain = plot_rois(ev.fs_directory, "fsaverage", "aparc.a2009s", tr_maxs, cmap="Oranges")
+    for view in views:
+        brain.show_view(**views[view])
+        brain.save_image(Path(save_dir, "{}_{}.png".format("task_relevant", view)))
+    brain.close()
+    # Plot a colorbar:
+    norm = mpl.colors.Normalize(vmin=min(tr_maxs.values()),
+                                vmax=max(tr_maxs.values()))
+    fig, ax = plt.subplots(figsize=(1, 6))
+    fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap='Oranges'),
+                 cax=ax, orientation='vertical', label='Duration (s)')
+    fig.savefig(Path(save_dir, "colorbar_tr.svg"),
+                transparent=False, dpi=300)
+    plt.close()
+
+    # ===========================================================================================
+    # Plot task irrelevant on brain:
+    # Extract the significant ROIs:
+    ti_rois = {roi_name: roi_results[roi_name] for roi_name in roi_results.keys()
+               if roi_results[roi_name]["h0_ti"] is False}
+    if not sig_rois:
+        continue
+    # Plot the onset of each roi on brain:
+    ti_maxs = {roi_name: ti_rois[roi_name]["max_ti"] for roi_name in ti_rois.keys()}
+    brain = plot_rois(ev.fs_directory, "fsaverage", "aparc.a2009s", ti_maxs, cmap="Greens")
+    for view in views:
+        brain.show_view(**views[view])
+        brain.save_image(Path(save_dir, "{}_{}.png".format("task_irrelevant", view)))
+    brain.close()
+    # Plot a colorbar:
+    norm = mpl.colors.Normalize(vmin=min(ti_maxs.values()),
+                                vmax=max(ti_maxs.values()))
+    fig, ax = plt.subplots(figsize=(1, 6))
+    fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap='Greens'),
+                 cax=ax, orientation='vertical', label='Duration (s)')
+    fig.savefig(Path(save_dir, "colorbar_ti.svg"),
+                transparent=False, dpi=300)
+    plt.close()
+
+    # ===========================================================================================
+    # Plot coverage:
+    # Plot the onset of each roi on brain:
+    n_channels = {roi_name: roi_results[roi_name]["n_channels"] for roi_name in roi_results.keys()}
+    brain = plot_rois(ev.fs_directory, "fsaverage", "aparc.a2009s", n_channels, cmap="cividis")
+    for view in views:
+        brain.show_view(**views[view])
+        brain.save_image(Path(save_dir, "{}_{}.png".format("coverage", view)))
+    brain.close()
+    # Plot a colorbar:
+    norm = mpl.colors.Normalize(vmin=min(n_channels.values()),
+                                vmax=max(n_channels.values()))
+    fig, ax = plt.subplots(figsize=(1, 6))
+    fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap='cividis'),
+                 cax=ax, orientation='vertical', label='Duration (s)')
+    fig.savefig(Path(save_dir, "colorbar_coverage.svg"),
+                transparent=False, dpi=500)
     plt.close()

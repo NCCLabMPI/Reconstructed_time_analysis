@@ -459,7 +459,7 @@ def plot_rois(subjects_dir, subject, parc, roi_dict, cmap="jet"):
     # Create brain:
     Brain = mne.viz.get_brain_class()
     brain = Brain('fsaverage', hemi='lh', surf='inflated', background='white', subjects_dir=ev.fs_directory,
-                  size=(800, 600))
+                  size=(1600, 1200))
 
     # Loop through each label:
     for roi in roi_dict.keys():
