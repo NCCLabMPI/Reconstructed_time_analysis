@@ -419,14 +419,20 @@ def plot_decoding_results(times, data, ci=0.95, smooth_ms=50, color=None, ax=Non
     ax.set_xlim([times[0], times[-1]])
     if onset is not None:
         # Plot the statistical significance:
-        sig_time = np.arange(onset, offset, times[1] - times[0])
-        ax.fill_between(sig_time, ylim[0], ylim[1],
-                        color=[1, 0, 0], alpha=.4)
+        if isinstance(onset, np.ndarray):
+            for i in range(len(onset)):
+                sig_time = np.arange(onset[i], offset[i], times[1] - times[0])
+                ax.fill_between(sig_time, ylim[0], ylim[1],
+                                color=[1, 0, 0], alpha=.4)
+        else:
+            sig_time = np.arange(onset, offset, times[1] - times[0])
+            ax.fill_between(sig_time, ylim[0], ylim[1],
+                            color=[1, 0, 0], alpha=.4)
 
     return ax
 
 
-def plot_rois(subjects_dir, subject, parc, roi_dict, cmap="jet"):
+def plot_rois(subjects_dir, subject, parc, roi_colors, plot_borders=True):
     """
     This function plots regions of interest (ROIs) on a brain surface using MNE-Python.
 
@@ -438,7 +444,7 @@ def plot_rois(subjects_dir, subject, parc, roi_dict, cmap="jet"):
     :param parc: Name of the parcellation to use (e.g., 'aparc', 'aparc.a2009s').
     :param roi_dict: Dictionary where keys are ROI names and values are the corresponding intensity values.
     :param cmap: Name of the colormap to use for mapping the ROI values (default is 'jet').
-
+    :param plot_borders: Plot the borders of the ROIs:
     :return: A Brain object with the plotted ROIs.
 
     Example usage:
@@ -449,11 +455,6 @@ def plot_rois(subjects_dir, subject, parc, roi_dict, cmap="jet"):
     import mne
     import matplotlib.colors as mcolors
 
-    # Normalize the values
-    norm = mcolors.Normalize(vmin=min(roi_dict.values()), vmax=max(roi_dict.values()))
-    # Create the color bar:
-    cmap = plt.get_cmap(cmap)
-
     # Read the annotations
     annot = mne.read_labels_from_annot(subject, parc=parc, subjects_dir=subjects_dir)
     # Create brain:
@@ -462,11 +463,35 @@ def plot_rois(subjects_dir, subject, parc, roi_dict, cmap="jet"):
                   size=(1600, 1200))
 
     # Loop through each label:
-    for roi in roi_dict.keys():
+    for roi in roi_colors.keys():
         # Find the corresponding label:
         lbl = [l for l in annot if l.name == roi + "-lh"]
-        roi_color = cmap(norm(roi_dict[roi]))
-        brain.add_label(lbl[0], color=mcolors.to_rgb(roi_color), borders=False)
-        brain.add_label(lbl[0], color=[0, 0, 0], borders=True)
+        brain.add_label(lbl[0], color=roi_colors[roi], borders=False)
+        if plot_borders:
+            brain.add_label(lbl[0], color=[0, 0, 0], borders=True)
 
     return brain
+
+
+def get_color_mapping(val_dict, color_map='Reds', max_prctile=None, min_prctile=None):
+    """
+    Generates colors for each key pair values in a dictionary
+    :param val_dict:
+    :param color_map:
+    :param max_prctile:
+    :param min_prctile:
+    :return:
+    """
+    import matplotlib.colors as mcolors
+    # Normalize the values
+    min_val = min(val_dict.values())
+    max_val = max(val_dict.values())
+    if max_prctile is not None:
+        max_val = max_val - (max_val - min_val) * max_prctile
+    if min_prctile is not None:
+        min_val = min_val - (max_val - min_val) * min_prctile
+    norm = mcolors.Normalize(vmin=min_val, vmax=max_val)
+    # Create the color bar:
+    cmap = plt.get_cmap(color_map)
+    # Get the color of each ROI:
+    return {key: mcolors.to_rgb(cmap(norm(val_dict[key]))) for key in val_dict.keys()}
