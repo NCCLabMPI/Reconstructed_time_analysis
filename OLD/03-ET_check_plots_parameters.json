@@ -1,0 +1,30 @@
+{
+  "visit": "1",
+  "task": "prp",
+  "session": "1",
+  "data_type": "eyetrack",
+  "crop": [-0.2, 2.7],
+  "z_thresh": 2,
+  "eyes": ["left", "right"],
+  "exlude_beh": true,
+  "decim_freq": null,
+  "baseline_window": [null, 0.0],
+  "windows": {
+    "0-0.5": [0, 0.5],
+    "0.5-1.0": [0.5, 1.0],
+    "1.0-1.5": [1.0, 1.5],
+    "1.5-2.0": [1.5, 2.0],
+    "0.0-2.0": [0.0, 2.0],
+    "0.0-1.0": [0.0, 1.0]
+  },
+  "fixdist_thresh_deg": 3,
+  "stim_size_deg": 3,
+  "screen_res": [1920, 1080],
+  "screen_size_cm": [53.2, 29.8],
+  "screen_distance_cm": 70,
+  "picks": ["fixdist_left", "fixdist_right", "blink_left", "blink_right"],
+  "task_relevance": ["non-target", "irrelevant"],
+  "durations": ["0.5", "1", "1.5"],
+  "soas": ["0", "0.116", "0.232", "0.466"],
+  "locks": ["onset", "offset"]
+}
