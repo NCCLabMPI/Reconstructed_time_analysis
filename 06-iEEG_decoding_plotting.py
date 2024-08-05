@@ -1,17 +1,14 @@
-import mne
 import os
 from os import listdir
-import json
 import numpy as np
 from pathlib import Path
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 import matplotlib as mpl
 import environment_variables as ev
-from mne.stats.cluster_level import _pval_from_histogram
 import pickle
-from helper_function.helper_general import extract_first_bout, cluster_test
-from helper_function.helper_plotter import plot_decoding_results, plot_rois
+import matplotlib.colors as mcolors
+from helper_function.helper_general import cluster_test
+from helper_function.helper_plotter import plot_decoding_results, plot_rois, get_color_mapping
 import pandas as pd
 
 # Set the font size:
@@ -49,7 +46,20 @@ for fl in subfolders:
             res = pickle.load(fp)
         roi_name = file.split("results-")[1].split(".pkl")[0]
         if res["n_channels"] < 10:
+            # Store the results here:
+            roi_results[roi_name] = {
+                "onset": None,
+                "offset": None,
+                "duration": None,
+                "h0_tr": True,
+                "max_tr": 0,
+                "h0_ti": True,
+                "max_ti": 0,
+                "n_channels": res["n_channels"]
+            }
             continue
+        if roi_name == 'S_front_inf':
+            print('A')
         # Compute the difference between both tasks conditions:
         decoding_diff = np.mean(res["scores_tr"], axis=0) - np.mean(res["scores_ti"], axis=0)
 
@@ -62,7 +72,7 @@ for fl in subfolders:
                                                                                 do_zscore=True)
         if any(p_values < 0.01):
             msk = np.array(p_values < 0.01, dtype=int)
-            onset = res["times"][np.where(np.diff(msk) == 1)[0][0]]
+            onset = res["times"][np.where(np.diff(msk) == 1)[0][0] + 1]
             offset = res["times"][np.where(np.diff(msk) == -1)[0][0]]
             duration = offset - onset
         else:
@@ -79,10 +89,10 @@ for fl in subfolders:
 
         #  Plot the time series:
         fig, ax = plt.subplots(figsize=[4, 3])
-        plot_decoding_results(res['times'], res["scores_tr"], ci=0.95, smooth_ms=50,
+        plot_decoding_results(res['times'], res["scores_tr"], ci=0.95, smooth_ms=25,
                               color=ev.colors["task_relevance"]["non-target"], ax=ax,
                               label="Relevant", ylim=[0.35, 1.0], onset=onset, offset=offset)
-        plot_decoding_results(res['times'], res["scores_ti"], ci=0.95, smooth_ms=50,
+        plot_decoding_results(res['times'], res["scores_ti"], ci=0.95, smooth_ms=25,
                               color=ev.colors["task_relevance"]["irrelevant"], ax=ax,
                               label="Irrelevant", ylim=[0.35, 1.0], onset=None, offset=None)
         ax.axhline(0.05, res['times'][0], res['times'][-1])
@@ -140,12 +150,12 @@ for fl in subfolders:
         # Task relevant
         x_zscored, h0_zscore, clusters, cluster_pv, p_values, h0 = cluster_test(np.mean(res["scores_tr"], axis=0),
                                                                                 res["scores_shuffle_tr"],
-                                                                                z_threshold=1.96,
+                                                                                z_threshold=1.5,
                                                                                 do_zscore=True)
         if any(p_values < 0.01):
             msk = np.array(p_values < 0.01, dtype=int)
-            onset_tr = res["times"][np.where(np.diff(msk) == 1)[0][0]]
-            offset_tr = res["times"][np.where(np.diff(msk) == -1)[0][0]]
+            onset_tr = res["times"][np.where(np.diff(msk) == 1)[0] + 1]
+            offset_tr = res["times"][np.where(np.diff(msk) == -1)[0]]
             duration_tr = offset_tr - onset_tr
             h0_tr = False
             max_tr = np.max(np.mean(res["scores_tr"], axis=0))
@@ -158,7 +168,7 @@ for fl in subfolders:
 
         #  Plot the time series:
         fig, ax = plt.subplots(figsize=[4, 3])
-        plot_decoding_results(res['times'], res["scores_tr"], ci=0.95, smooth_ms=50,
+        plot_decoding_results(res['times'], res["scores_tr"], ci=0.95, smooth_ms=25,
                               color=ev.colors["task_relevance"]["non-target"], ax=ax,
                               label="Relevant", ylim=[0.35, 1.0], onset=onset_tr, offset=offset_tr)
         ax.axhline(0.05, res['times'][0], res['times'][-1])
@@ -186,12 +196,12 @@ for fl in subfolders:
         # Compute pvalues:
         x_zscored, h0_zscore, clusters, cluster_pv, p_values, h0 = cluster_test(np.mean(res["scores_ti"], axis=0),
                                                                                 res["scores_shuffle_ti"],
-                                                                                z_threshold=1.96,
+                                                                                z_threshold=1.5,
                                                                                 do_zscore=True)
         if any(p_values < 0.01):
             msk = np.array(p_values < 0.01, dtype=int)
-            onset_ti = res["times"][np.where(np.diff(msk) == 1)[0][0]]
-            offset_ti = res["times"][np.where(np.diff(msk) == -1)[0][0]]
+            onset_ti = res["times"][np.where(np.diff(msk) == 1)[0] + 1]
+            offset_ti = res["times"][np.where(np.diff(msk) == -1)[0]]
             duration_ti = offset_ti - onset_ti
             h0_ti = False
             max_ti = np.max(np.mean(res["scores_tr"], axis=0))
@@ -204,7 +214,7 @@ for fl in subfolders:
 
         #  Plot the time series:
         fig, ax = plt.subplots(figsize=[4, 3])
-        plot_decoding_results(res['times'], res["scores_ti"], ci=0.95, smooth_ms=50,
+        plot_decoding_results(res['times'], res["scores_ti"], ci=0.95, smooth_ms=25,
                               color=ev.colors["task_relevance"]["irrelevant"], ax=ax,
                               label="Irrelevant", ylim=[0.35, 1.0], onset=onset_ti, offset=offset_ti)
         ax.axhline(0.05, res['times'][0], res['times'][-1])
@@ -229,15 +239,18 @@ for fl in subfolders:
 
         # Store the results here:
         roi_results[roi_name] = {
-            "onset": onset,
-            "offset": offset,
-            "duration": duration,
-            "h0_tr": h0_ti,
-            "max_tr": max_ti,
+            "onset": onset[0] if isinstance(onset, np.ndarray) else onset,
+            "offset": offset[0] if isinstance(offset, np.ndarray) else offset,
+            "duration": duration[0] if isinstance(duration, np.ndarray) else duration,
+            "h0_tr": h0_tr,
+            "max_tr": max_tr,
             "h0_ti": h0_ti,
             "max_ti": max_ti,
             "n_channels": res["n_channels"]
         }
+
+    # Prepare a dictionary to plot the ROI with too few electrodes in a different colour:
+    sparse_roi_colors = {roi: [0, 0, 0] for roi in roi_results if roi_results[roi]['n_channels'] == 0}
 
     # Extract the significant ROIs:
     sig_rois = {roi_name: roi_results[roi_name] for roi_name in roi_results.keys()
@@ -247,7 +260,10 @@ for fl in subfolders:
 
     # Plot the onset of each roi on brain:
     rois_onset = {roi_name: sig_rois[roi_name]["onset"] for roi_name in sig_rois.keys()}
-    brain = plot_rois(ev.fs_directory, "fsaverage", "aparc.a2009s", rois_onset, cmap="Reds")
+    # Convert to RGB values:
+    rois_colors = get_color_mapping(rois_onset, color_map='Reds', min_prctile=0.2)
+    rois_colors.update(sparse_roi_colors)
+    brain = plot_rois(ev.fs_directory, "fsaverage", "aparc.a2009s", rois_colors)
     for view in views:
         brain.show_view(**views[view])
         brain.save_image(Path(save_dir, "{}_{}.png".format("onset", view)))
@@ -255,7 +271,9 @@ for fl in subfolders:
 
     # Plot the offset of each roi on brain:
     rois_offset = {roi_name: sig_rois[roi_name]["offset"] for roi_name in sig_rois.keys()}
-    brain = plot_rois(ev.fs_directory, "fsaverage", "aparc.a2009s", rois_offset, cmap="Reds")
+    rois_colors = get_color_mapping(rois_offset, color_map='Reds', min_prctile=0.2)
+    rois_colors.update(sparse_roi_colors)
+    brain = plot_rois(ev.fs_directory, "fsaverage", "aparc.a2009s", rois_colors)
     for view in views:
         brain.show_view(**views[view])
         brain.save_image(Path(save_dir, "{}_{}.png".format("offset", view)))
@@ -263,14 +281,18 @@ for fl in subfolders:
 
     # Plot the duration of each roi on brain:
     rois_duration = {roi_name: sig_rois[roi_name]["duration"] for roi_name in sig_rois.keys()}
-    brain = plot_rois(ev.fs_directory, "fsaverage", "aparc.a2009s", rois_duration, cmap="Reds")
+    rois_colors = get_color_mapping(rois_duration, color_map='Reds', min_prctile=0.2)
+    rois_colors.update(sparse_roi_colors)
+    brain = plot_rois(ev.fs_directory, "fsaverage", "aparc.a2009s", rois_colors)
     for view in views.keys():
         brain.show_view(**views[view])
         brain.save_image(Path(save_dir, "{}_{}.png".format("duration", view)))
     brain.close()
     # Plot a colorbar:
-    norm = mpl.colors.Normalize(vmin=min(rois_duration.values()),
-                                vmax=max(rois_duration.values()))
+    min_val = min(rois_duration.values())
+    max_val = max(rois_duration.values())
+    norm = mpl.colors.Normalize(vmin=min_val - (max_val - min_val) * 0.2,
+                                vmax=max_val)
     fig, ax = plt.subplots(figsize=(6, 1))
     fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap='Reds'),
                  cax=ax, orientation='horizontal', label='Duration (s)')
@@ -288,14 +310,18 @@ for fl in subfolders:
 
     # Plot the onset of each roi on brain:
     tr_maxs = {roi_name: tr_rois[roi_name]["max_tr"] for roi_name in tr_rois.keys()}
-    brain = plot_rois(ev.fs_directory, "fsaverage", "aparc.a2009s", tr_maxs, cmap="Oranges")
+    rois_colors = get_color_mapping(tr_maxs, color_map="Oranges", min_prctile=0.2)
+    rois_colors.update(sparse_roi_colors)
+    brain = plot_rois(ev.fs_directory, "fsaverage", "aparc.a2009s", rois_colors)
     for view in views:
         brain.show_view(**views[view])
         brain.save_image(Path(save_dir, "{}_{}.png".format("task_relevant", view)))
     brain.close()
     # Plot a colorbar:
-    norm = mpl.colors.Normalize(vmin=min(tr_maxs.values()),
-                                vmax=max(tr_maxs.values()))
+    min_val = min(tr_maxs.values())
+    max_val = max(tr_maxs.values())
+    norm = mpl.colors.Normalize(vmin=min_val - (max_val - min_val) * 0.2,
+                                vmax=max_val)
     fig, ax = plt.subplots(figsize=(1, 6))
     fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap='Oranges'),
                  cax=ax, orientation='vertical', label='Duration (s)')
@@ -312,36 +338,21 @@ for fl in subfolders:
         continue
     # Plot the onset of each roi on brain:
     ti_maxs = {roi_name: ti_rois[roi_name]["max_ti"] for roi_name in ti_rois.keys()}
-    brain = plot_rois(ev.fs_directory, "fsaverage", "aparc.a2009s", ti_maxs, cmap="Greens")
+    rois_colors = get_color_mapping(ti_maxs, color_map="Greens", min_prctile=0.2)
+    rois_colors.update(sparse_roi_colors)
+    brain = plot_rois(ev.fs_directory, "fsaverage", "aparc.a2009s", rois_colors)
     for view in views:
         brain.show_view(**views[view])
         brain.save_image(Path(save_dir, "{}_{}.png".format("task_irrelevant", view)))
     brain.close()
     # Plot a colorbar:
-    norm = mpl.colors.Normalize(vmin=min(ti_maxs.values()),
-                                vmax=max(ti_maxs.values()))
+    min_val = min(ti_maxs.values())
+    max_val = max(ti_maxs.values())
+    norm = mpl.colors.Normalize(vmin=min_val - (max_val - min_val) * 0.2,
+                                vmax=max_val)
     fig, ax = plt.subplots(figsize=(1, 6))
     fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap='Greens'),
                  cax=ax, orientation='vertical', label='Duration (s)')
     fig.savefig(Path(save_dir, "colorbar_ti.svg"),
                 transparent=False, dpi=300)
-    plt.close()
-
-    # ===========================================================================================
-    # Plot coverage:
-    # Plot the onset of each roi on brain:
-    n_channels = {roi_name: roi_results[roi_name]["n_channels"] for roi_name in roi_results.keys()}
-    brain = plot_rois(ev.fs_directory, "fsaverage", "aparc.a2009s", n_channels, cmap="cividis")
-    for view in views:
-        brain.show_view(**views[view])
-        brain.save_image(Path(save_dir, "{}_{}.png".format("coverage", view)))
-    brain.close()
-    # Plot a colorbar:
-    norm = mpl.colors.Normalize(vmin=min(n_channels.values()),
-                                vmax=max(n_channels.values()))
-    fig, ax = plt.subplots(figsize=(1, 6))
-    fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap='cividis'),
-                 cax=ax, orientation='vertical', label='Duration (s)')
-    fig.savefig(Path(save_dir, "colorbar_coverage.svg"),
-                transparent=False, dpi=500)
     plt.close()
