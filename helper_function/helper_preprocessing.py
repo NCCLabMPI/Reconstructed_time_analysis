@@ -11,6 +11,161 @@ from helper_function.helper_general import beh_exclusion
 
 show_checks = False
 
+DFT_SCREEN_DIST_MM = 800
+
+DFT_SCREEN_SIZE_MM = [345,  195]
+
+COG_TRIGGERS = {
+    "1": "face_01",
+    "2": "face_02",
+    "3": "face_03",
+    "4": "face_04",
+    "5": "face_05",
+    "6": "face_06",
+    "7": "face_07",
+    "8": "face_08",
+    "9": "face_09",
+    "10": "face_10",
+    "11": "face_11",
+    "12": "face_12",
+    "13": "face_13",
+    "14": "face_14",
+    "15": "face_15",
+    "16": "face_16",
+    "17": "face_17",
+    "18": "face_18",
+    "19": "face_19",
+    "20": "face_20",
+    "21": "object_01",
+    "22": "object_02",
+    "23": "object_03",
+    "24": "object_04",
+    "25": "object_05",
+    "26": "object_06",
+    "27": "object_07",
+    "28": "object_08",
+    "29": "object_09",
+    "30": "object_10",
+    "31": "object_11",
+    "32": "object_12",
+    "33": "object_13",
+    "34": "object_14",
+    "35": "object_15",
+    "36": "object_16",
+    "37": "object_17",
+    "38": "object_18",
+    "39": "object_19",
+    "40": "object_20",
+    "41": "letter_01",
+    "42": "letter_02",
+    "43": "letter_03",
+    "44": "letter_04",
+    "45": "letter_05",
+    "46": "letter_06",
+    "47": "letter_07",
+    "48": "letter_08",
+    "49": "letter_09",
+    "50": "letter_10",
+    "51": "letter_11",
+    "52": "letter_12",
+    "53": "letter_13",
+    "54": "letter_14",
+    "55": "letter_15",
+    "56": "letter_16",
+    "57": "letter_17",
+    "58": "letter_18",
+    "59": "letter_19",
+    "60": "letter_20",
+    "61": "letter_01",
+    "62": "letter_02",
+    "63": "letter_03",
+    "64": "letter_04",
+    "65": "letter_05",
+    "66": "letter_06",
+    "67": "letter_07",
+    "68": "letter_08",
+    "69": "letter_09",
+    "70": "letter_10",
+    "71": "letter_11",
+    "72": "letter_12",
+    "73": "letter_13",
+    "74": "letter_14",
+    "75": "letter_15",
+    "76": "letter_16",
+    "77": "letter_17",
+    "78": "letter_18",
+    "79": "letter_19",
+    "80": "letter_20",
+    "101": "center",
+    "102": "left",
+    "103": "right",
+    "151": "500ms",
+    "152": "1000ms",
+    "153": "1500ms",
+    "201": "target",
+    "202": "non-target",
+    "203": "irrelevant"
+}
+
+
+def convert_cog_trig(raw):
+    """
+    Converts triggers from the COGITATE project to a more user friendly format. During acquisition, triggers
+    were sent successively, as we had too many experimental conditions to fit in 8 bits. Instead, we sent successive
+    triggers spaced by 50ms to identify all the experimental conditions associated with a trigger. This function
+    converts these successive triggers back into a single one at stimulus onset, with strings describing the
+    conditions (forward slash separated list)
+
+    Parameters:
+    raw (mne.io.Raw): The raw EEG data object containing event annotations.
+
+    Returns:
+    mne.io.Raw: The raw EEG data object with updated event descriptions.
+
+    Raises:
+    Exception: If the number of triggers in a trial is not exactly four.
+    """
+
+    # Extract the event descriptions from the raw data annotations
+    evt_dsc = np.array(raw.annotations.description.copy(), dtype="object")
+
+    # Find all the stimulus onset events
+    idxs = []
+    for val in [str(i + 1) for i in range(80)]:
+        idx = np.where(evt_dsc == val)[0]
+        if len(idx) > 0:
+            idxs.append(idx)
+
+    # Flatten and sort the array of indices
+    idxs = np.sort(np.concatenate(idxs, axis=0))
+
+    # Loop through each index to process trial events
+    for i, idx in enumerate(idxs):
+        # Determine the range of triggers for the current trial
+        if i == len(idxs) - 1:
+            trial_trig = evt_dsc[idx:]
+        else:
+            trial_trig = evt_dsc[idx:idxs[i + 1]]
+
+        # Filter for valid triggers based on predefined mapping
+        correct_triggers = [trig for trig in trial_trig if trig in COG_TRIGGERS.keys()]
+
+        # Ensure the trial contains exactly four triggers
+        if len(correct_triggers) != 4:
+            raise Exception("Something went wrong with the triggers!!!")
+
+        # Construct the stimulus identifier list
+        stim_id = ["vis_onset",
+                   COG_TRIGGERS[correct_triggers[0]].split("_")[0],
+                   COG_TRIGGERS[correct_triggers[0]]]
+        stim_id.extend([COG_TRIGGERS[trig] for trig in correct_triggers[1:]])
+        stim_id = "/".join(stim_id)
+        # Update the description of the event with the constructed identifier
+        evt_dsc[idx] = stim_id
+    raw.annotations.description = evt_dsc
+
+    return raw
+
 
 def format_summary_table(summary_dict):
     """
@@ -139,6 +294,74 @@ def annotate_nan(raw, nan_annotation="BAD_nan", eyes=None):
     return raw
 
 
+def load_cog_eyetracker(bids_root, subject, session, task, verbose=False, debug=False):
+    """
+    This functions loads the eyetracking data using mne python function. In addition, it loads the log files from the
+    raw root to extract additional information. For a few subjects, some triggers weren't received by the eyetracker
+    and therefore, the logs need to be aligned back to the eyetracker trigger to avoid any mismatch, which is what this
+    function does. In addition, loading the calibration results.
+    :param bids_root: (Path or string) path to the eyetracking files
+    :param subject: (string) name of the subject
+    :param session: (string) session
+    :param task: (string) task
+    :param beh_file_name: (string) template string  for the name of the behavioral log files
+    :param annotations_col_names: (list of strings) name to give the columns of the annotation table
+    :param event_of_interest: (string) identifier of the events of interest
+    :param verbose: (bool) verbose
+    :para debug: (bool) debug mode loads only 2 files
+    :return:
+    """
+    # Load all the files:
+    raws = []
+    calibs = []
+    screen_sizes = []
+    screen_ress = []
+    screen_distances = []
+    ctr = 0
+
+    # Create the files roots:
+    et_root = Path(bids_root, "sub-" + subject, "ses-" + session, "eyetrack")
+
+    # ===================================================================================
+    # Load the eyetracking data and ensure that the log files match:
+    for fl in os.listdir(et_root):
+        if debug and ctr > 5:  # Load only a subpart of the files for the debugging
+            continue
+        if fl.endswith('.asc') and fl.split("_task-")[1].split("_eyetrack.asc")[0] == task:
+            if verbose:
+                print("Loading: " + fl)
+
+            # Extract the run ID:
+            run_i = int(re.search(r'run-(\d{2})', fl).group(1))
+
+            try:
+                raw = mne.io.read_raw_eyelink(Path(et_root, fl), verbose=verbose)
+            except ValueError:
+                print("The data in sub-{}, ses-{}, task-{} and run-{} are unreadable".format(subject,
+                                                                                             session,
+                                                                                             task,
+                                                                                             run_i))
+                continue
+
+            # Add the triggers:
+            raw = convert_cog_trig(raw)
+            raws.append(raw)
+            calib, screen_dist, screen_size, screen_res = read_calib(Path(et_root, fl))
+            calibs.append(calib)
+            screen_distances.append(screen_dist)
+            screen_sizes.append(screen_size)
+            screen_ress.append(screen_res)
+            ctr += 1
+    # Check that the screen sizes, distances and resolutions are always the same:
+    assert len(np.unique(screen_sizes)) == 2, "Found different screen sizes within the same participant!"
+    assert len(np.unique(screen_distances)) == 1, "Found different screen distances within the same participant!"
+    assert len(np.unique(screen_ress)) == 3, "Found different screen resolutions within the same participant!"
+    screen_size = np.unique(screen_sizes)
+    screen_distance = np.unique(screen_distances)[0]
+    screen_res = np.unique(screen_ress)[1:3] + 1
+    return raws, calibs, screen_size, screen_distance, screen_res
+
+
 def load_raw_eyetracker(bids_root, subject, session, task, beh_file_name,
                         annotations_col_names, event_of_interest, verbose=False, debug=False):
     """
@@ -259,13 +482,23 @@ def read_calib(fname):
     fl_txt = f.read().splitlines(True)  # split into lines
     fl_txt = list(filter(None, fl_txt))  # remove emptys
     # Extract screen distance:
-    screen_distance = [txt.strip("\n") for txt in fl_txt if "Screen_distance_mm" in txt][0].split(":")[-1].split(" ")
-    # Convert to float:
-    screen_distance = np.mean([float(val) for val in screen_distance if val.isdigit()])
+    try:
+        screen_distance = [txt.strip("\n") for txt in fl_txt if "Screen_distance_mm" in txt][0].split(":")[-1].split(" ")
+        # Convert to float:
+        screen_distance = np.mean([float(val) for val in screen_distance if val.isdigit()])
+    except IndexError:
+        print("WARNING: No screen distance value found in the headers, using the default instead!")
+        print(f"Default: {DFT_SCREEN_DIST_MM}mm")
+        screen_distance = DFT_SCREEN_DIST_MM
     # Extract screen size:
-    screen_size = [txt.strip("\n") for txt in fl_txt if "Screen_size_mm" in txt][0].split(":")[-1].split(" ")
-    # Convert to float:
-    screen_size = [float(val) * 10 for val in screen_size if val.isdigit()]
+    try:
+        screen_size = [txt.strip("\n") for txt in fl_txt if "Screen_size_mm" in txt][0].split(":")[-1].split(" ")
+        # Convert to float:
+        screen_size = [float(val) * 10 for val in screen_size if val.isdigit()]
+    except IndexError:
+        print("WARNING: No screen size value found in the headers, using the default instead!")
+        print(f"Default: {DFT_SCREEN_SIZE_MM}mm")
+        screen_size = DFT_SCREEN_SIZE_MM
     # Extract screen res:
     screen_res = [txt.strip("\n") for txt in fl_txt if "GAZE_COORDS" in txt][0].split("GAZE_COORDS")[-1].split(" ")
     # Convert to float:
