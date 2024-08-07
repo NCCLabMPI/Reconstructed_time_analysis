@@ -67,7 +67,7 @@ def pupil_amplitude(parameters_file, subjects, bids_root, session="1", task="prp
         epochs.pick([f"pupil_{eye}" for eye in eyes])
         print(epochs.info["sfreq"])
         # Downsample:
-        epochs.resample(100)
+        epochs.resample(250)
         # Baseline correction:
         baseline_scaling(epochs, correction_method=param["baseline"], baseline=param["baseline_window"])
         subjects_epochs[sub] = epochs.copy()[param["task_relevance"]]

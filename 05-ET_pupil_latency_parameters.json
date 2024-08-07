@@ -5,7 +5,7 @@
   "data_type": "eyetrack",
   "crop": [-0.2, 2.7],
   "eyes": ["left", "right"],
-  "baseline": "mean",
+  "baseline": "ratio",
   "baseline_window": [null, 0.0],
   "baseline_zthresh": 2,
   "exlude_beh": true,
