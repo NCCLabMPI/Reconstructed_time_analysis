@@ -62,22 +62,12 @@ def pupil_amplitude(parameters_file, subjects, bids_root, session="1", task="prp
 
         # Extract the eyes:
         eyes = [ch.split("_")[-1] for ch in epochs.ch_names if "pupil" in ch]
-        binocular = True if len(eyes) == 2 else False
-        # Reject bad epochs according to predefined criterion:
-        if reject_bad_trials:
-            reject_bad_epochs(epochs,
-                              baseline_window=param["baseline_window"],
-                              z_thresh=param["baseline_zthresh"],
-                              eyes=param["eyes"],
-                              exlude_beh=param["exlude_beh"],
-                              remove_blinks=param["remove_blinks"],
-                              blinks_window=param["blinks_window"],
-                              remove_fixdist=param["remove_fixdist"],
-                              fixdist_thresh_deg=param["fixdist_thresh_deg"],
-                              fixdist_prop_trhesh=param["fixdist_prop_trhesh"])
 
         # Extract the relevant channels:
         epochs.pick([f"pupil_{eye}" for eye in eyes])
+        print(epochs.info["sfreq"])
+        # Downsample:
+        epochs.resample(100)
         # Baseline correction:
         baseline_scaling(epochs, correction_method=param["baseline"], baseline=param["baseline_window"])
         subjects_epochs[sub] = epochs.copy()[param["task_relevance"]]
@@ -111,8 +101,7 @@ def pupil_amplitude(parameters_file, subjects, bids_root, session="1", task="prp
     # Onset locked task relevance analysis:
     # ===========================================================
     # Create the condition string:
-    lock = "onset"
-    conditions = ["/".join([task, lock]) for task in param["task_relevance"]]
+    conditions = param["task_relevance"]
     # Compute cluster based permutation test across subject between task relevant and irrelevant:
     evks, evks_diff, _, clusters, cluster_p_values, _ = (
         cluster_1samp_across_sub(subjects_epochs, conditions,
@@ -129,7 +118,7 @@ def pupil_amplitude(parameters_file, subjects, bids_root, session="1", task="prp
                ax=ax, label=param["task_relevance"][1], clusters=clusters,
                clusters_pval=cluster_p_values, clusters_alpha=0.1, sig_thresh=0.05, plot_nonsig_clusters=True)
     # Compute the targets evoked:
-    targets_evoked = np.array([np.mean(subjects_targets[sub]["/".join([lock])].average().get_data(), axis=0)
+    targets_evoked = np.array([np.mean(subjects_targets[sub]["target"].average().get_data(), axis=0)
                                for sub in subjects_targets.keys()])
     plot_ts_ci(targets_evoked, epochs.times, [0.4, 0.4, 0.4],
                ax=ax, label="target")
@@ -139,10 +128,10 @@ def pupil_amplitude(parameters_file, subjects, bids_root, session="1", task="prp
     ax.set_ylim(ylim)
     ax.spines[['right', 'top']].set_visible(False)
     plt.legend()
-    plt.title("{} locked pupil size across durations (N={})".format(lock, len(subjects_epochs)))
+    plt.title("Pupil size across durations (N={})".format(len(subjects_epochs)))
     plt.tight_layout()
-    fig.savefig(Path(save_dir, "pupil_evoked_titr_{}.svg".format(lock)), transparent=True, dpi=300)
-    fig.savefig(Path(save_dir, "pupil_evoked_titr_{}.png".format(lock)), transparent=True, dpi=300)
+    fig.savefig(Path(save_dir, "pupil_evoked_titr.svg"), transparent=True, dpi=300)
+    fig.savefig(Path(save_dir, "pupil_evoked_titr.png"), transparent=True, dpi=300)
     plt.close()
 
     # ===========================================================
@@ -151,7 +140,7 @@ def pupil_amplitude(parameters_file, subjects, bids_root, session="1", task="prp
     fig, ax = plt.subplots(3, 1, sharex=True, sharey=True, figsize=[8.3, 11.7])
     for dur_i, dur in enumerate(param["duration"]):
         # Prepare the condition strings:
-        conditions = ["/".join([task, dur, lock]) for task in param["task_relevance"]]
+        conditions = ["/".join([task, dur]) for task in param["task_relevance"]]
         # Run cluster based permutation test:
         evks_dur, evks_diff_dur, _, clusters, cluster_p_values, _ = (
             cluster_1samp_across_sub(subjects_epochs, conditions,
@@ -171,7 +160,7 @@ def pupil_amplitude(parameters_file, subjects, bids_root, session="1", task="prp
                    label=param["task_relevance"][1], sig_thresh=0.05 / len(param["duration"]),
                    plot_single_subjects=False, plot_nonsig_clusters=True)
         # Compute the targets evoked:
-        targets_evoked = np.array([np.mean(subjects_targets[sub]["/".join([dur, lock])].average().get_data(), axis=0)
+        targets_evoked = np.array([np.mean(subjects_targets[sub]["/".join([dur])].average().get_data(), axis=0)
                                    for sub in subjects_targets.keys()])
         plot_ts_ci(targets_evoked, epochs.times, [0.4, 0.4, 0.4],
                    ax=ax[dur_i], label="target")
@@ -187,95 +176,10 @@ def pupil_amplitude(parameters_file, subjects, bids_root, session="1", task="prp
     ax[2].set_title("Long")
     ax[2].spines[['right', 'top']].set_visible(False)
     ax[2].legend()
-    plt.suptitle("{} locked pupil size (N={})".format(lock, len(subjects_epochs)))
+    plt.suptitle("locked pupil size (N={})".format(len(subjects_epochs)))
     plt.tight_layout()
-    fig.savefig(Path(save_dir, "pupil_evoked_titr_{}_perdur.svg".format(lock)), transparent=True, dpi=300)
-    fig.savefig(Path(save_dir, "pupil_evoked_titr_{}_perdur.png".format(lock)), transparent=True, dpi=300)
-    plt.close()
-
-    # ==================================================================================================================
-    # Offset locked task relevance analysis:
-    # ===========================================================
-    # Create the condition string:
-    lock = "offset"
-    conditions = ["/".join([task, lock]) for task in param["task_relevance"]]
-    # Compute cluster based permutation test across subject between task relevant and irrelevant:
-    evks, evks_diff, _, clusters, cluster_p_values, _ = (
-        cluster_1samp_across_sub(subjects_epochs, conditions,
-                                 n_permutations=param["n_permutations"],
-                                 threshold=param["threshold"],
-                                 tail=1, downsample=True))
-    # Plot the results:
-    fig, ax = plt.subplots(figsize=[8.3, 11.7 / 3])
-    # Task relevant:
-    plot_ts_ci(evks[conditions[0]], epochs.times, ev.colors["task_relevance"][param["task_relevance"][0]],
-               ax=ax, label=param["task_relevance"][0], plot_single_subjects=False, plot_nonsig_clusters=True)
-    # Task irrelevant (plot the cluster only on one to avoid incremental plotting):
-    plot_ts_ci(evks[conditions[1]], epochs.times, ev.colors["task_relevance"][param["task_relevance"][1]],
-               ax=ax, label=param["task_relevance"][1], clusters=clusters,
-               clusters_pval=cluster_p_values, clusters_alpha=0.1, sig_thresh=0.05, plot_single_subjects=False,
-               plot_nonsig_clusters=True)
-    # Compute the targets evoked:
-    targets_evoked = np.array([np.mean(subjects_targets[sub]["/".join([lock])].average().get_data(), axis=0)
-                               for sub in subjects_targets.keys()])
-    plot_ts_ci(targets_evoked, epochs.times, [0.4, 0.4, 0.4],
-               ax=ax, label="target")
-    # Decorate the axes:
-    ax.set_ylim(ylim)
-    ax.set_xlabel("Time (sec.)")
-    ax.set_ylabel("Pupil dilation (norm.)")
-    ax.spines[['right', 'top']].set_visible(False)
-    plt.legend()
-    plt.title("{} locked pupil size across durations (N={})".format(lock, len(subjects_epochs)))
-    plt.tight_layout()
-    fig.savefig(Path(save_dir, "pupil_evoked_titr_{}.svg".format(lock)), transparent=True, dpi=300)
-    fig.savefig(Path(save_dir, "pupil_evoked_titr_{}.png".format(lock)), transparent=True, dpi=300)
-    plt.close()
-
-    # ===========================================================
-    # Separately for each trial durations:
-    # Prepare a figure for all the durations:
-    fig, ax = plt.subplots(3, 1, sharex=True, sharey=True, figsize=[8.3, 11.7])
-    for dur_i, dur in enumerate(param["duration"]):
-        # Prepare the condition strings:
-        conditions = ["/".join([task, dur, lock]) for task in param["task_relevance"]]
-        # Run cluster based permutation test:
-        evks_dur, evks_diff_dur, _, clusters, cluster_p_values, _ = (
-            cluster_1samp_across_sub(subjects_epochs, conditions,
-                                     n_permutations=param["n_permutations"],
-                                     threshold=param["threshold"],
-                                     tail=1, downsample=True))
-        # Plot the results:
-        # Task relevant:
-        plot_ts_ci(evks_dur[conditions[0]], epochs.times,
-                   ev.colors["task_relevance"][param["task_relevance"][0]], ax=ax[dur_i],
-                   label=param["task_relevance"][0], plot_single_subjects=False)
-        # Task irrelevant:
-        plot_ts_ci(evks_dur[conditions[1]], epochs.times,
-                   ev.colors["task_relevance"][param["task_relevance"][1]], ax=ax[dur_i], clusters=clusters,
-                   clusters_pval=cluster_p_values, clusters_alpha=0.1,
-                   label=param["task_relevance"][1], sig_thresh=0.05 / len(param["duration"]),
-                   plot_single_subjects=False, plot_nonsig_clusters=True)
-        # Compute the targets evoked:
-        targets_evoked = np.array([np.mean(subjects_targets[sub]["/".join([dur, lock])].average().get_data(), axis=0)
-                                   for sub in subjects_targets.keys()])
-        plot_ts_ci(targets_evoked, epochs.times, [0.4, 0.4, 0.4],
-                   ax=ax[dur_i], label="target")
-    # Decorate the axes:
-    ax[0].set_ylim(ylim)
-    ax[0].spines[['right', 'top']].set_visible(False)
-    ax[0].set_title("Short")
-    ax[1].set_ylabel("Pupil dilation (norm.)")
-    ax[1].spines[['right', 'top']].set_visible(False)
-    ax[1].set_title("Intermediate")
-    ax[2].set_xlabel("Time (sec.)")
-    ax[2].set_title("Long")
-    ax[2].spines[['right', 'top']].set_visible(False)
-    ax[2].legend()
-    plt.suptitle("{} locked pupil size (N={})".format(lock, len(subjects_epochs)))
-    plt.tight_layout()
-    fig.savefig(Path(save_dir, "pupil_evoked_titr_{}_perdur.svg".format(lock)), transparent=True, dpi=300)
-    fig.savefig(Path(save_dir, "pupil_evoked_titr_{}_perdur.png".format(lock)), transparent=True, dpi=300)
+    fig.savefig(Path(save_dir, "pupil_evoked_titr_perdur.svg"), transparent=True, dpi=300)
+    fig.savefig(Path(save_dir, "pupil_evoked_titr_perdur.png"), transparent=True, dpi=300)
     plt.close()
 
 
@@ -283,20 +187,12 @@ if __name__ == "__main__":
     # Set the parameters to use:
     parameters = (
         r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis"
-        r"\04-ET_pupil_amplitude_parameters.json")
+        r"\04-ET_pupil_amplitude_parameters_cog.json")
 
     # ==================================================================================
-    # Introspection analysis:
-    task = "introspection"
-    pupil_amplitude(parameters, ev.subjects_lists_et[task], ev.bids_root, task=task, session=["2", "3"],
-                    analysis_name="pupil_amplitude", reject_bad_trials=True)
-    pupil_amplitude(parameters, ev.subjects_lists_et[task], ev.bids_root, task=task, session=["2", "3"],
-                    analysis_name="pupil_amplitude_no_rej", reject_bad_trials=False)
-
-    # ==================================================================================
-    # PRP analysis:
-    task = "prp"
-    pupil_amplitude(parameters, ev.subjects_lists_et[task], ev.bids_root, task="prp", session="1",
-                    analysis_name="pupil_amplitude", reject_bad_trials=True)
-    pupil_amplitude(parameters, ev.subjects_lists_et[task], ev.bids_root, task="prp", session="1",
-                    analysis_name="pupil_amplitude_no_rej", reject_bad_trials=False)
+    # Cogitate duration analysis:
+    task = "Dur"
+    pupil_amplitude(parameters, [
+         "CE103", "CE106", "CE107", "CE108", "CE112", "CE113",
+         "CE119", "CE120"], ev.cog_bids_root, task=task, session="1",
+                    analysis_name="pupil_amplitude", reject_bad_trials=False)
