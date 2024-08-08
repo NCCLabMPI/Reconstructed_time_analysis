@@ -193,6 +193,6 @@ if __name__ == "__main__":
     # Cogitate duration analysis:
     task = "Dur"
     pupil_amplitude(parameters, [
-         "CE103", "CE106", "CE107", "CE108", "CE112", "CE113",
+         "CE103", "CE106", "CE107", "CE108", "CE110",  "CE112", "CE113", 
          "CE119", "CE120"], ev.cog_bids_root, task=task, session="1",
                     analysis_name="pupil_amplitude", reject_bad_trials=False)
