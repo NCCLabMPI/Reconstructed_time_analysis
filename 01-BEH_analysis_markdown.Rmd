@@ -1565,12 +1565,12 @@ RT_aud_effect_size_table[2, ] = c(mean(target_event_table2 %>% filter(SOA == 0.4
 # PRP size
 RT_aud_effect_size_table[3, ] = RT_aud_effect_size_table[1, ] - RT_aud_effect_size_table[2, ] 
 # joined SD
-RT_aud_effect_size_table[4, ] = c(sd(c(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'target') %>% pull(RT_aud),target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' & task_relevance == 'target' & duration == 1.5) %>% pull(RT_aud))),
-                                  sd(c(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(RT_aud), target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(RT_aud))),
-                                  sd(c(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(RT_aud), target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(RT_aud))),
-                                  sd(c(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 0.5) %>% pull(RT_aud), all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 0.5) %>% pull(RT_aud))),
-                                  sd(c(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1) %>% pull(RT_aud), all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1) %>% pull(RT_aud))),
-                                  sd(c(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1.5) %>% pull(RT_aud), all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1.5) %>% pull(RT_aud))))
+RT_aud_effect_size_table[4, ] = c(sd(c(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'target') %>% pull(RT_aud),target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' & task_relevance == 'target' & duration == 1.5) %>% pull(RT_aud) / 1000)),
+                                  sd(c(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(RT_aud) / 1000, target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(RT_aud))),
+                                  sd(c(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(RT_aud) / 1000, target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(RT_aud) / 1000)),
+                                  sd(c(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 0.5) %>% pull(RT_aud) / 1000, all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 0.5) %>% pull(RT_aud) / 1000)),
+                                  sd(c(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1) %>% pull(RT_aud) / 1000, all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1) %>% pull(RT_aud) / 1000)),
+                                  sd(c(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1.5) %>% pull(RT_aud) / 1000, all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1.5) %>% pull(RT_aud) / 1000)))
 # ==================================================
 # cohens d 
 RT_aud_effect_size_table[5, ] = (RT_aud_effect_size_table[1, ] - RT_aud_effect_size_table[2, ])/RT_aud_effect_size_table[4, ]
@@ -1584,33 +1584,33 @@ colnames(IT_aud_effect_size_table) = c("target", "non_target_onset", "irrelevant
 
 # ==================================================
 # mean of SOA = 0
-IT_aud_effect_size_table[1, ] = c(mean(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'target') %>% pull(iRT_aud), na.rm = TRUE),
-                                  mean(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(iRT_aud), na.rm = TRUE), 
-                                  mean(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(iRT_aud), na.rm = TRUE), 
-                                  mean(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 0.5) %>% pull(iRT_aud), na.rm = TRUE), 
-                                  mean(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1) %>% pull(iRT_aud), na.rm = TRUE), 
-                                  mean(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1.5) %>% pull(iRT_aud), na.rm = TRUE))
+IT_aud_effect_size_table[1, ] = c(mean(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'target') %>% pull(iRT_aud) / 1000, na.rm = TRUE),
+                                  mean(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(iRT_aud) / 1000, na.rm = TRUE), 
+                                  mean(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(iRT_aud) / 1000, na.rm = TRUE), 
+                                  mean(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 0.5) %>% pull(iRT_aud) / 1000, na.rm = TRUE), 
+                                  mean(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1) %>% pull(iRT_aud) / 1000, na.rm = TRUE), 
+                                  mean(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1.5) %>% pull(iRT_aud) / 1000, na.rm = TRUE))
 
 # ==================================================
 # mean of SOA = 466
-IT_aud_effect_size_table[2, ] = c(mean(target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' & task_relevance == 'target' & duration == 1.5) %>% pull(iRT_aud), na.rm = TRUE),
-                                  mean(target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(iRT_aud), na.rm = TRUE),
-                                  mean(target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(iRT_aud), na.rm = TRUE),
-                                  mean(all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 0.5) %>% pull(iRT_aud), na.rm = TRUE),
-                                  mean(all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1) %>% pull(iRT_aud), na.rm = TRUE),
-                                  mean(all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1.5) %>% pull(iRT_aud), na.rm = TRUE))
+IT_aud_effect_size_table[2, ] = c(mean(target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' & task_relevance == 'target' & duration == 1.5) %>% pull(iRT_aud) / 1000, na.rm = TRUE),
+                                  mean(target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(iRT_aud) / 1000, na.rm = TRUE),
+                                  mean(target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(iRT_aud) / 1000, na.rm = TRUE),
+                                  mean(all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 0.5) %>% pull(iRT_aud) / 1000, na.rm = TRUE),
+                                  mean(all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1) %>% pull(iRT_aud) / 1000, na.rm = TRUE),
+                                  mean(all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1.5) %>% pull(iRT_aud) / 1000, na.rm = TRUE))
 
 # ==================================================
 # PRP size
 IT_aud_effect_size_table[3, ] = IT_aud_effect_size_table[1, ] - IT_aud_effect_size_table[2, ] 
 
 # joined SD
-IT_aud_effect_size_table[4, ] = c(sd(c(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'target') %>% pull(iRT_aud),target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' & task_relevance == 'target' & duration == 1.5) %>% pull(iRT_aud))),
-                                  sd(c(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(iRT_aud), target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(iRT_aud))),
-                                  sd(c(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(iRT_aud), target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(iRT_aud))),
-                                  sd(c(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 0.5) %>% pull(iRT_aud), all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 0.5) %>% pull(iRT_aud))),
-                                  sd(c(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1) %>% pull(iRT_aud), all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1) %>% pull(iRT_aud))),
-                                  sd(c(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1.5) %>% pull(iRT_aud), all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1.5) %>% pull(iRT_aud))))
+IT_aud_effect_size_table[4, ] = c(sd(c(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'target') %>% pull(iRT_aud),target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' & task_relevance == 'target' & duration == 1.5) %>% pull(iRT_aud) / 1000)),
+                                  sd(c(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(iRT_aud) / 1000, target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(iRT_aud) / 1000)),
+                                  sd(c(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(iRT_aud) / 1000, target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(iRT_aud) / 1000)),
+                                  sd(c(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 0.5) %>% pull(iRT_aud) / 1000, all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 0.5) %>% pull(iRT_aud) / 1000)),
+                                  sd(c(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1) %>% pull(iRT_aud) / 1000, all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1) %>% pull(iRT_aud) / 1000)),
+                                  sd(c(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1.5) %>% pull(iRT_aud) / 1000, all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1.5) %>% pull(iRT_aud) / 1000)))
 
 # cohens d 
 IT_aud_effect_size_table[5, ] = (IT_aud_effect_size_table[1, ] - IT_aud_effect_size_table[2, ])/IT_aud_effect_size_table[4, ]
@@ -1625,33 +1625,33 @@ colnames(IT_vis_effect_size_table) = c("target", "non_target_onset", "irrelevant
 
 # ==================================================
 # mean of SOA = 0
-IT_vis_effect_size_table[1, ] = c(mean(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'target') %>% pull(iRT_vis), na.rm = TRUE),
-                                  mean(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(iRT_vis), na.rm = TRUE), 
-                                  mean(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(iRT_vis), na.rm = TRUE), 
-                                  mean(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 0.5) %>% pull(iRT_vis), na.rm = TRUE), 
-                                  mean(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1) %>% pull(iRT_vis), na.rm = TRUE), 
-                                  mean(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1.5) %>% pull(iRT_vis), na.rm = TRUE))
+IT_vis_effect_size_table[1, ] = c(mean(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'target') %>% pull(iRT_vis) / 1000, na.rm = TRUE),
+                                  mean(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(iRT_vis) / 1000, na.rm = TRUE), 
+                                  mean(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(iRT_vis) / 1000, na.rm = TRUE), 
+                                  mean(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 0.5) %>% pull(iRT_vis) / 1000, na.rm = TRUE), 
+                                  mean(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1) %>% pull(iRT_vis) / 1000, na.rm = TRUE), 
+                                  mean(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1.5) %>% pull(iRT_vis) / 1000, na.rm = TRUE))
 
 # ==================================================
 # mean of SOA = 466
-IT_vis_effect_size_table[2, ] = c(mean(target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' & task_relevance == 'target' & duration == 1.5) %>% pull(iRT_vis), na.rm = TRUE),
-                                  mean(target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(iRT_vis), na.rm = TRUE),
-                                  mean(target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(iRT_vis), na.rm = TRUE),
-                                  mean(all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 0.5) %>% pull(iRT_vis), na.rm = TRUE),
-                                  mean(all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1) %>% pull(iRT_vis), na.rm = TRUE),
-                                  mean(all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1.5) %>% pull(iRT_vis), na.rm = TRUE))
+IT_vis_effect_size_table[2, ] = c(mean(target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' & task_relevance == 'target' & duration == 1.5) %>% pull(iRT_vis) / 1000, na.rm = TRUE),
+                                  mean(target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(iRT_vis) / 1000, na.rm = TRUE),
+                                  mean(target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(iRT_vis) / 1000, na.rm = TRUE),
+                                  mean(all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 0.5) %>% pull(iRT_vis) / 1000, na.rm = TRUE),
+                                  mean(all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1) %>% pull(iRT_vis) / 1000, na.rm = TRUE),
+                                  mean(all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1.5) %>% pull(iRT_vis) / 1000, na.rm = TRUE))
 
 # ==================================================
 # PRP size
 IT_vis_effect_size_table[3, ] = IT_vis_effect_size_table[1, ] - IT_vis_effect_size_table[2, ] 
 
 # joined SD
-IT_vis_effect_size_table[4, ] = c(sd(c(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'target') %>% pull(iRT_vis),target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' & task_relevance == 'target' & duration == 1.5) %>% pull(iRT_vis))),
-                                  sd(c(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(iRT_vis), target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(iRT_vis))),
-                                  sd(c(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(iRT_vis), target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(iRT_vis))),
-                                  sd(c(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 0.5) %>% pull(iRT_vis), all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 0.5) %>% pull(iRT_vis))),
-                                  sd(c(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1) %>% pull(iRT_vis), all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1) %>% pull(iRT_vis))),
-                                  sd(c(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1.5) %>% pull(iRT_vis), all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1.5) %>% pull(iRT_vis))))
+IT_vis_effect_size_table[4, ] = c(sd(c(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'target') %>% pull(iRT_vis) / 1000,target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' & task_relevance == 'target' & duration == 1.5) %>% pull(iRT_vis)  / 1000)),
+                                  sd(c(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(iRT_vis)  / 1000, target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'non-target') %>% pull(iRT_vis)  / 1000)),
+                                  sd(c(target_event_table2 %>% filter(SOA == 0 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(iRT_vis) / 1000, target_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'onset' & task_relevance == 'irrelevant') %>% pull(iRT_vis) / 1000)),
+                                  sd(c(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 0.5) %>% pull(iRT_vis) / 1000, all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 0.5) %>% pull(iRT_vis) / 1000)),
+                                  sd(c(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1) %>% pull(iRT_vis) / 1000, all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1) %>% pull(iRT_vis) / 1000)),
+                                  sd(c(all_event_table2 %>% filter(SOA == 0 & SOA_lock == 'offset' & duration == 1.5) %>% pull(iRT_vis) / 1000, all_event_table2 %>% filter(SOA == 0.466 & SOA_lock == 'offset' &  duration == 1.5) %>% pull(iRT_vis) / 1000)))
 
 # cohens d 
 IT_vis_effect_size_table[5, ] = (IT_vis_effect_size_table[1, ] - IT_vis_effect_size_table[2, ])/IT_vis_effect_size_table[4, ]
