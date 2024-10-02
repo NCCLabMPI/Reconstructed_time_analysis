@@ -94,7 +94,7 @@ def check_plots(parameters_file, subjects, session="1", task="prp"):
             }, index=[0])])
 
         # Compute the fixation proportion across durations betweenn 0 and 2 secs:
-        epo = epochs.copy().crop(0, 2.0)
+        epo = epochs.copy().crop(0, 1.5)
         # Extract the fixation mask:
         fixation_mask = np.any(epo.copy().pick(["fixation_left", "fixation_right"]).get_data(copy=False), axis=1)
         # Average fixation distance across both eyes:

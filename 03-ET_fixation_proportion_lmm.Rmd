@@ -1,0 +1,70 @@
+---
+title: "02-pupil_size_peak_lmm"
+output: html_document
+date: "2023-08-22"
+---
+
+```{r setup, include=FALSE}
+# install all needed packages 
+pacman::p_load('dplyr', 'ggdist', 'ggeffects', 'ggpubr', 'lme4', 'emmeans', 'rstatix', 'car', 'rsq', 'sjPlot', 'MASS')
+library(lme4) # for the analysis
+# library(tidyverse) # needed for data manipulation.
+library(emmeans)
+library(lmerTest)
+library(MASS)
+```
+
+##  Setting the parameters
+Setting the parameters. This is where the user can change the parameters if needed
+
+```{r Housekeeping and parameters setting}
+rm(list = ls())
+bids_root <- getwd()
+
+```
+# Experiment 1
+## Model RT2 as a function of pupil latency
+```{r Loading and transform the data}
+# Generate the file name:
+full_path = file.path(bids_root, 'bids', 'derivatives', 'fixation_proportion', 'prp', 'fixation_proportion.csv')
+data_exp1 <- read.csv(full_path)
+# Remove the all group:
+data_exp1 = data_exp1 %>% filter(duration != "all")
+data_exp1$duration <- as.factor(data_exp1$duration)
+
+# Modelling:
+model_exp1 <- lmer(formula = fixation_proportion ~ 1 + duration + (1 | sub_id), 
+                         data = data_exp1)
+summary(model_exp1)
+anova(model_exp1)
+# Save to file:
+plot(fitted(model_exp1),residuals(model_exp1))
+qqnorm(residuals(model_exp1))
+# Compute the pairwise contrasts:
+em1 <- emmeans(model_exp1, "duration")
+fixation_proportion_contrast <- contrast(em1, "pairwise", adjust = "bonferroni")
+fixation_proportion_contrast
+```
+# Experiment 2
+## Model RT2 as a function of pupil latency
+```{r Loading and transform the data}
+# Generate the file name:
+full_path = file.path(bids_root, 'bids', 'derivatives', 'fixation_proportion', 'introspection', 'fixation_proportion.csv')
+data_exp2 <- read.csv(full_path)
+# Remove the all group:
+data_exp2 = data_exp2 %>% filter(duration != "all")
+data_exp2$duration <- as.factor(data_exp2$duration)
+
+# Modelling:
+model_exp2 <- lmer(formula = fixation_proportion ~ 1 + duration + (1 | sub_id), 
+                         data = data_exp2)
+summary(model_exp2)
+anova(model_exp2)
+# Save to file:
+plot(fitted(model_exp2),residuals(model_exp2))
+qqnorm(residuals(model_exp2))
+# Compute the pairwise contrasts:
+em1 <- emmeans(model_exp2, "duration")
+fixation_proportion_contrast <- contrast(em1, "pairwise", adjust = "bonferroni")
+fixation_proportion_contrast
+```
