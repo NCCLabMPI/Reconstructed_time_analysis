@@ -48,24 +48,24 @@ fig_ta, ax_ta = soa_boxplot(data_df[data_df["task_relevance"] == 'target'],
                             "RT_vis",
                             colors_onset_locked=[[0.5, 0.5, 0.5]] * 4, colors_offset_locked=[[0.5, 0.5, 0.5]] * 4,
                             fig_size=[8.3 / 2, 11.7 / 2], avg_line_color=[0.5, 0.5, 0.5], zorder=0,
-                            alpha=0.5, label="RT visual", jitter=-0.04)
+                            alpha=0.5, label="RT visual", jitter=-0.04, linestyle="solid")
 # RT audio
 soa_boxplot(data_df[data_df["task_relevance"] == 'target'],
             "RT_aud", ax=ax_ta,
             colors_onset_locked=colors_onset, colors_offset_locked=colors_offset,
-            fig_size=[8.3 / 2, 11.7 / 2], zorder=10000, label="RT audio", jitter=0.04)
+            fig_size=[8.3 / 2, 11.7 / 2], zorder=10000, label="RT audio", jitter=0.04, linestyle="solid")
 for ax in ax_ta:
     ax.axhline(0.64, linestyle="--", color=[0.7, 0.7, 0.7], alpha=0.8)
 # Task relevant:
 fig_tr, ax_tr = soa_boxplot(data_df[data_df["task_relevance"] == 'non-target'],
                             "RT_aud",
                             colors_onset_locked=colors_onset, colors_offset_locked=colors_offset,
-                            fig_size=[8.3 / 2, 11.7 / 2], label="RT audio")
+                            fig_size=[8.3 / 2, 11.7 / 2], label="RT audio", linestyle="solid")
 # Task irrelevant:
 fig_ti, ax_ti = soa_boxplot(data_df[data_df["task_relevance"] == 'irrelevant'],
                             "RT_aud",
                             colors_onset_locked=colors_onset, colors_offset_locked=colors_offset,
-                            fig_size=[8.3 / 2, 11.7 / 2], label="RT audio")
+                            fig_size=[8.3 / 2, 11.7 / 2], label="RT audio", linestyle="solid")
 # Set the y limit to be the same for both plots:
 lims = [[ax_tr[0].get_ylim()[0], ax_ti[0].get_ylim()[0]], [ax_tr[0].get_ylim()[1], ax_ti[0].get_ylim()[1]]]
 max_lims = [min(min(lims)), max(max(lims))]
@@ -178,52 +178,57 @@ fig_ta, ax_ta = soa_boxplot(data_df[data_df["task_relevance"] == 'target'],
                             "RT_vis",
                             colors_onset_locked=[[0.5, 0.5, 0.5]] * 4, colors_offset_locked=[[0.5, 0.5, 0.5]] * 4,
                             fig_size=[8.3 / 2, 11.7 / 2], avg_line_color=[0.5, 0.5, 0.5], zorder=0,
-                            alpha=0.5, label="RT visual", jitter=-0.04)
+                            alpha=0.4, label="RT visual", jitter=-0.04, linestyle="solid")
 # RT audio
 soa_boxplot(data_df[data_df["task_relevance"] == 'target'],
             "RT_aud", ax=ax_ta,
             colors_onset_locked=onset_lock_rt, colors_offset_locked=offset_lock_rt,
-            fig_size=[8.3 / 2, 11.7 / 2], zorder=10000, label="RT audio", jitter=0.04)
+            fig_size=[8.3 / 2, 11.7 / 2], zorder=10000, label="RT audio", jitter=0.04, linestyle="solid")
 # iRT audio
 soa_boxplot(data_df[data_df["task_relevance"] == 'target'],
             "iRT_aud", ax=ax_ta,
-            colors_onset_locked=onset_lock_it, colors_offset_locked=offset_lock_it,
-            fig_size=[8.3 / 2, 11.7 / 2], zorder=10000, label="iT audio", jitter=-0.04)
+            colors_onset_locked=onset_lock_rt, colors_offset_locked=offset_lock_rt,
+            fig_size=[8.3 / 2, 11.7 / 2], zorder=10000, label="iT audio", jitter=-0.04, linestyle="dashed",
+            marker='D')
 # iRT vis
 soa_boxplot(data_df[data_df["task_relevance"] == 'target'],
             "iRT_vis", ax=ax_ta,
-            colors_onset_locked=onset_lock_visit, colors_offset_locked=offset_lock_visit,
-            fig_size=[8.3 / 2, 11.7 / 2], zorder=10000, label="iT visual", jitter=0.04)
+            colors_onset_locked=[[0.5, 0.5, 0.5]] * 4, colors_offset_locked=[[0.5, 0.5, 0.5]] * 4, alpha=0.4,
+            fig_size=[8.3 / 2, 11.7 / 2], zorder=10000, label="iT visual", jitter=0.04, linestyle="dashed",
+            marker='D')
 
 for ax in ax_ta:
     ax.axhline(0.64, linestyle="--", color=[0.7, 0.7, 0.7], alpha=0.8)
 # Task relevant:
 fig_tr, ax_tr = soa_boxplot(data_df[data_df["task_relevance"] == 'non-target'],
                             "RT_aud",
-                            colors_onset_locked=colors_onset, colors_offset_locked=colors_offset,
-                            fig_size=[8.3 / 2, 11.7 / 2], label="RT audio")
+                            colors_onset_locked=onset_lock_rt, colors_offset_locked=offset_lock_rt,
+                            fig_size=[8.3 / 2, 11.7 / 2], label="RT audio", linestyle="solid")
 soa_boxplot(data_df[data_df["task_relevance"] == 'non-target'],
             "iRT_aud", ax=ax_tr,
-            colors_onset_locked=onset_lock_it, colors_offset_locked=offset_lock_it,
-            fig_size=[8.3 / 2, 11.7 / 2], label="iT audio")
+            colors_onset_locked=onset_lock_rt, colors_offset_locked=offset_lock_rt,
+            fig_size=[8.3 / 2, 11.7 / 2], label="iT audio", linestyle="dashed",
+            marker='D')
 soa_boxplot(data_df[data_df["task_relevance"] == 'non-target'],
             "iRT_vis", ax=ax_tr,
-            colors_onset_locked=onset_lock_visit, colors_offset_locked=offset_lock_visit,
-            fig_size=[8.3 / 2, 11.7 / 2], label="iT visual")
+            colors_onset_locked=[[0.5, 0.5, 0.5]] * 4, colors_offset_locked=[[0.5, 0.5, 0.5]] * 4,
+            fig_size=[8.3 / 2, 11.7 / 2], alpha=0.4, label="iT visual", linestyle="dashed",
+            marker='D')
 # Task irrelevant:
 fig_ti, ax_ti = soa_boxplot(data_df[data_df["task_relevance"] == 'irrelevant'],
                             "RT_aud",
                             colors_onset_locked=colors_onset, colors_offset_locked=colors_offset,
-                            fig_size=[8.3 / 2, 11.7 / 2], label="RT audio")
+                            fig_size=[8.3 / 2, 11.7 / 2], label="RT audio", linestyle="solid")
 soa_boxplot(data_df[data_df["task_relevance"] == 'irrelevant'],
             "iRT_aud", ax=ax_ti,
-            colors_onset_locked=onset_lock_it, colors_offset_locked=offset_lock_it,
-            fig_size=[8.3 / 2, 11.7 / 2], label="iT audio")
+            colors_onset_locked=onset_lock_rt, colors_offset_locked=offset_lock_rt,
+            fig_size=[8.3 / 2, 11.7 / 2], label="iT audio", linestyle="dashed",
+            marker='D')
 soa_boxplot(data_df[data_df["task_relevance"] == 'irrelevant'],
             "iRT_vis", ax=ax_ti,
-            colors_onset_locked=onset_lock_visit, colors_offset_locked=offset_lock_visit,
-            fig_size=[8.3 / 2, 11.7 / 2], label="iT visual")
-
+            colors_onset_locked=[[0.5, 0.5, 0.5]] * 4, colors_offset_locked=[[0.5, 0.5, 0.5]] * 4,
+            fig_size=[8.3 / 2, 11.7 / 2], label="iT visual", linestyle="dashed",
+            marker='D', alpha=0.4)
 # Set the y limit to be the same for both plots:
 lims = [[ax_tr[0].get_ylim()[0], ax_ti[0].get_ylim()[0]], [ax_tr[0].get_ylim()[1], ax_ti[0].get_ylim()[1]]]
 max_lims = [min(min(lims)), max(max(lims))]
@@ -290,7 +295,7 @@ for i, tsk in enumerate(tasks):
         data_irt = data_irt[~np.isnan(data_irt)]
         xlims.append(np.percentile(data_irt, [2.5, 97.5]))
         # Compute the 1 and 99 percentile of the distribution to clip the data
-        ax[0, i].ecdf(data_irt, label=label_irt, color=ev.colors["soa_onset_locked_iRT"][str(soa)])
+        ax[0, i].ecdf(data_irt, label=label_irt, color=ev.colors["soa_onset_locked"][str(soa)], linestyle="dotted")
 
 # ===============================================
 # Offset locked:
@@ -327,7 +332,7 @@ for dur_i, dur in enumerate(durations):
             data_irt = data_irt[~np.isnan(data_irt)]
             xlims.append(np.percentile(data_irt, [2.5, 97.5]))
             ax[dur_i + 1, tsk_i].ecdf(data_irt, label=label_irt,
-                                      color=ev.colors["soa_offset_locked_iRT"][str(soa)])
+                                      color=ev.colors["soa_offset_locked"][str(soa)], linestyle="dotted")
 # Add axis decorations:
 fig.supxlabel("RT (s)")
 fig.supylabel("CDF")
