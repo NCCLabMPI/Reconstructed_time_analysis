@@ -30,10 +30,11 @@ views = {'side': {"azimuth": 180, "elevation": 90}, 'front': {"azimuth": 130, "e
          "ventral": {"azimuth": 90, "elevation": 180}}
 
 subfolders = ["decoding_auc", "decoding_acc"]
-
+alpha = 0.01
+smooth_ms = 40
 for fl in subfolders:
     # Directory of the results:
-    save_dir = Path(ev.bids_root, "derivatives", "decoding_10ms", "Dur", fl)
+    save_dir = Path(ev.bids_root, "derivatives", "decoding_10ms_alpha01", "Dur", fl)
 
     # Prepare a dict for the results of each ROI:
     roi_results = {}
@@ -70,15 +71,19 @@ for fl in subfolders:
         x_zscored, h0_zscore, clusters, cluster_pv, p_values, h0 = cluster_test(decoding_diff, diff_null,
                                                                                 z_threshold=1.5,
                                                                                 do_zscore=True)
-        if any(p_values < 0.01):
-            msk = np.array(p_values < 0.01, dtype=int)
-            onset = res["times"][np.where(np.diff(msk) == 1)[0][0] + 1]
-            offset = res["times"][np.where(np.diff(msk) == -1)[0][0]]
+        if any(p_values < alpha):
+            msk = np.array(p_values < alpha, dtype=int)
+            onset = res["times"][np.where(np.diff(msk) == 1)[0] + 1]
+            offset = res["times"][np.where(np.diff(msk) == -1)[0]]
+            if offset.size == 0:
+                offset = np.array([res["times"][-1]])
             duration = offset - onset
         else:
             onset = None
             offset = None
             duration = 0
+        if onset is not None and len(onset) > 1:
+            print("A")
 
         # pvals = _pval_from_histogram(decoding_diff, diff_null, 1)
         # onset, offset = extract_first_bout(res['times'], pvals, 0.05, 0.04)
@@ -89,10 +94,10 @@ for fl in subfolders:
 
         #  Plot the time series:
         fig, ax = plt.subplots(figsize=[4, 3])
-        plot_decoding_results(res['times'], res["scores_tr"], ci=0.95, smooth_ms=25,
+        plot_decoding_results(res['times'], res["scores_tr"], ci=0.95, smooth_ms=smooth_ms,
                               color=ev.colors["task_relevance"]["non-target"], ax=ax,
                               label="Relevant", ylim=[0.35, 1.0], onset=onset, offset=offset)
-        plot_decoding_results(res['times'], res["scores_ti"], ci=0.95, smooth_ms=25,
+        plot_decoding_results(res['times'], res["scores_ti"], ci=0.95, smooth_ms=smooth_ms,
                               color=ev.colors["task_relevance"]["irrelevant"], ax=ax,
                               label="Irrelevant", ylim=[0.35, 1.0], onset=None, offset=None)
         ax.axhline(0.05, res['times'][0], res['times'][-1])
@@ -152,10 +157,12 @@ for fl in subfolders:
                                                                                 res["scores_shuffle_tr"],
                                                                                 z_threshold=1.5,
                                                                                 do_zscore=True)
-        if any(p_values < 0.01):
-            msk = np.array(p_values < 0.01, dtype=int)
+        if any(p_values < alpha):
+            msk = np.array(p_values < alpha, dtype=int)
             onset_tr = res["times"][np.where(np.diff(msk) == 1)[0] + 1]
             offset_tr = res["times"][np.where(np.diff(msk) == -1)[0]]
+            if offset_tr.size == 0:
+                offset_tr = np.array([res["times"][-1]])
             duration_tr = offset_tr - onset_tr
             h0_tr = False
             max_tr = np.max(np.mean(res["scores_tr"], axis=0))
@@ -168,7 +175,7 @@ for fl in subfolders:
 
         #  Plot the time series:
         fig, ax = plt.subplots(figsize=[4, 3])
-        plot_decoding_results(res['times'], res["scores_tr"], ci=0.95, smooth_ms=25,
+        plot_decoding_results(res['times'], res["scores_tr"], ci=0.95, smooth_ms=smooth_ms,
                               color=ev.colors["task_relevance"]["non-target"], ax=ax,
                               label="Relevant", ylim=[0.35, 1.0], onset=onset_tr, offset=offset_tr)
         ax.axhline(0.05, res['times'][0], res['times'][-1])
@@ -198,10 +205,12 @@ for fl in subfolders:
                                                                                 res["scores_shuffle_ti"],
                                                                                 z_threshold=1.5,
                                                                                 do_zscore=True)
-        if any(p_values < 0.01):
-            msk = np.array(p_values < 0.01, dtype=int)
+        if any(p_values < alpha):
+            msk = np.array(p_values < alpha, dtype=int)
             onset_ti = res["times"][np.where(np.diff(msk) == 1)[0] + 1]
             offset_ti = res["times"][np.where(np.diff(msk) == -1)[0]]
+            if offset_ti.size == 0:
+                offset_ti = np.array([res["times"][-1]])
             duration_ti = offset_ti - onset_ti
             h0_ti = False
             max_ti = np.max(np.mean(res["scores_tr"], axis=0))
@@ -214,9 +223,10 @@ for fl in subfolders:
 
         #  Plot the time series:
         fig, ax = plt.subplots(figsize=[4, 3])
-        plot_decoding_results(res['times'], res["scores_ti"], ci=0.95, smooth_ms=25,
-                              color=ev.colors["task_relevance"]["irrelevant"], ax=ax,
-                              label="Irrelevant", ylim=[0.35, 1.0], onset=onset_ti, offset=offset_ti)
+        plot_decoding_results(res['times'], res["scores_ti"], ci=0.95, smooth_ms=smooth_ms,
+                            color=ev.colors["task_relevance"]["irrelevant"], ax=ax,
+                            label="Irrelevant", ylim=[0.35, 1.0], onset=onset_ti, offset=offset_ti)
+
         ax.axhline(0.05, res['times'][0], res['times'][-1])
         ax.set_xlim([res['times'][0], res['times'][-1]])
         ax.text(0.15, 0.9, "N={}".format(res["n_channels"]),

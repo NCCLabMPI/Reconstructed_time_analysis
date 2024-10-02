@@ -129,7 +129,8 @@ def plot_within_subject_boxplot(data_df, within_column, between_column, dependen
                                 ax=None, cousineau_correction=True, title="", xlabel="", ylabel="", xlim=None,
                                 width=0.1, face_colors=None, edge_colors=None, xlabel_fontsize=9,
                                 plot_avg_line=False, style="boxplot", plot_single_sub=True,
-                                avg_line_color=None, zorder=1, alpha=1, label=None, jitter=0):
+                                avg_line_color=None, zorder=1, alpha=1, label=None, jitter=0, linestyle="solid",
+                                marker='o'):
     """
     This function generates within subject design boxplot with line plots connecting each subjects dots across
     conditions. Further offers the option to apply Cousineau Morey correction. Importantly, data must be passed before
@@ -197,19 +198,19 @@ def plot_within_subject_boxplot(data_df, within_column, between_column, dependen
         for pos_i, pos in enumerate(positions):
             ax.errorbar(pos + jitter, np.mean(avg_data_2d[:, pos_i], axis=0),
                         yerr=np.std(avg_data_2d[:, pos_i], axis=0) / np.sqrt(avg_data_2d.shape[0]),
-                        color=face_colors[pos_i], fmt="None", zorder=zorder, alpha=0.8)
+                        color=face_colors[pos_i], fmt="None", zorder=zorder, alpha=alpha)
             ax.scatter(pos + jitter, np.mean(avg_data_2d[:, pos_i], axis=0),
-                       color=face_colors[pos_i], s=40, alpha=0.8)
+                       color=face_colors[pos_i], s=40, alpha=alpha, marker=marker)
     else:
         raise Exception("The only supported styles are boxplot or error bars")
     if plot_single_sub:
         avg_line_color = np.mean(np.array(face_colors), axis=0)
         lineplot = ax.plot(positions, avg_data_2d.T, ':', linewidth=0.5,
-                           color=avg_line_color, alpha=0.5, zorder=zorder)
+                           color=avg_line_color, alpha=alpha, zorder=zorder)
     if plot_avg_line:
         avg_line_color = np.mean(np.array(face_colors), axis=0)
-        ax.plot(positions + jitter, np.mean(avg_data_2d, axis=0), '-', linewidth=2, color=avg_line_color, alpha=0.8,
-                zorder=zorder, label=label)
+        ax.plot(positions + jitter, np.mean(avg_data_2d, axis=0), linewidth=2, color=avg_line_color, alpha=alpha,
+                zorder=zorder, label=label, linestyle=linestyle)
     ax.set_xticks(positions, labels=positions)
     ax.tick_params(axis='x', labelrotation=45, labelsize=xlabel_fontsize)
     ax.set_title(title)
@@ -231,7 +232,7 @@ def plot_within_subject_boxplot(data_df, within_column, between_column, dependen
 
 def soa_boxplot(data_df, dependent_variable, fig_size=None, lock_column="SOA_lock", subject_column="sub_id",
                 between_column="onset_SOA", ax=None, fig=None, colors_onset_locked=None, colors_offset_locked=None,
-                avg_line_color=None, zorder=0, alpha=1, label="", jitter=0):
+                avg_line_color=None, zorder=0, alpha=0.8, label="", jitter=0, linestyle="solid", marker='o'):
     """
     This function plots the PRP study data in a standardized format, so that it can be used across experiments and data
     types. It is not super well documented, but it is not meant to be reuused as highly specific to this design.
@@ -261,7 +262,8 @@ def soa_boxplot(data_df, dependent_variable, fig_size=None, lock_column="SOA_loc
                                           xlim=[-0.1, 0.6], width=0.1,
                                           face_colors=colors_onset_locked, plot_avg_line=True,
                                           style="errorbar", plot_single_sub=False, avg_line_color=avg_line_color,
-                                          zorder=zorder, alpha=alpha, label=label + " onset", jitter=jitter)
+                                          zorder=zorder, alpha=alpha, label=label + " onset", jitter=jitter,
+                                          linestyle=linestyle, marker=marker)
     # Loop through each duration to plot the offset locked SOA separately:
     for i, dur in enumerate(sorted(list(data_df["duration"].unique()))):
         _, _, _ = plot_within_subject_boxplot(data_df[(data_df[lock_column] == 'offset')
@@ -276,7 +278,8 @@ def soa_boxplot(data_df, dependent_variable, fig_size=None, lock_column="SOA_loc
                                               face_colors=colors_offset_locked, plot_avg_line=True,
                                               style="errorbar", plot_single_sub=False,
                                               avg_line_color=avg_line_color, zorder=zorder,
-                                              alpha=alpha, label=label + " offset", jitter=jitter)
+                                              alpha=alpha, label=label + " offset", jitter=jitter,
+                                              linestyle=linestyle, marker=marker)
         ax[i + 1].yaxis.set_visible(False)
     # Remove the spines:
     for i in [0, 1, 2]:

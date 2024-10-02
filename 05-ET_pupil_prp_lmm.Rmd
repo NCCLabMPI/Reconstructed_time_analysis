@@ -32,13 +32,12 @@ data_exp1 <- read.csv(full_path)
 data_exp1 = data_exp1 %>% filter(task != "target")
 # Convert the task relevance to a binary variable:
 data_exp1 = data_exp1 %>% filter(SOA_lock != "offset")
-# Convert the task to a categorical variable:
-data_exp1 = data_exp1 %>% mutate(f_task = factor(task, ordered = FALSE))
 
 # Modelling:
-model_exp1 <- lmer(formula = RT2 ~ 1 + pupil_latency * task + (pupil_latency | sub_id), 
+model_exp1 <- lmer(formula = RT2 ~ 1 + pupil_latency + (pupil_latency | sub_id), 
                          data = data_exp1)
 summary(model_exp1)
+# Save to file:
 plot(fitted(model_exp1),residuals(model_exp1))
 qqnorm(residuals(model_exp1))
 ```
@@ -51,11 +50,9 @@ data_exp2 <- read.csv(full_path)
 # Remove the targets:
 data_exp2 = data_exp2 %>% filter(task != "target")
 data_exp2 = data_exp2 %>% filter(SOA_lock != "offset")
-# Convert the task to a categorical variable:
-data_exp2 = data_exp2 %>% mutate(f_task = factor(task, ordered = FALSE))
 
 # Modelling:
-model_exp2 <- lmer(formula = RT2 ~ 1 + pupil_latency * task + (pupil_latency | sub_id), 
+model_exp2 <- lmer(formula = RT2 ~ 1 + pupil_latency + (pupil_latency | sub_id), 
                          data = data_exp2)
 summary(model_exp2)
 plot(fitted(model_exp2),residuals(model_exp2))
