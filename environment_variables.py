@@ -1,8 +1,8 @@
 
-bids_root = r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\bids"
-cog_bids_root = r"C:\Users\alexander.lepauvre\Documents\GitHub\iEEG-data-release\bids-curate"
+bids_root = './data/bids'
+cog_bids_root = '/home/alexlepauvre/.local/share/COGITATE/bids/'
 # raw_root = "P:\2023-0357-ReconTime\03_data\raw_data"
-fs_directory = r"C:\Users\alexander.lepauvre\Documents\GitHub\Reconstructed_time_analysis\bids\derivatives\fs"
+fs_directory =  './data/bids/derivatives/fs'
 colors = {
     "task_relevance": {
         "non-target": [104/255, 142/255, 38/255],
